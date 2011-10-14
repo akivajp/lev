@@ -126,7 +126,7 @@ int luaopen_lev_std(lua_State *L)
 //  globals(L)["require"]("lev.info");
 //  globals(L)["require"]("lev.net");
 //  globals(L)["require"]("lev.package");
-//  globals(L)["require"]("lev.sound");
+  globals(L)["require"]("lev.sound");
 //  globals(L)["require"]("lev.string");
   globals(L)["require"]("lev.system");
 //  globals(L)["require"]("lev.timer");
@@ -134,7 +134,7 @@ int luaopen_lev_std(lua_State *L)
 //
 //  globals(L)["app"] = globals(L)["lev"]["app"]();
   globals(L)["system"] = globals(L)["lev"]["system"]();
-//  globals(L)["mixer"] = globals(L)["lev"]["sound"]["mixer"]();
+  globals(L)["mixer"] = globals(L)["lev"]["sound"]["mixer"]();
 //  globals(L)["package"]["loaded"]["lev.std"] = globals(L)["lev"];
 //  globals(L)["package"]["loaded"]["lev.std"] = globals(L)["lev"];
   globals(L)["collectgarbage"]();
@@ -165,7 +165,7 @@ namespace lev
 //    register_to(globals(L)["package"]["preload"], "lev.net", luaopen_lev_net);
 //    register_to(globals(L)["package"]["preload"], "lev.package", luaopen_lev_package);
     register_to(globals(L)["package"]["preload"], "lev.prim", luaopen_lev_prim);
-//    register_to(globals(L)["package"]["preload"], "lev.sound", luaopen_lev_sound);
+    register_to(globals(L)["package"]["preload"], "lev.sound", luaopen_lev_sound);
 //    register_to(globals(L)["package"]["preload"], "lev.std", luaopen_lev_std);
 //    register_to(globals(L)["package"]["preload"], "lev.string", luaopen_lev_string);
     register_to(globals(L)["package"]["preload"], "lev.system", luaopen_lev_system);

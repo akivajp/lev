@@ -39,6 +39,7 @@ int luaopen_lev_system(lua_State *L)
         .def("set_video_mode", &system::set_video_mode)
         .def("set_video_mode", &system::set_video_mode2)
         .property("ticks", &system::get_ticks)
+        .def("toggle_full_screen", &system::toggle_full_screen)
         .scope
         [
           def("get", &system::get),
@@ -87,15 +88,16 @@ namespace lev
 
   system::~system()
   {
-printf("QUITING!\n");
+//printf("QUITING!\n");
     if (_obj)
     {
-printf("QUITING!1\n");
+//printf("QUITING!1\n");
       delete cast_sys(_obj);
-printf("QUITING!2\n");
-      SDL_Quit();
+//printf("QUITING!2\n");
+      SDL_QuitSubSystem(SDL_INIT_VIDEO);
+//      SDL_Quit();
     }
-printf("QUITING!3\n");
+//printf("QUITING!3\n");
   }
 
   bool system::delay(unsigned long msec)
@@ -150,6 +152,8 @@ printf("QUITING!3\n");
     static system sys;
     if (sys._obj) { return &sys; }
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0) { return NULL; }
+//    if (SDL_Init(SDL_INIT_EVERYTHING) < 0) { return NULL; }
+//printf("INITTED!\n");
     sys._obj = mySystem::Create();
     if (! sys._obj) { return NULL; }
     return &sys;
@@ -164,6 +168,13 @@ printf("QUITING!3\n");
   screen* system::set_video_mode(int width, int height, int depth)
   {
     return screen::set_mode(width, height, depth);
+  }
+
+  bool system::toggle_full_screen()
+  {
+    screen* s = system::get_screen();
+    if (! s) { return false; }
+    return SDL_WM_ToggleFullScreen((SDL_Surface *)s->get_rawobj());
   }
 
 }

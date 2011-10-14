@@ -41,6 +41,7 @@ namespace lev
       bool set_on_quit(luabind::object func);
       screen* set_video_mode(int width, int height, int depth = 32);
       screen* set_video_mode2(int width, int height) { return set_video_mode(width, height); }
+      bool toggle_full_screen();
     protected:
       void *_obj;
   };
