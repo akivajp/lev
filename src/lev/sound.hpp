@@ -39,12 +39,15 @@ namespace lev
       virtual const char *get_type_name() const { return "lev.sound"; }
       bool is_playing();
       bool load(const std::string &filename);
-      bool load_and_play(const std::string &filename);
+      bool load_and_play(const std::string &filename, bool repeat = false);
+      bool load_and_play1(const std::string &filename) { return load_and_play(filename); }
       bool open(const std::string &filename);
       bool pause() { return set_playing(false); }
-      bool play() { return set_playing(true); }
+      bool play(bool repeat = false) { return set_playing(true, repeat); }
+      bool play0() { return play(); }
       bool set_pan(float pan);
-      bool set_playing(bool play);
+      bool set_playing(bool play, bool repeat = false);
+      bool set_playing1(bool play) { return set_playing(play); }
       bool set_position(double pos);
     protected:
       void *_obj;

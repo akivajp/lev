@@ -8,7 +8,7 @@ RANLIB = ranlib
 CORE_SRC  = entry.cpp image.cpp prim.cpp sound.cpp system.cpp util.cpp
 OBJS = $(CORE_SRC:%.cpp=%.o)
 DLIB = lev.so
-LIBS = -llua -lluabind -lSDL
+LIBS = -llua -lluabind -lSDL -lvorbisfile
 
 all: pch tags bin lib
 

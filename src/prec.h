@@ -24,6 +24,8 @@ extern "C" {
 #include <vector>
 
 #include <boost/format.hpp>
+#include <boost/shared_array.hpp>
+#include <boost/shared_ptr.hpp>
 #include <luabind/adopt_policy.hpp>
 #include <luabind/luabind.hpp>
 
