@@ -12,9 +12,11 @@
 /////////////////////////////////////////////////////////////////////////////
 
 #include "entry.hpp"
+#include "font.hpp"
 #include "image.hpp"
 #include "prim.hpp"
 #include "sound.hpp"
+#include "string.hpp"
 #include "system.hpp"
 #include "util.hpp"
 

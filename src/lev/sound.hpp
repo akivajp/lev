@@ -29,7 +29,7 @@ namespace lev
       sound();
     public:
       ~sound();
-      bool clean();
+      bool clear();
       static sound *create();
       double get_length();
       float get_pan();
@@ -61,7 +61,7 @@ namespace lev
       ~mixer();
       bool activate(bool active = true);
       bool activate0() { return activate(); }
-      bool clean_slot(int slot_num);
+      bool clear_slot(int slot_num);
       static mixer* get() { return init(); }
       int get_channels();
       int get_freq();

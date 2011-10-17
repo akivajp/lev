@@ -36,7 +36,7 @@ int luaopen_lev_sound(lua_State *L)
     namespace_("classes")
     [
       class_<sound, base>("sound")
-        .def("clean", &sound::clean)
+        .def("clear", &sound::clear)
         .property("is_playing", &sound::is_playing, &sound::set_playing)
         .property("len", &sound::get_length)
         .property("length", &sound::get_length)
@@ -57,7 +57,7 @@ int luaopen_lev_sound(lua_State *L)
       class_<mixer, base>("mixer")
         .def("activate", &mixer::activate)
         .def("activate", &mixer::activate0)
-        .def("clean_slot", &mixer::clean_slot)
+        .def("clear_slot", &mixer::clear_slot)
         .property("channels", &mixer::get_channels)
         .property("freq", &mixer::get_freq)
         .property("frequency", &mixer::get_freq)
@@ -267,10 +267,10 @@ namespace lev
 
       ~mySound()
       {
-        Clean();
+        Clear();
       }
 
-      bool Clean()
+      bool Clear()
       {
         audio_locker lock(mx);
         if (buf)
@@ -343,7 +343,7 @@ namespace lev
 
       bool LoadSample(const std::string &filename)
       {
-        Clean();
+        Clear();
         Uint8 *wav_buf;
         Uint32 wav_len;
 
@@ -392,7 +392,7 @@ namespace lev
 
       bool OpenStream(const std::string &filename)
       {
-        Clean();
+        Clear();
         Uint8 *wav_buf;
         Uint32 wav_len;
 
@@ -524,7 +524,7 @@ namespace lev
     }
   }
 
-  bool sound::clean() { return ((mySound *)_obj)->Clean(); }
+  bool sound::clear() { return ((mySound *)_obj)->Clear(); }
   double sound::get_length() { return ((mySound *)_obj)->GetLength(); }
   float sound::get_pan() { return ((mySound *)_obj)->GetPan(); }
   double sound::get_position() { return cast_snd(_obj)->GetPosition(); }
@@ -564,7 +564,7 @@ namespace lev
         std::map<int, sound *>::iterator i;
         for (i = slots.begin(); i != slots.end(); i++)
         {
-          if (i->second != NULL) { i->second->clean(); }
+          if (i->second != NULL) { i->second->clear(); }
         }
       }
 
@@ -576,7 +576,7 @@ namespace lev
         return true;
       }
 
-      bool CleanSlot(int slot_num)
+      bool ClearSlot(int slot_num)
       {
         return false;
 //        if (slot_num < 0) { return false; }
@@ -751,9 +751,9 @@ namespace lev
     return cast_mx(_obj)->Activate(active);
   }
 
-  bool mixer::clean_slot(int slot_num)
+  bool mixer::clear_slot(int slot_num)
   {
-    return ((myMixer *)_obj)->CleanSlot(slot_num);
+    return ((myMixer *)_obj)->ClearSlot(slot_num);
   }
 
   int mixer::get_channels()

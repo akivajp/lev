@@ -34,12 +34,14 @@ namespace lev
             LEV_TIMAGE_END,
           LEV_TDRAWABLE_END,
 
+          LEV_TFONT,
           LEV_TMIXER,
           LEV_TPOINT,
           LEV_TRECT,
           LEV_TSIZE,
           LEV_TSOUND,
           LEV_TSYSTEM,
+          LEV_TUNISTR,
           LEV_TVECTOR,
         LEV_TBASE_END,
       };

@@ -1,14 +1,15 @@
 CXX = g++
-CXXFLAGS = -fPIC -Os
+CXXFLAGS = -fPIC -Os -I/usr/include/freetype2
 SHARED= -shared
 SLIB = liblev.a
 OUT = a.out
 PCH = prec.h.gch
 RANLIB = ranlib
-CORE_SRC  = entry.cpp image.cpp prim.cpp sound.cpp system.cpp util.cpp
+CORE_SRC  = entry.cpp font.cpp image.cpp prim.cpp \
+	    sound.cpp string.cpp system.cpp util.cpp
 OBJS = $(CORE_SRC:%.cpp=%.o)
 DLIB = lev.so
-LIBS = -llua -lluabind -lSDL -lvorbisfile
+LIBS = -llua -lluabind -lSDL -lvorbisfile -lfreetype
 
 all: pch tags bin lib
 
@@ -51,9 +52,11 @@ $(DLIB): $(OBJS)
 	$(CXX) $(SHARED) -o $(DLIB) $(OBJS) $(LIBS)
 
 entry.o: entry.cpp lev/entry.hpp
+font.o: font.cpp lev/font.hpp
 image.o: image.cpp lev/image.hpp
 prim.o: prim.cpp lev/prim.hpp
 sound.o: sound.cpp lev/sound.hpp
+string.o: string.cpp lev/string.hpp
 system.o: system.cpp lev/system.hpp
 util.o: util.cpp lev/util.hpp
 %.o: %.cpp
