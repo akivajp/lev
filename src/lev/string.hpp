@@ -1,3 +1,6 @@
+#ifndef _STRING_HPP
+#define _STRING_HPP
+
 /////////////////////////////////////////////////////////////////////////////
 // Name:        lev/string.hpp
 // Purpose:     header for string classes
@@ -22,10 +25,11 @@ namespace lev
   {
     protected:
       unistr();
+    public:
       unistr(const std::string &str);
       unistr(const unistr &str);
-    public:
       virtual ~unistr();
+
       unistr &append(const unistr &str);
       unistr &append_utf8(const std::string &str) { return append(unistr(str)); }
       bool assign_utf8(const std::string &src);
@@ -37,17 +41,20 @@ namespace lev
       int find(const unistr &str);
       int find_utf8(const std::string &str) { return find(str); }
       static unistr* from_utf8(const std::string &src);
-      unistr* index(size_t pos) { return sub_string(pos, 1); }
+      long index(size_t pos) const;
+      unistr* index_str(size_t pos) const { return sub_string(pos, 1); }
       bool is_valid() { return _obj != NULL; }
       virtual type_id get_type_id() const { return LEV_TUNISTR; }
       virtual const char *get_type_name() const { return "lev.unistr"; }
       size_t len() const;
-      unistr *sub_string(size_t from, size_t to);
-      unistr *sub_string1(size_t from) { return sub_string(from, -1); }
+      unistr *sub_string(size_t from, size_t to) const;
+      unistr *sub_string1(size_t from) const { return sub_string(from, -1); }
       std::string to_utf8() const;
     protected:
       void *_obj;
   };
 
 }
+
+#endif // _STRING_HPP
 

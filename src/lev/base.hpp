@@ -37,6 +37,7 @@ namespace lev
           LEV_TFONT,
           LEV_TMIXER,
           LEV_TPOINT,
+          LEV_TRASTER,
           LEV_TRECT,
           LEV_TSIZE,
           LEV_TSOUND,

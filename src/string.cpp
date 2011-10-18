@@ -33,7 +33,8 @@ int luaopen_lev_string(lua_State *L)
         .def("empty", &unistr::empty)
         .def("find", &unistr::find)
         .def("find", &unistr::find_utf8)
-        .def("index", &unistr::index, adopt(result))
+        .def("index_code", &unistr::index)
+        .def("index", &unistr::index_str, adopt(result))
         .property("len", &unistr::len)
         .property("length", &unistr::len)
         .property("str", &unistr::to_utf8, &unistr::assign_utf8)
@@ -338,12 +339,18 @@ namespace lev
     }
   }
 
+  long unistr::index(size_t pos) const
+  {
+    if (pos < cast_str(_obj)->str.length()) { return cast_str(_obj)->str[pos]; }
+    else { return -1; }
+  }
+
   size_t unistr::len() const
   {
     return cast_str(_obj)->str.length();
   }
 
-  unistr* unistr::sub_string(size_t from, size_t to)
+  unistr* unistr::sub_string(size_t from, size_t to) const
   {
     unistr *uni = NULL;
     try {

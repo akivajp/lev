@@ -10,6 +10,7 @@
 #include "prec.h"
 
 #include "lev/font.hpp"
+#include "lev/image.hpp"
 #include "lev/util.hpp"
 #include "register.hpp"
 
@@ -22,13 +23,22 @@ int luaopen_lev_font(lua_State *L)
   using namespace luabind;
 
   open(L);
-  globals(L)["require"]("lev");
+  globals(L)["package"]["loaded"]["lev.font"] = true;
+  globals(L)["require"]("lev.base");
+  globals(L)["require"]("lev.string");
 
   module_(L, "lev")
   [
     namespace_("font"),
     namespace_("classes")
     [
+      class_<raster, base>("raster")
+        .def("get_pixel", &raster::get_pixel)
+        .property("h", &raster::get_h)
+        .property("height", &raster::get_h)
+        .def("set_pixel", &raster::set_pixel)
+        .property("w", &raster::get_w)
+        .property("width", &raster::get_w),
       class_<font, base>("font")
         .def("clone", &font::clone, adopt(result))
         .property("family", &font::get_family)
@@ -39,11 +49,14 @@ int luaopen_lev_font(lua_State *L)
         .property("style_name", &font::get_style)
         .property("pixel_size", &font::get_pixel_size, &font::set_pixel_size)
         .property("px_size", &font::get_pixel_size, &font::set_pixel_size)
+        .def("rasterize", &font::rasterize, adopt(result))
+        .def("rasterize", &font::rasterize_utf8, adopt(result))
+        .def("rasterize", &font::rasterize_utf16, adopt(result))
         .property("size", &font::get_pixel_size, &font::set_pixel_size)
         .property("sz", &font::get_pixel_size, &font::set_pixel_size)
         .scope
         [
-//          def("clone", &font::clone, adopt(result)),
+          def("clone", &font::clone, adopt(result)),
           def("load", &font::load, adopt(result)),
           def("load", &font::load0, adopt(result)),
           def("load", &font::load1, adopt(result))
@@ -53,8 +66,8 @@ int luaopen_lev_font(lua_State *L)
   object lev = globals(L)["lev"];
   object classes = lev["classes"];
   object font = lev["font"];
-//
-//  font["clone"]  = classes["font"]["clone"];
+
+  font["clone"]  = classes["font"]["clone"];
   font["load"]   = classes["font"]["load"];
 
   globals(L)["package"]["loaded"]["lev.font"] = font;
@@ -63,6 +76,48 @@ int luaopen_lev_font(lua_State *L)
 
 namespace lev
 {
+
+  raster::raster() : base(), w(-1), h(-1), bitmap(NULL) { }
+
+  raster::~raster()
+  {
+    if (bitmap)
+    {
+      delete [] bitmap;
+      bitmap = NULL;
+    }
+  }
+
+  raster* raster::create(int width, int height)
+  {
+    raster* r = NULL;
+    if (width <= 0 || height <= 0) { return NULL; }
+    try {
+      r = new raster;
+      r->bitmap = new unsigned char [width * height];
+      r->w = width;
+      r->h = height;
+      return r;
+    }
+    catch (...) {
+      delete r;
+      return NULL;
+    }
+  }
+
+  unsigned char raster::get_pixel(int x, int y) const
+  {
+    if (x < 0 || x >= w || y < 0 || y >= h) { return 0; }
+    return bitmap[y * w + x];
+  }
+
+  bool raster::set_pixel(int x, int y, unsigned char gray)
+  {
+    if (x < 0 || x >= w || y < 0 || y >= h) { return false; }
+    bitmap[y * w + x] = gray;
+    return true;
+  }
+
 
   class myFontManager
   {
@@ -138,6 +193,7 @@ namespace lev
           f = new myFont;
           if (FT_New_Face(man->lib, file.c_str(), index, &f->face)) { throw -1; }
           f->file = file;
+          f->SetSize(20);
           return f;
         }
         catch (...) {
@@ -235,6 +291,49 @@ namespace lev
       delete f;
       return NULL;
     }
+  }
+
+  raster *font::rasterize(unsigned long code)
+  {
+    raster *r = NULL;
+    try {
+      FT_Face face = cast_font(_obj)->face;
+      if (FT_Load_Char(face, code, 0)) { throw -1; }
+      if (FT_Render_Glyph(face->glyph, FT_RENDER_MODE_NORMAL)) { throw -2; }
+
+      FT_Bitmap &bmp = face->glyph->bitmap;
+      int h = get_pixel_size();
+      int w = bmp.width;
+      int offset_y = h - bmp.rows;
+      if (w == 0) { w = get_pixel_size() / 2; }
+      r = raster::create(w, h);
+      if (! r) { throw -3; }
+
+      for (int y = 0; y < bmp.rows; y++)
+      {
+        for (int x = 0; x < bmp.width; x++)
+        {
+          r->set_pixel(x, offset_y + y, bmp.buffer[y * bmp.pitch + x]);
+        }
+      }
+      return r;
+    }
+    catch (...) {
+      delete r;
+      return NULL;
+    }
+  }
+
+  raster *font::rasterize_utf8(const std::string &unit)
+  {
+    return font::rasterize_utf16(unistr(unit));
+  }
+
+  raster *font::rasterize_utf16(const unistr &unit)
+  {
+    long code = unit.index(0);
+    if (code < 0) { return NULL; }
+    return font::rasterize(code);
   }
 
   bool font::set_index(int index)

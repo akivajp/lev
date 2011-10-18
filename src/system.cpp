@@ -24,6 +24,7 @@ int luaopen_lev_system(lua_State *L)
 
   open(L);
   globals(L)["require"]("lev.base");
+  globals(L)["require"]("lev.image");
 
   module(L, "lev")
   [
@@ -34,8 +35,12 @@ int luaopen_lev_system(lua_State *L)
         .def("delay", &system::delay)
         .def("do_event", &system::do_event)
         .def("do_events", &system::do_events)
+        .property("is_running", &system::is_running, &system::set_running)
         .property("on_quit", &system::get_on_quit, &system::set_on_quit)
+        .def("quit", &system::quit)
+        .def("quit", &system::quit0)
         .property("screen", &system::get_screen)
+        .def("set_running", &system::set_running)
         .def("set_video_mode", &system::set_video_mode)
         .def("set_video_mode", &system::set_video_mode2)
         .property("ticks", &system::get_ticks)
@@ -61,7 +66,7 @@ namespace lev
   class mySystem
   {
     private:
-      mySystem() : funcs() { }
+      mySystem() : funcs(), running(true) { }
     public:
       ~mySystem() { }
 
@@ -78,7 +83,14 @@ namespace lev
         }
       }
 
+      bool SetRunning(bool run)
+      {
+        running = run;
+        return true;
+      }
+
       std::map<Uint8, luabind::object> funcs;
+      bool running;
   };
   static mySystem *cast_sys(void *obj) { return (mySystem *)obj; }
 
@@ -121,6 +133,7 @@ namespace lev
       switch (event.type)
       {
         case SDL_QUIT:
+          if (! f) { set_running(false); }
 //          printf("QUIT!\n");
           return true;
         default:
@@ -159,10 +172,35 @@ namespace lev
     return &sys;
   }
 
+  bool system::is_running()
+  {
+    return cast_sys(_obj)->running;
+  }
+
+  bool system::quit(bool force)
+  {
+    if (force)
+    {
+      set_running(false);
+    }
+    else
+    {
+      SDL_Event q;
+      q.type = SDL_QUIT;
+      SDL_PushEvent(&q);
+    }
+    return true;
+  }
+
   bool system::set_on_quit(luabind::object func)
   {
     cast_sys(_obj)->funcs[SDL_QUIT] = func;
     return true;
+  }
+
+  bool system::set_running(bool run)
+  {
+    return cast_sys(_obj)->SetRunning(run);
   }
 
   screen* system::set_video_mode(int width, int height, int depth)

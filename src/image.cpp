@@ -13,7 +13,7 @@
 #include "lev/image.hpp"
 
 //#include "lev/draw.hpp"
-//#include "lev/font.hpp"
+#include "lev/font.hpp"
 #include "lev/util.hpp"
 #include "register.hpp"
 //#include "resource/levana.xpm"
@@ -21,10 +21,8 @@
 //#include <boost/shared_array.hpp>
 #include <luabind/adopt_policy.hpp>
 #include <luabind/luabind.hpp>
-//#include <wx/filename.h>
-//#include <wx/glcanvas.h>
-//#include <wx/graphics.h>
-//#include <wx/rawbmp.h>
+
+#include <auto_ptr.h>
 
 int luaopen_lev_image(lua_State *L)
 {
@@ -32,8 +30,9 @@ int luaopen_lev_image(lua_State *L)
   using namespace lev;
 
   open(L);
-  globals(L)["require"]("lev");
-//  globals(L)["require"]("lev.font");
+  globals(L)["package"]["loaded"]["lev.image"] = true;
+  globals(L)["require"]("lev.base");
+  globals(L)["require"]("lev.font");
   globals(L)["require"]("lev.prim");
 
   module(L, "lev")
@@ -54,8 +53,9 @@ int luaopen_lev_image(lua_State *L)
         .def("clear", &image::clear0)
         .def("clear", &image::clear_rect)
         .def("clear", &image::clear_rect1)
-        .def("draw", &image::blit)
+//        .def("draw", &image::blit)
         .def("draw_pixel", &image::draw_pixel)
+        .def("draw_raster", &image::draw_raster)
 //        .def("fill_circle", &image::fill_circle)
 //        .def("fill_rect", &image::fill_rect)
 //        .def("fill_rectangle", &image::fill_rect)
@@ -141,6 +141,8 @@ int luaopen_lev_image(lua_State *L)
   object classes = lev["classes"];
   object image = lev["image"];
 //  register_to(classes["image"], "draw_text", &image::draw_text_l);
+  register_to(classes["image"], "draw", &image::draw_l);
+  register_to(classes["screen"], "draw", &image::draw_l);
   register_to(classes["image"], "get_sub", &image::sub_image_l);
   register_to(classes["image"], "get_sub_image", &image::sub_image_l);
 //  register_to(classes["image"], "string", &image::string_l);
@@ -253,8 +255,8 @@ namespace lev
 
   static bool draw_pixel_raw(image *img, int x, int y, const color &c)
   {
-    boost::shared_ptr<color> src(get_pixel_raw(img, x, y));
-    if (! src) { return false; }
+    std::auto_ptr<color> src(get_pixel_raw(img, x, y));
+    if (! src.get()) { return false; }
     if (src->get_a() == 0)
     {
       return set_pixel_raw(img, x, y, c);
@@ -304,6 +306,7 @@ namespace lev
       SDL_Surface *surf_hold;
       bool result;
   };
+
 
   image::image() : drawable(), _obj(NULL) { }
 
@@ -458,7 +461,26 @@ namespace lev
     if (! lock.success()) { return false; }
     return draw_pixel_raw(this, x, y, c);
   }
-//
+
+  bool image::draw_raster(const raster *r, int offset_x, int offset_y, const color *c)
+  {
+    if (! r) { return false; }
+
+    surface_locker lock(cast_image(_obj));
+    color orig = color::white();
+    if (c) { orig = *c; }
+    color copy = orig;
+    for (int y = 0; y < r->get_h(); y++)
+    {
+      for (int x = 0; x < r->get_w(); x++)
+      {
+        copy.set_a(orig.get_a() * (r->get_pixel(x, y) / 255.0));
+        draw_pixel_raw(this, offset_x + x, offset_y + y, copy);
+      }
+    }
+    return true;
+  }
+
 //  bool image::draw_text(const std::string &text, font *f, color *fg, color *bg, int x, int y)
 //  {
 //    try {
@@ -470,7 +492,69 @@ namespace lev
 //      return false;
 //    }
 //  }
-//
+
+  int image::draw_l(lua_State *L)
+  {
+    using namespace luabind;
+
+    try {
+      luaL_checktype(L, 1, LUA_TUSERDATA);
+      image *img = object_cast<image *>(object(from_stack(L, 1)));
+      object t = util::get_merged(L, 2, -1);
+
+      if (t["lev.raster1"])
+      {
+        int x = 0, y = 0;
+        color *c = NULL;
+        raster *r = object_cast<raster *>(t["lev.raster1"]);
+
+        if (t["x"]) { x = object_cast<int>(t["x"]); }
+        else if (t["lua.number1"]) { x = object_cast<int>(t["lua.number1"]); }
+
+        if (t["y"]) { y = object_cast<int>(t["y"]); }
+        else if (t["lua.number2"]) { y = object_cast<int>(t["lua.number2"]); }
+
+        if (t["color"]) { c = object_cast<color *>(t["color"]); }
+        else if (t["c"]) { c = object_cast<color *>(t["c"]); }
+        else if (t["lev.prim.color1"]) { c = object_cast<color *>(t["lev.prim.color1"]); }
+
+        img->draw_raster(r, x, y, c);
+      }
+      else if (t["lev.font1"])
+      {
+        int x = 0, y = 0;
+        color *c = NULL;
+        font *f = object_cast<font *>(t["lev.font1"]);
+        const char *str = NULL;
+
+        if (t["x"]) { x = object_cast<int>(t["x"]); }
+        else if (t["lua.number1"]) { x = object_cast<int>(t["lua.number1"]); }
+
+        if (t["y"]) { y = object_cast<int>(t["y"]); }
+        else if (t["lua.number2"]) { y = object_cast<int>(t["lua.number2"]); }
+
+        if (t["color"]) { c = object_cast<color *>(t["color"]); }
+        else if (t["c"]) { c = object_cast<color *>(t["c"]); }
+        else if (t["lev.prim.color1"]) { c = object_cast<color *>(t["lev.prim.color1"]); }
+
+        if (t["lua.string1"]) { str = object_cast<const char *>(t["lua.string1"]); }
+
+        if (! str) { throw -1; }
+
+        std::auto_ptr<raster> r(f->rasterize_utf8(str));
+        if (! r.get()) { throw -2; }
+        img->draw_raster(r.get(), x, y, c);
+      }
+      else { throw -1; }
+      lua_pushboolean(L, true);
+      return 1;
+    }
+    catch (...) {
+      lua_pushboolean(L, false);
+      return 1;
+    }
+  }
+
 //  int image::draw_text_l(lua_State *L)
 //  {
 //    using namespace luabind;

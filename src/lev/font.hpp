@@ -11,6 +11,7 @@
 /////////////////////////////////////////////////////////////////////////////
 
 #include "base.hpp"
+#include "string.hpp"
 #include <luabind/luabind.hpp>
 
 extern "C" {
@@ -20,14 +21,22 @@ extern "C" {
 namespace lev
 {
 
-  class glyph : public base
+  class raster: public base
   {
     protected:
-      glyph() { }
-//      virtual type_id get_type_id() const { return LEV_TGLYPH; }
-      virtual const char *get_type_name() const { return "lev.glyph"; }
+      raster();
     public:
-      virtual ~glyph() { }
+      virtual ~raster();
+      static raster* create(int width, int height);
+      int get_h() const { return h; }
+      unsigned char get_pixel(int x, int y) const;
+      virtual type_id get_type_id() const { return LEV_TRASTER; }
+      virtual const char *get_type_name() const { return "lev.raster"; }
+      int get_w() const { return w; }
+      bool set_pixel(int x, int y, unsigned char gray = 255);
+    protected:
+      int w, h;
+      unsigned char *bitmap;
   };
 
   class font : public base
@@ -48,6 +57,9 @@ namespace lev
       static font* load(const std::string &file = "default.ttf", int index = 0);
       static font* load0() { return load(); }
       static font* load1(const std::string &file) { return load(file); }
+      raster *rasterize(unsigned long code);
+      raster *rasterize_utf8(const std::string &unit);
+      raster *rasterize_utf16(const unistr &unit);
       bool set_encoding(const std::string &encode);
       bool set_index(int index);
       bool set_pixel_size(int size);

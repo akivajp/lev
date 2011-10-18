@@ -21,6 +21,7 @@ extern "C" {
 #include FT_FREETYPE_H
 }
 
+#include <auto_ptr.h>
 #include <map>
 #include <sstream>
 #include <string>

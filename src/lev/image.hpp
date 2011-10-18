@@ -23,9 +23,8 @@ namespace lev
 {
 
   // class dependencies
-//  class canvas;
-//  class control;
-//  class font;
+  class font;
+  class raster;
   class image;
 
   class drawable : public base
@@ -64,6 +63,8 @@ namespace lev
       static image* create2(int width, int height) { return create(width, height); }
       virtual bool draw_on(image *target, int x = 0, int y = 0, unsigned char alpha = 255);
       bool draw_pixel(int x, int y, const color &c);
+      bool draw_raster(const raster *r, int x = 0, int y = 0, const color *c = NULL);
+      static int draw_l(lua_State *L);
 //      bool draw_text(const std::string &text, font *f = NULL, color *fg = NULL,
 //                     color *bg = NULL, int x = 0, int y = 0);
       static int draw_text_l(lua_State *L);

@@ -38,7 +38,11 @@ namespace lev
       virtual type_id get_type_id() const { return LEV_TSYSTEM; }
       virtual const char *get_type_name() const { return "lev.system"; }
       static system* init();
+      bool is_running();
+      bool quit(bool force = false);
+      bool quit0() { return quit(); }
       bool set_on_quit(luabind::object func);
+      bool set_running(bool run = true);
       screen* set_video_mode(int width, int height, int depth = 32);
       screen* set_video_mode2(int width, int height) { return set_video_mode(width, height); }
       bool toggle_full_screen();
