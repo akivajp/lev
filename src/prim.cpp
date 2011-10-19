@@ -140,6 +140,14 @@ int luaopen_lev_prim(lua_State *L)
   prim["size"]     = classes["size"]["create"];
   prim["vector"]   = classes["vector"]["create"];
 
+  prim["black"] = classes["color"]["create"](  0,   0,   0);
+  prim["blue"]  = classes["color"]["create"](  0,   0, 255);
+  prim["green"] = classes["color"]["create"](  0, 255,   0);
+  prim["red"]   = classes["color"]["create"](255,   0,   0);
+  prim["trans"] = classes["color"]["create"](  0,   0,   0,   0);
+  prim["transparent"] = classes["color"]["create"](0, 0, 0, 0);
+  prim["white"] = classes["color"]["create"](255, 255, 255);
+
   globals(L)["package"]["loaded"]["lev.prim"] = prim;
   return 0;
 }
@@ -177,8 +185,32 @@ namespace lev
   {
     using namespace luabind;
     unsigned char r = 0, g = 0, b = 0, a = 255;
+    const char *name = NULL;
 
     object t = util::get_merged(L, 1, -1);
+
+    if (t["name"]) { name = object_cast<const char *>(t["name"]); }
+    else if (t["n"]) { name = object_cast<const char *>(t["n"]); }
+    else if (t["lua.string1"]) { name = object_cast<const char *>(t["lua.string1"]); }
+
+    if (name)
+    {
+      object o;
+      object func = globals(L)["lev"]["classes"]["color"]["create_c"];
+
+      if (t["alpha"]) { a = object_cast<unsigned char>(t["alpha"]); }
+      else if (t["a"]) { a = object_cast<unsigned char>(t["a"]); }
+      else if (t["lua.number1"]) { a = object_cast<unsigned char>(t["lua.number1"]); }
+
+      if      (strstr(name, "black")) { o = func(  0,   0,   0, a); }
+      else if (strstr(name, "blue"))  { o = func(  0,   0, 255, a); }
+      else if (strstr(name, "green")) { o = func(  0, 255,   0, a); }
+      else if (strstr(name, "red"))   { o = func(255,   0,   0, a); }
+      else if (strstr(name, "trans")) { o = func(  0,   0,   0, 0); }
+      else if (strstr(name, "white")) { o = func(255, 255, 255, a); }
+      o.push(L);
+      return 1;
+    }
 
     if (t["red"]) { r = object_cast<unsigned char>(t["red"]); }
     else if (t["r"]) { r = object_cast<unsigned char>(t["r"]); }

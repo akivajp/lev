@@ -32,13 +32,17 @@ int luaopen_lev_system(lua_State *L)
     namespace_("classes")
     [
       class_<lev::system, base>("system")
+        .def("close", &system::done)
         .def("delay", &system::delay)
         .def("do_event", &system::do_event)
         .def("do_events", &system::do_events)
+        .def("done", &system::done)
         .property("is_running", &system::is_running, &system::set_running)
         .property("on_quit", &system::get_on_quit, &system::set_on_quit)
         .def("quit", &system::quit)
         .def("quit", &system::quit0)
+        .def("run", &system::run)
+        .def("run", &system::run0)
         .property("screen", &system::get_screen)
         .def("set_running", &system::set_running)
         .def("set_video_mode", &system::set_video_mode)
@@ -100,22 +104,28 @@ namespace lev
 
   system::~system()
   {
-//printf("QUITING!\n");
-    if (_obj)
-    {
-//printf("QUITING!1\n");
-      delete cast_sys(_obj);
-//printf("QUITING!2\n");
-      SDL_QuitSubSystem(SDL_INIT_VIDEO);
-//      SDL_Quit();
-    }
-//printf("QUITING!3\n");
+    done();
   }
 
   bool system::delay(unsigned long msec)
   {
     SDL_Delay(msec);
     return true;
+  }
+
+  bool system::done()
+  {
+//printf("QUITING1\n");
+    if (_obj)
+    {
+//printf("QUITING2\n");
+      SDL_Quit();
+      delete cast_sys(_obj);
+      _obj = NULL;
+      return true;
+    }
+//printf("QUITING3\n");
+    return false;
   }
 
   bool system::do_event()
@@ -164,8 +174,8 @@ namespace lev
   {
     static system sys;
     if (sys._obj) { return &sys; }
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0) { return NULL; }
-//    if (SDL_Init(SDL_INIT_EVERYTHING) < 0) { return NULL; }
+//printf("INITTING!\n");
+    if (SDL_Init(SDL_INIT_EVERYTHING) < 0) { return NULL; }
 //printf("INITTED!\n");
     sys._obj = mySystem::Create();
     if (! sys._obj) { return NULL; }
@@ -189,6 +199,16 @@ namespace lev
       q.type = SDL_QUIT;
       SDL_PushEvent(&q);
     }
+    return true;
+  }
+
+  bool system::run(bool auto_shutdown)
+  {
+    while (is_running())
+    {
+      do_events();
+    }
+    if (auto_shutdown) { done(); }
     return true;
   }
 

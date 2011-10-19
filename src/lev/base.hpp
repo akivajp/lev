@@ -32,6 +32,7 @@ namespace lev
             LEV_TIMAGE,
               LEV_TSCREEN,
             LEV_TIMAGE_END,
+            LEV_TLAYOUT,
           LEV_TDRAWABLE_END,
 
           LEV_TFONT,

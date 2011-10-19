@@ -31,6 +31,7 @@ namespace lev
       bool delay(unsigned long msec = 1000);
       bool do_event();
       bool do_events();
+      bool done();
       static system* get() { return init(); }
       luabind::object get_on_quit();
       screen* get_screen() { return screen::get(); }
@@ -41,6 +42,8 @@ namespace lev
       bool is_running();
       bool quit(bool force = false);
       bool quit0() { return quit(); }
+      bool run(bool auto_shutdown = true);
+      bool run0() { return run(); }
       bool set_on_quit(luabind::object func);
       bool set_running(bool run = true);
       screen* set_video_mode(int width, int height, int depth = 32);

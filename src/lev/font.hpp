@@ -27,6 +27,7 @@ namespace lev
       raster();
     public:
       virtual ~raster();
+      static raster* concat(const std::vector<boost::shared_ptr<raster> > &array);
       static raster* create(int width, int height);
       int get_h() const { return h; }
       unsigned char get_pixel(int x, int y) const;
@@ -57,9 +58,12 @@ namespace lev
       static font* load(const std::string &file = "default.ttf", int index = 0);
       static font* load0() { return load(); }
       static font* load1(const std::string &file) { return load(file); }
-      raster *rasterize(unsigned long code);
-      raster *rasterize_utf8(const std::string &unit);
-      raster *rasterize_utf16(const unistr &unit);
+      raster *rasterize(unsigned long code, int spacing = 1);
+      raster *rasterize1(unsigned long code) { return rasterize(code); }
+      raster *rasterize_utf8(const std::string &str, int spacing = 1);
+      raster *rasterize_utf8_1(const std::string &str) { return rasterize_utf8(str); }
+      raster *rasterize_utf16(const unistr &str, int spacing = 1);
+      raster *rasterize_utf16_1(const unistr &str) { return rasterize_utf16(str); }
       bool set_encoding(const std::string &encode);
       bool set_index(int index);
       bool set_pixel_size(int size);

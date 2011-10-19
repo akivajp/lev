@@ -740,10 +740,9 @@ namespace lev
   mixer::~mixer()
   {
     if (_obj) { delete (myMixer *)_obj; }
-//printf("CLOSING1\n");
-//    SDL_QuitSubSystem(SDL_INIT_AUDIO);
-//    SDL_CloseAudio();
-//printf("CLOSING2\n");
+//printf("CLOSING AUDIO!\n");
+    SDL_CloseAudio();
+//printf("CLOSED AUDIO!\n");
   }
 
   bool mixer::activate(bool active)

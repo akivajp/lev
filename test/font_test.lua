@@ -1,11 +1,10 @@
 require 'lev.font'
+require 'lev.image'
 
-f = lev.font.load() or os.exit(-1)
-bitmap = f:rasterize('龍') or os.exit(-1)
+f = lev.font.load()
+f.size = 72
 
-for y = 0, bitmap.h do
-  for x = 0, bitmap.w do
-    print(x, y, bitmap:get_pixel(x, y))
-  end
-end
+--img = lev.image.string(f, 'Hello, World! ggg 日本語', lev.prim.color('red'), lev.prim.color('white'), 2)
+img = lev.image.string(f, 'Hello, World! ggg 日本語', lev.prim.color('red'), lev.prim.color('white'), 10)
+img:save('test.bmp')
 

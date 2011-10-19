@@ -50,8 +50,11 @@ int luaopen_lev_font(lua_State *L)
         .property("pixel_size", &font::get_pixel_size, &font::set_pixel_size)
         .property("px_size", &font::get_pixel_size, &font::set_pixel_size)
         .def("rasterize", &font::rasterize, adopt(result))
+        .def("rasterize", &font::rasterize1, adopt(result))
         .def("rasterize", &font::rasterize_utf8, adopt(result))
+        .def("rasterize", &font::rasterize_utf8_1, adopt(result))
         .def("rasterize", &font::rasterize_utf16, adopt(result))
+        .def("rasterize", &font::rasterize_utf16_1, adopt(result))
         .property("size", &font::get_pixel_size, &font::set_pixel_size)
         .property("sz", &font::get_pixel_size, &font::set_pixel_size)
         .scope
@@ -88,6 +91,48 @@ namespace lev
     }
   }
 
+  raster* raster::concat(const std::vector<boost::shared_ptr<raster> > &array)
+  {
+    raster *r = NULL;
+    try {
+      int w = 0, h = 0;
+      for (int i = 0; i < array.size(); i++)
+      {
+        if (array[i])
+        {
+          w += array[i]->get_w();
+          if (array[i]->get_h() > h) { h = array[i]->get_h(); }
+        }
+      }
+
+      r = raster::create(w, h);
+      if (! r) { throw -1; }
+
+      int pos_x = 0;
+      for (int i = 0; i < array.size(); i++)
+      {
+        if (array[i])
+        {
+          for (int y = 0; y < array[i]->get_h(); y++)
+          {
+            for (int x = 0; x < array[i]->get_w(); x++)
+            {
+              unsigned char gray = array[i]->get_pixel(x, y);
+              int pos_y = h - array[i]->get_h();
+              r->set_pixel(pos_x + x, pos_y + y, gray);
+            }
+          }
+          pos_x += array[i]->get_w();
+        }
+      }
+      return r;
+    }
+    catch (...) {
+      delete r;
+      return NULL;
+    }
+  }
+
   raster* raster::create(int width, int height)
   {
     raster* r = NULL;
@@ -95,6 +140,7 @@ namespace lev
     try {
       r = new raster;
       r->bitmap = new unsigned char [width * height];
+      memset(r->bitmap, 0, width * height);
       r->w = width;
       r->h = height;
       return r;
@@ -293,7 +339,7 @@ namespace lev
     }
   }
 
-  raster *font::rasterize(unsigned long code)
+  raster *font::rasterize(unsigned long code, int spacing)
   {
     raster *r = NULL;
     try {
@@ -303,9 +349,9 @@ namespace lev
 
       FT_Bitmap &bmp = face->glyph->bitmap;
       int h = get_pixel_size();
-      int w = bmp.width;
+      int w = bmp.width + spacing;
       int offset_y = h - bmp.rows;
-      if (w == 0) { w = get_pixel_size() / 2; }
+      if (bmp.width <= 0) { w = get_pixel_size() / 2; }
       r = raster::create(w, h);
       if (! r) { throw -3; }
 
@@ -324,16 +370,25 @@ namespace lev
     }
   }
 
-  raster *font::rasterize_utf8(const std::string &unit)
+  raster *font::rasterize_utf8(const std::string &str, int spacing)
   {
-    return font::rasterize_utf16(unistr(unit));
+    return font::rasterize_utf16(unistr(str), spacing);
   }
 
-  raster *font::rasterize_utf16(const unistr &unit)
+  raster *font::rasterize_utf16(const unistr &str, int spacing)
   {
-    long code = unit.index(0);
-    if (code < 0) { return NULL; }
-    return font::rasterize(code);
+    if (str.empty()) { return NULL; }
+    try {
+      std::vector<boost::shared_ptr<raster> > array;
+      for (int i = 0; i < str.len(); i++)
+      {
+        array.push_back(boost::shared_ptr<raster>(rasterize(str.index(i), spacing)));
+      }
+      return raster::concat(array);
+    }
+    catch (...) {
+      return NULL;
+    }
   }
 
   bool font::set_index(int index)
