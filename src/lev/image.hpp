@@ -49,20 +49,19 @@ namespace lev
       bool blit(int x, int y, image *src,
                 int src_x = 0, int src_y = 0, int w = -1, int h = -1,
                 unsigned char alpha = 255);
-//      bool blit(int src_x, int src_y, int w, int h,
-//                image *dst, int dst_x = 0, int dst_y = 0, unsigned char alpha = 255);
       bool blit1(image *src) { return blit(0, 0, src); }
       bool blit2(image *src, unsigned char alpha) { return blit(0, 0, src, 0, 0, -1, -1, alpha); }
       bool blit3(int x, int y, image *src) { return blit(x, y, src); }
       bool blit4(int x, int y, image *src, unsigned char alpha) { return blit(x, y, src, 0, 0, -1, -1, alpha); }
 
-      virtual bool clear(const color &c);
-      virtual bool clear0() { return clear(color::transparent()); }
-      bool clear_rect(const rect &r, const color &c = color::transparent());
-      bool clear_rect1(const rect &r) { return clear_rect(r); }
+      virtual bool clear(const color &c = color::transparent());
+      virtual bool clear0() { return clear(); }
+      bool clear_rect(int x, int y, int w, int h, const color &c = color::transparent());
+      bool clear_rect1(const rect &r) { return clear_rect2(r); }
+      bool clear_rect2(const rect &r, const color &c = color::transparent());
+      bool clear_rect4(int x, int y, int w, int h) { return clear_rect(x, y, w, h); }
       image* clone();
-      static image* create(int width, int height, int depth = 32);
-      static image* create2(int width, int height) { return create(width, height); }
+      static image* create(int width, int height);
       bool draw(drawable *src, int x = 0, int y = 0, unsigned char alpha = 255);
       virtual bool draw_on(image *target, int x = 0, int y = 0, unsigned char alpha = 255);
       bool draw_pixel(int x, int y, const color &c);
@@ -103,17 +102,24 @@ namespace lev
       void *_status;
   };
 
-  class screen : public image
+  class screen : public base
   {
     protected:
       screen();
     public:
       ~screen();
+      virtual bool clear() { return clear_color(0, 0, 0, 0); }
+      virtual bool clear_color(unsigned char r,
+                               unsigned char g,
+                               unsigned char b,
+                               unsigned char a);
+      virtual bool clear_color1(const color &c);
       bool flip();
       static screen *get();
       virtual type_id get_type_id() const { return LEV_TSCREEN; }
       virtual const char *get_type_name() const { return "lev.image.screen"; }
       static screen *set_mode(int width, int height, int depth = 32);
+      bool swap();
   };
 
 //  class animation : public drawable

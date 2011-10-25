@@ -12,17 +12,19 @@
 
 #include "lev/image.hpp"
 
-//#include "lev/draw.hpp"
 #include "lev/font.hpp"
 #include "lev/util.hpp"
+#include "lev/system.hpp"
 #include "register.hpp"
 //#include "resource/levana.xpm"
 
-//#include <boost/shared_array.hpp>
 #include <luabind/adopt_policy.hpp>
 #include <luabind/luabind.hpp>
-
 #include <auto_ptr.h>
+
+#include "stb_image.c"
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
 
 int luaopen_lev_image(lua_State *L)
 {
@@ -54,12 +56,12 @@ int luaopen_lev_image(lua_State *L)
         .def("clear", &image::clear0)
         .def("clear", &image::clear_rect)
         .def("clear", &image::clear_rect1)
-//        .def("draw", &image::blit)
+        .def("clone", &image::clone, adopt(result))
         .def("draw_pixel", &image::draw_pixel)
         .def("draw_raster", &image::draw_raster)
 //        .def("fill_circle", &image::fill_circle)
-//        .def("fill_rect", &image::fill_rect)
-//        .def("fill_rectangle", &image::fill_rect)
+        .def("fill_rect", &image::fill_rect)
+        .def("fill_rectangle", &image::fill_rect)
         .def("get_color", &image::get_pixel, adopt(result))
         .def("get_pixel", &image::get_pixel, adopt(result))
         .property("h", &image::get_h)
@@ -82,7 +84,6 @@ int luaopen_lev_image(lua_State *L)
         .scope
         [
           def("create",  &image::create, adopt(result)),
-          def("create",  &image::create2, adopt(result)),
 //          def("draw_text_c", &image::draw_text),
 //          def("levana_icon", &image::levana_icon),
           def("load",    &image::load, adopt(result)),
@@ -90,7 +91,11 @@ int luaopen_lev_image(lua_State *L)
           def("sub_image_c", &image::sub_image, adopt(result))
         ],
         class_<screen, image>("screen")
+          .def("clear", &screen::clear)
+          .def("clear", &screen::clear_color)
+          .def("clear", &screen::clear_color1)
           .def("flip", &screen::flip)
+          .def("swap", &screen::swap)
           .scope
           [
             def("get", &screen::get)
@@ -171,147 +176,114 @@ int luaopen_lev_image(lua_State *L)
 namespace lev
 {
 
-  static SDL_Surface *cast_image(void *obj) { return (SDL_Surface *)obj; }
-
-  static Uint32 to_color32(SDL_PixelFormat *format, const color &c)
+  class myImage
   {
-    return SDL_MapRGBA(format, c.get_r(), c.get_g(), c.get_b(), c.get_a());
-  }
+    public:
+      myImage(int w, int h) : w(w), h(h) { }
 
-  static color to_color(SDL_PixelFormat *format, Uint32 code)
-  {
-    Uint8 r, g, b, a;
-    SDL_GetRGBA(code, format, &r, &g, &b, &a);
-    return color(r, g, b, a);
-  }
+      virtual ~myImage()
+      {
+        if (buf) { delete [] buf; }
+      }
 
-
-  static bool set_pixel_raw(image *img, int x, int y, const color &c)
-  {
-    SDL_Surface *surf = cast_image(img->get_rawobj());
-    if (x < 0 || x >= surf->w || y < 0 || y >= surf->h) { return false; }
-    Uint32 rgba = SDL_MapRGBA(surf->format, c.get_r(), c.get_g(), c.get_b(), c.get_a());
-    switch(surf->format->BytesPerPixel)
-    {
-      case 1:
-        *((Uint8 *)surf->pixels + y * surf->pitch + x) = rgba;
-        break;
-      case 2:
-        *((Uint16 *)surf->pixels + y * surf->pitch / 2 + x) = rgba;
-        break;
-      case 3:
-        {
-          Uint8 *bufp = (Uint8 *)surf->pixels + y * surf->pitch + x * 3;
-#if SDL_BYTEORDER == SDL_LIL_ENDIAN
-          bufp[0] = rgba ;
-          bufp[1] = rgba >> 8;
-          bufp[2] = rgba >> 16;
-#else
-          bufp[2] = rgba;
-          bufp[1] = rgba >> 8;
-          bufp[0] = rgba >> 16;
-#endif
-          break;
+      static myImage* Create(int w, int h)
+      {
+        if (w <= 0 || h <= 0) { return NULL; }
+        myImage *img = NULL;
+        try {
+          img = new myImage(w, h);
+          img->buf = new unsigned char [w * h * 4];
+          return img;
         }
-      case 4:
-        *((Uint32 *)surf->pixels + y * surf->pitch / 4 + x) = rgba;
-        break;
-      default:
-        return false;
+        catch (...) {
+          delete img;
+          return NULL;
+        }
+      }
+
+      int w, h;
+      unsigned char *buf;
+  };
+
+  static myImage *cast_image(void *obj) { return (myImage *)obj; }
+
+  static bool blend_pixel(unsigned char *dst, unsigned char *src)
+  {
+    if (src[3] == 0) { return true; }
+
+    unsigned char dst_r = dst[0];
+    unsigned char dst_g = dst[1];
+    unsigned char dst_b = dst[2];
+    unsigned char dst_a = dst[3];
+    unsigned char src_r = src[0];
+    unsigned char src_g = src[1];
+    unsigned char src_b = src[2];
+    unsigned char src_a = src[3];
+
+    if (dst_a == 0 || src_a == 255)
+    {
+      dst[0] = src_r;
+      dst[1] = src_g;
+      dst[2] = src_b;
+      dst[3] = src_a;
+    }
+    else if (dst_a == 255)
+    {
+      unsigned char base_alpha = 255 - src_a;
+      dst[0] = ((unsigned short)src_r * src_a + (unsigned short)dst_r * base_alpha) / 255;
+      dst[1] = ((unsigned short)src_g * src_a + (unsigned short)dst_g * base_alpha) / 255;
+      dst[2] = ((unsigned short)src_b * src_a + (unsigned short)dst_b * base_alpha) / 255;
+      // dst[3] = 255;
+    }
+    else
+    {
+      unsigned char base_alpha = (unsigned short)dst_a * (255 - src_a) / 255;
+      dst[3] = src_a + base_alpha;
+      dst[0] = ((unsigned short)src_r * src_a + (unsigned short)dst_r * base_alpha) / dst[3];
+      dst[1] = ((unsigned short)src_g * src_a + (unsigned short)dst_g * base_alpha) / dst[3];
+      dst[2] = ((unsigned short)src_b * src_a + (unsigned short)dst_b * base_alpha) / dst[3];
     }
     return true;
   }
 
-  static color* get_pixel_raw(image *img, int x, int y)
+  static bool blend_pixel(unsigned char *dst, const color &c)
   {
-    Uint32 code = 0;
-    SDL_Surface *surf = cast_image(img->get_rawobj());
-    if (x < 0 || x >= surf->w || y < 0 || y >= surf->h) { return NULL; }
-    switch (surf->format->BytesPerPixel)
-    {
-      case 1:
-        code = *((Uint8 *)surf->pixels + y * surf->pitch + x);
-        break;
-      case 2:
-        code = *((Uint16 *)surf->pixels + y * surf->pitch / 2 + x);
-        break;
-      case 3:
-        {
-          Uint8 *bufp = (Uint8 *)surf->pixels + y * surf->pitch + x * 3;
-#if SDL_BYTEORDER == SDL_LIL_ENDIAN
-          code = bufp[0] | (bufp[1] << 8) | (bufp[2] << 16);
-#else
-          code = bufp[2] | (bufp[1] << 8) | (bufp[0] << 16);
-#endif
-          break;
-        }
-      case 4:
-        code = *((Uint32 *)surf->pixels + y * surf->pitch / 4 + x);
-        break;
-      default:
-        return NULL;
-    }
-
-    Uint8 r, g, b, a;
-    SDL_GetRGBA(code, surf->format, &r, &g, &b, &a);
-    return color::create(r, g, b, a);
-  }
-
-  static bool draw_pixel_raw(image *img, int x, int y, const color &c)
-  {
-    std::auto_ptr<color> src(get_pixel_raw(img, x, y));
-    if (! src.get()) { return false; }
     if (c.get_a() == 0) { return true; }
-    if (src->get_a() == 0)
+
+    unsigned char dst_r = dst[0];
+    unsigned char dst_g = dst[1];
+    unsigned char dst_b = dst[2];
+    unsigned char dst_a = dst[3];
+    unsigned char src_r = c.get_r();
+    unsigned char src_g = c.get_g();
+    unsigned char src_b = c.get_b();
+    unsigned char src_a = c.get_a();
+
+    if (dst_a == 0 || src_a == 255)
     {
-      return set_pixel_raw(img, x, y, c);
+      dst[0] = src_r;
+      dst[1] = src_g;
+      dst[2] = src_b;
+      dst[3] = src_a;
+    }
+    else if (dst_a == 255)
+    {
+      unsigned char base_alpha = 255 - src_a;
+      dst[0] = ((unsigned short)src_r * src_a + (unsigned short)dst_r * base_alpha) / 255;
+      dst[1] = ((unsigned short)src_g * src_a + (unsigned short)dst_g * base_alpha) / 255;
+      dst[2] = ((unsigned short)src_b * src_a + (unsigned short)dst_b * base_alpha) / 255;
+      // dst[3] = 255;
     }
     else
     {
-      double alpha_norm = c.get_a() / 255.0;
-      double base_alpha = (1 - alpha_norm) * src->get_a() / 255.0;
-      unsigned char r, g, b, a;
-      a = 255 * (alpha_norm + base_alpha);
-      if (a > 0)
-      {
-        double fix = 255.0 / a;
-        r = (src->get_r() * base_alpha + c.get_r() * alpha_norm) * fix;
-        g = (src->get_g() * base_alpha + c.get_g() * alpha_norm) * fix;
-        b = (src->get_b() * base_alpha + c.get_b() * alpha_norm) * fix;
-        return set_pixel_raw(img, x, y, color(r, g, b, a));
-      }
+      unsigned char base_alpha = (unsigned short)dst_a * (255 - src_a) / 255;
+      dst[3] = src_a + base_alpha;
+      dst[0] = ((unsigned short)src_r * src_a + (unsigned short)dst_r * base_alpha) / dst[3];
+      dst[1] = ((unsigned short)src_g * src_a + (unsigned short)dst_g * base_alpha) / dst[3];
+      dst[2] = ((unsigned short)src_b * src_a + (unsigned short)dst_b * base_alpha) / dst[3];
     }
-    return false;
+    return true;
   }
-
-  class surface_locker
-  {
-    public:
-      surface_locker(SDL_Surface *surf) : surf_hold(NULL), result(false)
-      {
-        if (SDL_MUSTLOCK(surf))
-        {
-          if (SDL_LockSurface(surf) == 0)
-          {
-            surf_hold = surf;
-            result = true;
-          }
-        }
-        else { result = true; }
-      }
-
-      ~surface_locker()
-      {
-        if (surf_hold) { SDL_UnlockSurface(surf_hold); }
-      }
-
-      bool success() { return result; }
-
-    private:
-      SDL_Surface *surf_hold;
-      bool result;
-  };
-
 
   image::image() : drawable(), _obj(NULL) { }
 
@@ -319,75 +291,105 @@ namespace lev
   {
     if (_obj)
     {
-      SDL_FreeSurface(cast_image(_obj));
+      delete cast_image(_obj);
       _obj = NULL;
     }
   }
 
-  bool image::blit(int x, int y, image *src,
+  bool image::blit(int dst_x, int dst_y, image *src,
                    int src_x, int src_y, int w, int h, unsigned char alpha)
   {
     if (src == NULL) { return false; }
 
-    SDL_Surface *surf_dst = cast_image(_obj);
-    SDL_Surface *surf_src = cast_image(src->_obj);
-    SDL_Rect rect_dst;
-    rect_dst.x = x;
-    rect_dst.y = y;
-    SDL_Rect rect_src;
-    rect_src.x = src_x;
-    rect_src.y = src_y;
-    rect_src.w = w;
-    rect_src.h = h;
-    if (w <= 0) { rect_src.w = src->get_w(); }
-    if (h <= 0) { rect_src.w = src->get_h(); }
-
-    bool result;
-    if (alpha == 255)
+    unsigned char *dst_buf = cast_image(this->_obj)->buf;
+    unsigned char *src_buf = cast_image(src->_obj)->buf;
+    int dst_h = get_h();
+    int dst_w = get_w();
+    int src_h = src->get_h();
+    int src_w = src->get_w();
+    for (int y = 0; y < h; y++)
     {
-      if (SDL_BlitSurface(surf_src, NULL, surf_dst, &rect_dst) == 0) { result = true; }
+      for (int x = 0; x < w; x++)
+      {
+        int real_src_x = src_x + x;
+        int real_src_y = src_y + y;
+        if (real_src_x < 0 || real_src_x >= src_w || real_src_y < 0 || real_src_y >= src_h)
+        { continue; }
+        int real_dst_x = dst_x + x;
+        int real_dst_y = dst_y + y;
+        if (real_dst_x < 0 || real_dst_x >= dst_w || real_dst_y < 0 || real_dst_y >= dst_h)
+        { continue; }
+        unsigned char *src_pixel = &src_buf[4 * (real_src_y * src_w + real_src_x)];
+        blend_pixel(&dst_buf[4 * (real_dst_y * dst_w + real_dst_x)], src_pixel);
+      }
     }
-    else
-    {
-      SDL_SetAlpha(surf_src, SDL_SRCALPHA | SDL_RLEACCEL, alpha);
-      if (SDL_BlitSurface(surf_src, NULL, surf_dst, &rect_dst) == 0) { result = true; }
-      SDL_SetAlpha(surf_src, SDL_SRCALPHA | SDL_RLEACCEL, 255);
-    }
-    return result;
+    return true;
   }
 
   bool image::clear(const color &c)
   {
-    SDL_Surface *surf = cast_image(_obj);
-    SDL_Rect rect;
-    rect.x = 0;
-    rect.y = 0;
-    rect.w = surf->w;
-    rect.h = surf->h;
-    if (SDL_FillRect(surf, &rect, to_color32(surf->format, c)) == 0) { return true; }
-    else { return false; }
+    return clear_rect(0, 0, get_w(), get_h(), c);
   }
 
-  bool image::clear_rect(const rect &r, const color &c)
+  bool image::clear_rect(int offset_x, int offset_y, int w, int h, const color &c)
   {
-    SDL_Surface *surf = cast_image(_obj);
-    SDL_Rect rect_src;
-    rect_src.x = r.get_x();
-    rect_src.y = r.get_y();
-    rect_src.w = r.get_w();
-    rect_src.h = r.get_h();
-    if (SDL_FillRect(surf, &rect_src, to_color32(surf->format, c)) == 0) { return true; }
-    else { return false; }
+    int img_w = get_w();
+    int img_h = get_h();
+    unsigned char *buf = cast_image(_obj)->buf;
+    unsigned char r = c.get_r(), g = c.get_g(), b = c.get_b(), a = c.get_a();
+    if (a > 0)
+    {
+      for (int y = 0; y < h; y++)
+      {
+        for (int x = 0; x < w; x++)
+        {
+          int real_x = offset_x + x;
+          int real_y = offset_y + y;
+          if (real_x < 0 || real_x >= img_w || real_y < 0 || real_y >= img_h) { continue; }
+          unsigned char *pixel = &buf[4 * (real_y * img_w + real_x)];
+          pixel[0] = r;
+          pixel[1] = g;
+          pixel[2] = b;
+          pixel[3] = a;
+        }
+      }
+    }
+    else
+    {
+      for (int y = 0; y < h; y++)
+      {
+        for (int x = 0; x < w; x++)
+        {
+          int real_x = offset_x + x;
+          int real_y = offset_y + y;
+          if (real_x < 0 || real_x >= img_w || real_y < 0 || real_y >= img_h) { continue; }
+          unsigned char *pixel = &buf[4 * (real_y * img_w + real_x)];
+          pixel[3] = 0;
+        }
+      }
+    }
+    return true;
+  }
+
+  bool image::clear_rect2(const rect &r, const color &c)
+  {
+    return clear_rect(r.get_x(), r.get_y(), r.get_w(), r.get_h(), c);
   }
 
   image* image::clone()
   {
     image* img = NULL;
-    SDL_Surface *surf = cast_image(_obj);
     try {
       img = new image;
-      img->_obj = SDL_DisplayFormatAlpha(surf);
+      img->_obj = myImage::Create(get_w(), get_h());
       if (! img->_obj) { throw -1; }
+      long length = 4 * get_w() * get_h();
+      unsigned char *src_buf = cast_image(_obj)->buf;
+      unsigned char *new_buf = cast_image(img->_obj)->buf;
+      for (int i = 0; i < length; i++)
+      {
+        new_buf[i] = src_buf[i];
+      }
       return img;
     }
     catch (...) {
@@ -396,27 +398,14 @@ namespace lev
     }
   }
 
-  image* image::create(int width, int height, int depth)
+  image* image::create(int width, int height)
   {
     image *img = NULL;
-    Uint32 rmask, gmask, bmask, amask;
-#if SDL_BYTEORDER == SDL_BIG_ENDIAN
-    rmask = 0xff000000;
-    gmask = 0x00ff0000;
-    bmask = 0x0000ff00;
-    amask = 0x000000ff;
-#else
-    rmask = 0x000000ff;
-    gmask = 0x0000ff00;
-    bmask = 0x00ff0000;
-    amask = 0xff000000;
-#endif
     try {
       img = new image;
-      img->_obj = SDL_CreateRGBSurface(SDL_HWSURFACE | SDL_SRCALPHA,
-                                       width, height, depth,
-                                       rmask, gmask, bmask, amask);
+      img->_obj = myImage::Create(width, height);
       if (! img->_obj) { throw -1; }
+      img->clear();
       return img;
     }
     catch (...) {
@@ -428,42 +417,27 @@ namespace lev
   bool image::draw(drawable *src, int x, int y, unsigned char alpha)
   {
     if (! src) { return false; }
-
     return src->draw_on(this, x, y, alpha);
   }
 
   bool image::draw_on(image *dst, int offset_x, int offset_y, unsigned char alpha)
   {
     if (! dst) { return false; }
-
-    surface_locker lock(cast_image(dst->_obj));
-    for (int y = 0; y < get_h(); y++)
-    {
-      for (int x = 0; x < get_w(); x++)
-      {
-        std::auto_ptr<color> c(get_pixel(x, y));
-        if (c.get())
-        {
-          if (alpha != 255) { c->set_a(c->get_a() * (alpha / 255.0)); }
-          draw_pixel_raw(dst, offset_x + x, offset_y + y, *c);
-        }
-      }
-    }
-    return true;
+    return dst->blit(offset_x, offset_y, this, 0, 0, get_w(), get_h(), alpha);
   }
 
   bool image::draw_pixel(int x, int y, const color &c)
   {
-    surface_locker lock(cast_image(_obj));
-    if (! lock.success()) { return false; }
-    return draw_pixel_raw(this, x, y, c);
+    if (x < 0 || x >= get_w() || y < 0 || y >= get_h()) { return false; }
+    unsigned char *buf = cast_image(_obj)->buf;
+    unsigned char *pixel = &buf[4 * (y * get_w() + x)];
+    return blend_pixel(pixel, c);
   }
 
   bool image::draw_raster(const raster *r, int offset_x, int offset_y, const color *c)
   {
     if (! r) { return false; }
 
-    surface_locker lock(cast_image(_obj));
     color orig = color::white();
     if (c) { orig = *c; }
     color copy = orig;
@@ -472,7 +446,7 @@ namespace lev
       for (int x = 0; x < r->get_w(); x++)
       {
         copy.set_a(orig.get_a() * (r->get_pixel(x, y) / 255.0));
-        draw_pixel_raw(this, offset_x + x, offset_y + y, copy);
+        draw_pixel(offset_x + x, offset_y + y, copy);
       }
     }
     return true;
@@ -546,7 +520,11 @@ namespace lev
         if (! r.get()) { throw -2; }
         img->draw_raster(r.get(), x, y, c);
       }
-      else { throw -1; }
+      else
+      {
+        lua_pushboolean(L, false);
+        return 1;
+      }
       lua_pushboolean(L, true);
       return 1;
     }
@@ -577,48 +555,25 @@ namespace lev
 //    }
 //    return image_draw_mask(this, &tmp, filling);
 //  }
-//
-//  bool image::fill_rect(int x, int y, int w, int h, color *filling)
-//  {
-//#ifdef __WXGTK__
-//    wxBitmap tmp(get_w(), get_h(), 32);
-//
-//    try {
-//      wxMemoryDC mdc(tmp);
-//      mdc.SetPen(wxColour(255, 255, 255, 255));
-//      mdc.SetBrush(wxColour(255, 255, 255, 255));
-//      mdc.SetBackground(wxColour(0, 0, 0, 255));
-//      mdc.Clear();
-//      mdc.DrawRectangle(x, y, w, h);
-//      return image_draw_mask(this, &tmp, filling);
-//    }
-//    catch (...) {
-//      return false;
-//    }
-//#else
-//    try {
-//      wxMemoryDC mdc(*cast_image(_obj));
-//      wxGCDC gdc(mdc);
-//      if (filling)
-//      {
-//        gdc.SetPen(wxColour(to_wxcolor(*filling)));
-//        gdc.SetBrush(wxColour(to_wxcolor(*filling)));
-//      }
-//      gdc.DrawRectangle(x, y, w, h);
-//      return true;
-//    }
-//    catch (...) {
-//      return false;
-//    }
-//#endif
-//  }
-//
-//
+
+  bool image::fill_rect(int offset_x, int offset_y, int w, int h, color *filling)
+  {
+    for (int y = 0; y < h; y++)
+    {
+      for (int x = 0; x < w; x++)
+      {
+        draw_pixel(offset_x + x, offset_y + y, *filling);
+      }
+    }
+    return true;
+  }
+
   color* image::get_pixel(int x, int y)
   {
-    surface_locker lock(cast_image(_obj));
-    if (! lock.success()) { throw -1; }
-    return get_pixel_raw(this, x, y);
+    if (x < 0 || x >= get_w() || y < 0 || y >= get_h()) { return NULL; }
+    unsigned char *buf = cast_image(_obj)->buf;
+    unsigned char *pixel = &buf[4 * (y * get_w() + x)];
+    return color::create(pixel[0], pixel[1], pixel[2], pixel[3]);
   }
 
   const rect image::get_rect() const
@@ -657,13 +612,33 @@ namespace lev
   image* image::load(const std::string &filename)
   {
     image *img = NULL;
+    unsigned char *buf = NULL;
     try {
-      img = new image;
-      img->_obj = SDL_LoadBMP(filename.c_str());
-      if (! img->_obj) { throw -1; }
+      int w, h;
+      buf = stbi_load(filename.c_str(), &w, &h, NULL, 4);
+      if (! buf) { throw -1; }
+
+      img = image::create(w, h);
+      if (! img) { throw -2; }
+      unsigned char *pixel = buf;
+      for (int y = 0; y < h; y++)
+      {
+        for (int x = 0; x < w; x++)
+        {
+          unsigned char *pixel = buf + (y * w + x) * 4;
+          unsigned char r, g, b, a;
+          r = pixel[0];
+          g = pixel[1];
+          b = pixel[2];
+          a = pixel[3];
+          img->set_pixel(x, y, color(r, g, b, a));
+        }
+      }
+      stbi_image_free(buf);
       return img;
     }
     catch (...) {
+      stbi_image_free(buf);
       delete img;
       return NULL;
     }
@@ -671,24 +646,31 @@ namespace lev
 
   bool image::reload(const std::string &filename)
   {
-    SDL_Surface *surf = SDL_LoadBMP(filename.c_str());
-    if (! surf) { return false; }
-    delete cast_image(_obj);
-    _obj = surf;
+    image *img = image::load(filename);
+    if (! img) { return false; }
+    this->swap(img);
+    delete img;
     return true;
   }
 
   bool image::save(const std::string &filename) const
   {
-    if (SDL_SaveBMP(cast_image(_obj), filename.c_str()) == 0) { return true; }
+    unsigned char *buf = cast_image(_obj)->buf;
+    if (stbi_write_png(filename.c_str(), get_w(), get_h(), 4, buf, 4 * get_w()) != 0)
+    { return true; }
     else { return false; }
   }
 
   bool image::set_pixel(int x, int y, const color &c)
   {
-    surface_locker lock(cast_image(_obj));
-    if (! lock.success()) { return false; }
-    return set_pixel_raw(this, x, y, c);
+    if (x < 0 || x >= get_w() || y < 0 || y >= get_h()) { return false; }
+    unsigned char *buf = cast_image(_obj)->buf;
+    unsigned char *pixel = &buf[4 * (y * get_w() + x)];
+    pixel[0] = c.get_r();
+    pixel[1] = c.get_g();
+    pixel[2] = c.get_b();
+    pixel[3] = c.get_a();
+    return true;
   }
 
 
@@ -834,7 +816,7 @@ namespace lev
   {
     image* img = NULL;
     try {
-      img = image::create(w, h, 32);
+      img = image::create(w, h);
       if (! img) { throw -1; }
       img->blit(0, 0, this, x, y, w, h);
       return img;
@@ -887,12 +869,24 @@ namespace lev
   }
 
 
-  screen::screen() : image() { }
+  screen::screen() : base() { }
 
   screen::~screen()
   {
-    // not removing by SDL_FreeSurface !
-    _obj = NULL;
+  }
+
+  bool screen::clear_color(unsigned char r, unsigned char g,
+                   unsigned char b, unsigned char a)
+  {
+    glClearColor(r / 255.0, g / 255.0, b / 255.0, a / 255.0);
+//    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT);
+    return true;
+  }
+
+  bool screen::clear_color1(const color &c)
+  {
+    return clear_color(c.get_r(), c.get_g(), c.get_b(), c.get_a());
   }
 
   bool screen::flip()
@@ -905,17 +899,36 @@ namespace lev
   screen* screen::get()
   {
     static screen scr;
-    if (scr._obj) { return &scr; }
-    scr._obj = SDL_GetVideoSurface();
-    if (! scr._obj) { return NULL; }
-    return &scr;
+    if (SDL_GetVideoSurface()) { return &scr; }
+//    if (scr._obj) { return &scr; }
+//    scr._obj = SDL_GetVideoSurface();
+//    if (! scr._obj) { return NULL; }
+//    return &scr;
   }
 
   screen* screen::set_mode(int width, int height, int depth)
   {
-    SDL_SetVideoMode(width, height, depth, SDL_DOUBLEBUF);
+    SDL_GL_SetAttribute(SDL_GL_RED_SIZE,    8);
+    SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE,  8);
+    SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE,   8);
+    SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE,  8);
+    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+    SDL_GL_SetAttribute(SDL_GL_SWAP_CONTROL, 0);
+//    SDL_GL_SetAttribute(SDL_GL_BUFFER_SIZE, 24);
+//    SDL_GL_SetAttribute(SDL_GL_ACCELERATED_VISUAL, 1);
+    SDL_SetVideoMode(width, height, depth, SDL_OPENGL);
+//    SDL_SetVideoMode(width, height, depth, SDL_HWSURFACE | SDL_DOUBLEBUF);
+//    SDL_SetVideoMode(width, height, depth, SDL_SWSURFACE | SDL_DOUBLEBUF);
     return get();
   }
+
+  bool screen::swap()
+  {
+    SDL_GL_SwapBuffers();
+    return true;
+  }
+
 
   /*
   class myAnimation

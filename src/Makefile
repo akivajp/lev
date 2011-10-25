@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = -fPIC -Os -I/usr/include/freetype2
+CXXFLAGS = -fPIC -O2 -I/usr/include/freetype2
 SHARED= -shared
 SLIB = liblev.a
 OUT = a.out
@@ -9,7 +9,7 @@ CORE_SRC  = entry.cpp font.cpp image.cpp prim.cpp \
 	    sound.cpp string.cpp system.cpp util.cpp
 OBJS = $(CORE_SRC:%.cpp=%.o)
 DLIB = lev.so
-LIBS = -llua -lluabind -lSDL -lvorbisfile -lfreetype
+LIBS = -llua -lluabind -lSDL -lvorbisfile -lfreetype -lGL
 
 all: pch tags bin lib
 

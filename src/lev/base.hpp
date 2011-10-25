@@ -35,6 +35,8 @@ namespace lev
             LEV_TLAYOUT,
           LEV_TDRAWABLE_END,
 
+          LEV_TEVENT,
+          LEV_TFINALIZER,
           LEV_TFONT,
           LEV_TMIXER,
           LEV_TPOINT,
