@@ -81,6 +81,8 @@ int luaopen_lev_system(lua_State *L)
         .property("pressed", &event::is_pressed)
         .property("released", &event::is_released)
         .property("right_is_down", &event::right_is_down)
+        .property("scan_code", &event::get_scan_code)
+        .property("scancode", &event::get_scan_code)
         .property("x", &event::get_x)
         .property("y", &event::get_y),
       class_<lev::system, base>("system")
@@ -142,6 +144,235 @@ int luaopen_lev_system(lua_State *L)
 
 namespace lev
 {
+
+  const char *input::to_keyname(long code)
+  {
+    static std::map<long, std::string> *keymap = NULL;
+
+    if (keymap == NULL)
+    {
+      try {
+        keymap = new std::map<long, std::string>;
+
+        for (int i = 0; i <= 127; i++)
+        {
+          char ascii[2] = {tolower(i), 0};
+          (*keymap)[tolower(i)] = ascii;
+        }
+
+        (*keymap)[SDLK_UNKNOWN]            = "(unknown)";
+        (*keymap)[SDLK_AC_BACK]            = "ac_back";
+        (*keymap)[SDLK_AC_BOOKMARKS]       = "ac_bookmarks";
+        (*keymap)[SDLK_AC_FORWARD]         = "ac_forward";
+        (*keymap)[SDLK_AC_HOME]            = "ac_home";
+        (*keymap)[SDLK_AC_REFRESH]         = "ac_refresh";
+        (*keymap)[SDLK_AC_SEARCH]          = "ac_search";
+        (*keymap)[SDLK_AC_STOP]            = "ac_stop";
+        (*keymap)[SDLK_AGAIN]              = "again";
+        (*keymap)[SDLK_ALTERASE]           = "alterase";
+        (*keymap)[SDLK_AMPERSAND]          = "ampersand";
+        (*keymap)[SDLK_APPLICATION]        = "application";
+        (*keymap)[SDLK_ASTERISK]           = "asterisk";
+        (*keymap)[SDLK_AT]                 = "at";
+        (*keymap)[SDLK_AUDIOMUTE]          = "audiomute";
+        (*keymap)[SDLK_AUDIONEXT]          = "audionext";
+        (*keymap)[SDLK_AUDIOPLAY]          = "audioplay";
+        (*keymap)[SDLK_AUDIOPREV]          = "audioprev";
+        (*keymap)[SDLK_AUDIOSTOP]          = "audiostop";
+        (*keymap)[SDLK_BACKSLASH]          = "backslash";
+        (*keymap)[SDLK_BACKSPACE]          = "backspace";
+        (*keymap)[SDLK_BACKQUOTE]          = "backquote";
+        (*keymap)[SDLK_BRIGHTNESSDOWN]     = "brightnessdown";
+        (*keymap)[SDLK_BRIGHTNESSUP]       = "brightnessup";
+        (*keymap)[SDLK_CALCULATOR]         = "calculator";
+        (*keymap)[SDLK_CANCEL]             = "cancel";
+        (*keymap)[SDLK_CAPSLOCK]           = "capslock";
+        (*keymap)[SDLK_CARET]              = "caret";
+        (*keymap)[SDLK_CLEAR]              = "clear";
+        (*keymap)[SDLK_CLEARAGAIN]         = "clearagain";
+        (*keymap)[SDLK_COLON]              = "colon";
+        (*keymap)[SDLK_COMMA]              = "comma";
+        (*keymap)[SDLK_COMPUTER]           = "computer";
+        (*keymap)[SDLK_COPY]               = "copy";
+        (*keymap)[SDLK_CRSEL]              = "crsel";
+        (*keymap)[SDLK_CURRENCYUNIT]       = "currencyunit";
+        (*keymap)[SDLK_CURRENCYSUBUNIT]    = "currencysubunit";
+        (*keymap)[SDLK_CUT]                = "cut";
+        (*keymap)[SDLK_DECIMALSEPARATOR]   = "decimalseparator";
+        (*keymap)[SDLK_DELETE]             = "delete";
+        (*keymap)[SDLK_DISPLAYSWITCH]      = "displayswitch";
+        (*keymap)[SDLK_DOLLAR]             = "dollar";
+        (*keymap)[SDLK_DOWN]               = "down";
+        (*keymap)[SDLK_QUOTEDBL]           = "doublequote";
+        (*keymap)[SDLK_EJECT]              = "eject";
+        (*keymap)[SDLK_END]                = "end";
+        (*keymap)[SDLK_EQUALS]             = "equals";
+        (*keymap)[SDLK_ESCAPE]             = "escape";
+        (*keymap)[SDLK_EXCLAIM]            = "exclaim";
+        (*keymap)[SDLK_EXECUTE]            = "execute";
+        (*keymap)[SDLK_EXSEL]              = "exsel";
+        (*keymap)[SDLK_F1]                 = "f1";
+        (*keymap)[SDLK_F2]                 = "f2";
+        (*keymap)[SDLK_F3]                 = "f3";
+        (*keymap)[SDLK_F4]                 = "f4";
+        (*keymap)[SDLK_F5]                 = "f5";
+        (*keymap)[SDLK_F6]                 = "f6";
+        (*keymap)[SDLK_F7]                 = "f7";
+        (*keymap)[SDLK_F8]                 = "f8";
+        (*keymap)[SDLK_F9]                 = "f9";
+        (*keymap)[SDLK_F10]                = "f10";
+        (*keymap)[SDLK_F11]                = "f11";
+        (*keymap)[SDLK_F12]                = "f12";
+        (*keymap)[SDLK_F13]                = "f13";
+        (*keymap)[SDLK_F14]                = "f14";
+        (*keymap)[SDLK_F15]                = "f15";
+        (*keymap)[SDLK_F16]                = "f16";
+        (*keymap)[SDLK_F17]                = "f17";
+        (*keymap)[SDLK_F18]                = "f18";
+        (*keymap)[SDLK_F19]                = "f19";
+        (*keymap)[SDLK_F20]                = "f20";
+        (*keymap)[SDLK_F21]                = "f21";
+        (*keymap)[SDLK_F22]                = "f22";
+        (*keymap)[SDLK_F23]                = "f23";
+        (*keymap)[SDLK_F24]                = "f24";
+        (*keymap)[SDLK_FIND]               = "find";
+        (*keymap)[SDLK_GREATER]            = "greater";
+        (*keymap)[SDLK_HASH]               = "hash";
+        (*keymap)[SDLK_HELP]               = "help";
+        (*keymap)[SDLK_HOME]               = "home";
+        (*keymap)[SDLK_INSERT]             = "insert";
+        (*keymap)[SDLK_KBDILLUMDOWN]       = "kbdillumdown";
+        (*keymap)[SDLK_KBDILLUMTOGGLE]     = "kbdillumtoggle";
+        (*keymap)[SDLK_KBDILLUMUP]         = "kbdillumup";
+        (*keymap)[SDLK_KP_0]               = "kp_0";
+        (*keymap)[SDLK_KP_1]               = "kp_1";
+        (*keymap)[SDLK_KP_2]               = "kp_2";
+        (*keymap)[SDLK_KP_3]               = "kp_3";
+        (*keymap)[SDLK_KP_4]               = "kp_4";
+        (*keymap)[SDLK_KP_5]               = "kp_5";
+        (*keymap)[SDLK_KP_6]               = "kp_6";
+        (*keymap)[SDLK_KP_7]               = "kp_7";
+        (*keymap)[SDLK_KP_8]               = "kp_8";
+        (*keymap)[SDLK_KP_9]               = "kp_9";
+        (*keymap)[SDLK_KP_00]              = "kp_00";
+        (*keymap)[SDLK_KP_000]             = "kp_000";
+        (*keymap)[SDLK_KP_A]               = "kp_a";
+        (*keymap)[SDLK_KP_AMPERSAND]       = "kp_ampersand";
+        (*keymap)[SDLK_KP_AT]              = "kp_at";
+        (*keymap)[SDLK_KP_B]               = "kp_b";
+        (*keymap)[SDLK_KP_BACKSPACE]       = "kp_backspace";
+        (*keymap)[SDLK_KP_BINARY]          = "kp_binary";
+        (*keymap)[SDLK_KP_C]               = "kp_c";
+        (*keymap)[SDLK_KP_CLEAR]           = "kp_clear";
+        (*keymap)[SDLK_KP_CLEARENTRY]      = "kp_clearentry";
+        (*keymap)[SDLK_KP_COLON]           = "kp_colon";
+        (*keymap)[SDLK_KP_COMMA]           = "kp_comma";
+        (*keymap)[SDLK_KP_D]               = "kp_d";
+        (*keymap)[SDLK_KP_DBLAMPERSAND]    = "kp_dblampersand";
+        (*keymap)[SDLK_KP_DBLVERTICALBAR]  = "kp_dblverticalbar";
+        (*keymap)[SDLK_KP_DECIMAL]         = "kp_decimal";
+        (*keymap)[SDLK_KP_DIVIDE]          = "kp_divide";
+        (*keymap)[SDLK_KP_E]               = "kp_e";
+        (*keymap)[SDLK_KP_ENTER]           = "kp_enter";
+        (*keymap)[SDLK_KP_EQUALS]          = "kp_equals";
+        (*keymap)[SDLK_KP_EQUALSAS400]     = "kp_equalsas400";
+        (*keymap)[SDLK_KP_EXCLAM]          = "kp_exclam";
+        (*keymap)[SDLK_KP_F]               = "kp_f";
+        (*keymap)[SDLK_KP_GREATER]         = "kp_greater";
+        (*keymap)[SDLK_KP_HASH]            = "kp_hash";
+        (*keymap)[SDLK_KP_HEXADECIMAL]     = "kp_hexadecimal";
+        (*keymap)[SDLK_KP_LEFTBRACE]       = "kp_leftbrace";
+        (*keymap)[SDLK_KP_LEFTPAREN]       = "kp_leftparen";
+        (*keymap)[SDLK_KP_LESS]            = "kp_less";
+        (*keymap)[SDLK_KP_MEMADD]          = "kp_memadd";
+        (*keymap)[SDLK_KP_MEMCLEAR]        = "kp_memclear";
+        (*keymap)[SDLK_KP_MEMDIVIDE]       = "kp_memdivide";
+        (*keymap)[SDLK_KP_MEMMULTIPLY]     = "kp_memmultiply";
+        (*keymap)[SDLK_KP_MEMRECALL]       = "kp_memrecall";
+        (*keymap)[SDLK_KP_MEMSTORE]        = "kp_memstore";
+        (*keymap)[SDLK_KP_MEMSUBTRACT]     = "kp_memsubtract";
+        (*keymap)[SDLK_KP_MINUS]           = "kp_minus";
+        (*keymap)[SDLK_KP_MULTIPLY]        = "kp_multiply";
+        (*keymap)[SDLK_KP_OCTAL]           = "kp_octal";
+        (*keymap)[SDLK_KP_PERCENT]         = "kp_percent";
+        (*keymap)[SDLK_KP_PERIOD]          = "kp_period";
+        (*keymap)[SDLK_KP_PLUS]            = "kp_plus";
+        (*keymap)[SDLK_KP_PLUSMINUS]       = "kp_plusminus";
+        (*keymap)[SDLK_KP_POWER]           = "kp_power";
+        (*keymap)[SDLK_KP_RIGHTBRACE]      = "kp_rightbrace";
+        (*keymap)[SDLK_KP_RIGHTPAREN]      = "kp_rightparen";
+        (*keymap)[SDLK_KP_SPACE]           = "kp_space";
+        (*keymap)[SDLK_KP_TAB]             = "kp_tab";
+        (*keymap)[SDLK_KP_VERTICALBAR]     = "kp_verticalbar";
+        (*keymap)[SDLK_KP_XOR]             = "kp_xor";
+        (*keymap)[SDLK_LALT]               = "lalt";
+        (*keymap)[SDLK_LCTRL]              = "lctrl";
+        (*keymap)[SDLK_LEFT]               = "left";
+        (*keymap)[SDLK_LEFTBRACKET]        = "leftbracket";
+        (*keymap)[SDLK_LEFTPAREN]          = "leftparen";
+        (*keymap)[SDLK_LESS]               = "less";
+        (*keymap)[SDLK_LGUI]               = "lgui";
+        (*keymap)[SDLK_LSHIFT]             = "lshift";
+        (*keymap)[SDLK_MAIL]               = "mail";
+        (*keymap)[SDLK_MEDIASELECT]        = "mediaselect";
+        (*keymap)[SDLK_MENU]               = "menu";
+        (*keymap)[SDLK_MINUS]              = "minus";
+        (*keymap)[SDLK_MODE]               = "mode";
+        (*keymap)[SDLK_MUTE]               = "mute";
+        (*keymap)[SDLK_NUMLOCKCLEAR]       = "numlockclear";
+        (*keymap)[SDLK_OPER]               = "oper";
+        (*keymap)[SDLK_OUT]                = "out";
+        (*keymap)[SDLK_PAGEDOWN]           = "pagedown";
+        (*keymap)[SDLK_PAGEUP]             = "pageup";
+        (*keymap)[SDLK_PASTE]              = "paste";
+        (*keymap)[SDLK_PAUSE]              = "pause";
+        (*keymap)[SDLK_PERCENT]            = "percent";
+        (*keymap)[SDLK_PERIOD]             = "period";
+        (*keymap)[SDLK_PLUS]               = "plus";
+        (*keymap)[SDLK_POWER]              = "power";
+        (*keymap)[SDLK_PRINTSCREEN]        = "printscreen";
+        (*keymap)[SDLK_PRIOR]              = "prior";
+        (*keymap)[SDLK_QUOTE]              = "quote";
+        (*keymap)[SDLK_QUESTION]           = "question";
+        (*keymap)[SDLK_RALT]               = "ralt";
+        (*keymap)[SDLK_RCTRL]              = "rctrl";
+        (*keymap)[SDLK_RETURN]             = "return";
+        (*keymap)[SDLK_RETURN2]            = "return2";
+        (*keymap)[SDLK_RGUI]               = "rgui";
+        (*keymap)[SDLK_RIGHT]              = "right";
+        (*keymap)[SDLK_RIGHTPAREN]         = "rightparen";
+        (*keymap)[SDLK_RIGHTBRACKET]       = "rightbracket";
+        (*keymap)[SDLK_RSHIFT]             = "rshift";
+        (*keymap)[SDLK_SCROLLLOCK]         = "scrolllock";
+        (*keymap)[SDLK_SELECT]             = "select";
+        (*keymap)[SDLK_SEMICOLON]          = "semicolon";
+        (*keymap)[SDLK_SEPARATOR]          = "separator";
+        (*keymap)[SDLK_SLASH]              = "slash";
+        (*keymap)[SDLK_SLEEP]              = "sleep";
+        (*keymap)[SDLK_SPACE]              = "space";
+        (*keymap)[SDLK_STOP]               = "stop";
+        (*keymap)[SDLK_SYSREQ]             = "sysreq";
+        (*keymap)[SDLK_TAB]                = "tab";
+        (*keymap)[SDLK_THOUSANDSSEPARATOR] = "thousandsseparator";
+        (*keymap)[SDLK_UNDERSCORE]         = "underscore";
+        (*keymap)[SDLK_UNDO]               = "undo";
+        (*keymap)[SDLK_UP]                 = "up";
+        (*keymap)[SDLK_VOLUMEDOWN]         = "volumedown";
+        (*keymap)[SDLK_VOLUMEUP]           = "volumeup";
+        (*keymap)[SDLK_WWW]                = "www";
+      }
+      catch (...) {
+        delete keymap;
+        keymap = NULL;
+        return "(error)";
+      }
+    }
+
+    std::map<long, std::string>::iterator found;
+    found = keymap->find(code);
+    if (found == keymap->end()) { return "(undefined)"; }
+    else { return found->second.c_str(); }
+  }
 
   class myEvent
   {
@@ -243,6 +474,12 @@ namespace lev
 
   std::string event::get_key() const
   {
+    SDL_Event &evt = cast_evt(_obj)->evt;
+    if (evt.type == SDL_KEYDOWN || evt.type == SDL_KEYUP)
+    {
+      SDL_KeyboardEvent &key = (SDL_KeyboardEvent &)evt;
+      return input::to_keyname(key.keysym.sym);
+    }
     return "";
   }
 
@@ -252,7 +489,19 @@ namespace lev
     if (evt.type == SDL_KEYDOWN || evt.type == SDL_KEYUP)
     {
       SDL_KeyboardEvent &key = (SDL_KeyboardEvent &)evt;
-      return key.keysym.unicode;
+//      return key.keysym.unicode;
+      return key.keysym.sym;
+    }
+    return -1;
+  }
+
+  long event::get_scan_code() const
+  {
+    SDL_Event &evt = cast_evt(_obj)->evt;
+    if (evt.type == SDL_KEYDOWN || evt.type == SDL_KEYUP)
+    {
+      SDL_KeyboardEvent &key = (SDL_KeyboardEvent &)evt;
+      return key.keysym.scancode;
     }
     return -1;
   }
@@ -265,6 +514,11 @@ namespace lev
       SDL_MouseMotionEvent &motion = (SDL_MouseMotionEvent &)evt;
       return motion.x;
     }
+    else if (evt.type == SDL_MOUSEBUTTONDOWN || evt.type == SDL_MOUSEBUTTONUP)
+    {
+      SDL_MouseButtonEvent &mouse = (SDL_MouseButtonEvent &)evt;
+      return mouse.x;
+    }
     return -1;
   }
 
@@ -275,6 +529,11 @@ namespace lev
     {
       SDL_MouseMotionEvent &motion = (SDL_MouseMotionEvent &)evt;
       return motion.y;
+    }
+    else if (evt.type == SDL_MOUSEBUTTONDOWN || evt.type == SDL_MOUSEBUTTONUP)
+    {
+      SDL_MouseButtonEvent &mouse = (SDL_MouseButtonEvent &)evt;
+      return mouse.y;
     }
     return -1;
   }
@@ -419,7 +678,6 @@ namespace lev
       if (sdl_evt.type == SDL_KEYDOWN || sdl_evt.type == SDL_KEYUP)
       {
         SDL_KeyboardEvent &keyboard = (SDL_KeyboardEvent &)sdl_evt;
-//        e.set_key_code(keyboard.keysym.unicode);
       }
       else if (sdl_evt.type == SDL_MOUSEBUTTONDOWN || sdl_evt.type == SDL_MOUSEBUTTONUP)
       {

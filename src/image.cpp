@@ -907,7 +907,7 @@ namespace lev
       {
         if (index > 0)
         {
-printf("Rel: %d\n", index);
+//printf("Rel: %d\n", index);
           glDeleteTextures(1, &index);
           index = 0;
         }
@@ -920,12 +920,12 @@ printf("Rel: %d\n", index);
         try {
           tex = new myTexture(w, h);
           glGenTextures(1, &tex->index);
-printf("Gen: %d\n", tex->index);
+//printf("Gen: %d\n", tex->index);
           if (tex->index == 0) { throw -1; }
           return tex;
         }
         catch (...) {
-printf("ERROR!\n");
+//printf("ERROR!\n");
           delete tex;
           return NULL;
         }

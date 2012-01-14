@@ -83,13 +83,6 @@ namespace lev
   {
     window* win = NULL;
     try {
-      SDL_GL_SetAttribute(SDL_GL_RED_SIZE,    8);
-      SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE,  8);
-      SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE,   8);
-      SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE,  8);
-      SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
-      SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-
       win = new window;
       win->_obj = SDL_CreateWindow(title, x, y, w, h, flags);
       if (! win->_obj) { throw -1; }
@@ -133,15 +126,20 @@ namespace lev
     else if (t["lua.number4"]) { y = object_cast<int>(t["lua.number4"]); }
 
     if (t["flags"]) { flags_str = object_cast<const char *>(t["flags"]); }
+    else if (t["f"]) { flags_str = object_cast<const char *>(t["f"]); }
     else if (t["lua.string2"]) { flags_str = object_cast<const char *>(t["lua.string2"]); }
     if (flags_str)
     {
       if (strstr(flags_str, "borderless"))    { flags |= SDL_WINDOW_BORDERLESS; }
       if (strstr(flags_str, "full"))          { flags |= SDL_WINDOW_FULLSCREEN; }
+//      if (strstr(flags_str, "fullscreen"))    { flags |= SDL_WINDOW_FULLSCREEN; }
       if (strstr(flags_str, "hidden"))        { flags &= ~SDL_WINDOW_SHOWN; }
+//      if (strstr(flags_str, "input"))         { flags |= SDL_WINDOW_INPUT_GRABBED; }
       if (strstr(flags_str, "input_grabbed")) { flags |= SDL_WINDOW_INPUT_GRABBED; }
       if (strstr(flags_str, "max"))           { flags |= SDL_WINDOW_MAXIMIZED; }
+//      if (strstr(flags_str, "maximized"))     { flags |= SDL_WINDOW_MAXIMIZED; }
       if (strstr(flags_str, "min"))           { flags |= SDL_WINDOW_MINIMIZED; }
+//      if (strstr(flags_str, "minimized"))     { flags |= SDL_WINDOW_MINIMIZED; }
       if (strstr(flags_str, "resizable"))     { flags |= SDL_WINDOW_RESIZABLE; }
       if (strstr(flags_str, "shown"))         { flags |= SDL_WINDOW_SHOWN; }
     }

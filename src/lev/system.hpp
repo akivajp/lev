@@ -22,6 +22,12 @@ extern "C" {
 namespace lev
 {
 
+  class input
+  {
+    public:
+      static const char *to_keyname(long code);
+  };
+
   class event : public base
   {
     public:
@@ -33,6 +39,7 @@ namespace lev
       std::string get_key() const;
       long get_key_code() const;
       void *get_rawobj() { return _obj; }
+      long get_scan_code() const;
       virtual type_id get_type_id() const { return LEV_TEVENT; }
       virtual const char *get_type_name() const { return "lev.event"; }
       int get_x() const;
@@ -45,10 +52,6 @@ namespace lev
     protected:
       void *_obj;
   };
-
-//  class window : public screen
-//  {
-//  };
 
   class system : public base
   {
