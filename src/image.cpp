@@ -34,6 +34,7 @@ int luaopen_lev_image(lua_State *L)
   open(L);
   globals(L)["package"]["loaded"]["lev.image"] = true;
   globals(L)["require"]("lev.base");
+  globals(L)["require"]("lev.draw");
   globals(L)["require"]("lev.font");
   globals(L)["require"]("lev.prim");
 
@@ -42,10 +43,6 @@ int luaopen_lev_image(lua_State *L)
     namespace_("image"),
     namespace_("classes")
     [
-      class_<drawable, base>("drawable")
-        .def("draw_on", &drawable::draw_on)
-        .def("draw_on", &drawable::draw_on1)
-        .def("draw_on", &drawable::draw_on3),
       class_<image, drawable>("image")
         .def("blit", &image::blit)
         .def("blit", &image::blit1)
@@ -64,14 +61,12 @@ int luaopen_lev_image(lua_State *L)
         .def("fill_rectangle", &image::fill_rect)
         .def("get_color", &image::get_pixel, adopt(result))
         .def("get_pixel", &image::get_pixel, adopt(result))
-        .property("h", &image::get_h)
-        .property("height", &image::get_h)
         .def("load", &image::reload)
+        .property("rect",  &image::get_rect)
         .def("reload", &image::reload)
         .def("save", &image::save)
         .def("set_color", &image::set_pixel)
         .def("set_pixel", &image::set_pixel)
-        .property("rect",  &image::get_rect)
         .property("sz",  &image::get_size)
         .property("size",  &image::get_size)
 //        .def("stroke_circle", &image::stroke_circle)
@@ -79,8 +74,7 @@ int luaopen_lev_image(lua_State *L)
 //        .def("stroke_line", &image::stroke_line6)
 //        .def("stroke_rect", &image::stroke_rect)
 //        .def("stroke_rectangle", &image::stroke_rect)
-        .property("w", &image::get_w)
-        .property("width", &image::get_w)
+        .def("texturize", &texture::create, adopt(result))
         .scope
         [
           def("create",  &image::create, adopt(result)),
@@ -90,16 +84,11 @@ int luaopen_lev_image(lua_State *L)
           def("string_c",  &image::string, adopt(result)),
           def("sub_image_c", &image::sub_image, adopt(result))
         ],
-        class_<screen, image>("screen")
-          .def("clear", &screen::clear)
-          .def("clear", &screen::clear_color)
-          .def("clear", &screen::clear_color1)
-          .def("flip", &screen::flip)
-          .def("swap", &screen::swap)
-          .scope
-          [
-            def("get", &screen::get)
-          ],
+      class_<texture, drawable>("texture")
+        .scope
+        [
+          def("create", &texture::create, adopt(result))
+        ],
 //      class_<animation, drawable>("animation")
 //        .def("add", &animation::add_file)
 //        .property("current", &animation::get_current)
@@ -153,7 +142,6 @@ int luaopen_lev_image(lua_State *L)
   object image = lev["image"];
 //  register_to(classes["image"], "draw_text", &image::draw_text_l);
   register_to(classes["image"], "draw", &image::draw_l);
-  register_to(classes["screen"], "draw", &image::draw_l);
   register_to(classes["image"], "get_sub", &image::sub_image_l);
   register_to(classes["image"], "get_sub_image", &image::sub_image_l);
   register_to(classes["image"], "string", &image::string_l);
@@ -166,6 +154,7 @@ int luaopen_lev_image(lua_State *L)
 //  image["levana_icon"] = classes["image"]["levana_icon"];
   image["load"]        = classes["image"]["load"];
   image["string"]      = classes["image"]["string"];
+  image["tex2d"]       = classes["texture"]["create"];
 //  image["transition"]  = classes["transition"]["create"];
 
   globals(L)["package"]["loaded"]["lev.image"] = image;
@@ -307,6 +296,8 @@ namespace lev
     int dst_w = get_w();
     int src_h = src->get_h();
     int src_w = src->get_w();
+    if (w < 0) { w = src_w; }
+    if (h < 0) { h = src_h; }
     for (int y = 0; y < h; y++)
     {
       for (int x = 0; x < w; x++)
@@ -335,7 +326,7 @@ namespace lev
   {
     int img_w = get_w();
     int img_h = get_h();
-    unsigned char *buf = cast_image(_obj)->buf;
+    unsigned char *pixel = cast_image(_obj)->buf;
     unsigned char r = c.get_r(), g = c.get_g(), b = c.get_b(), a = c.get_a();
     if (a > 0)
     {
@@ -345,12 +336,16 @@ namespace lev
         {
           int real_x = offset_x + x;
           int real_y = offset_y + y;
-          if (real_x < 0 || real_x >= img_w || real_y < 0 || real_y >= img_h) { continue; }
-          unsigned char *pixel = &buf[4 * (real_y * img_w + real_x)];
+          if (real_x < 0 || real_x >= img_w || real_y < 0 || real_y >= img_h)
+          {
+            pixel += 4;
+            continue;
+          }
           pixel[0] = r;
           pixel[1] = g;
           pixel[2] = b;
           pixel[3] = a;
+          pixel += 4;
         }
       }
     }
@@ -362,9 +357,13 @@ namespace lev
         {
           int real_x = offset_x + x;
           int real_y = offset_y + y;
-          if (real_x < 0 || real_x >= img_w || real_y < 0 || real_y >= img_h) { continue; }
-          unsigned char *pixel = &buf[4 * (real_y * img_w + real_x)];
+          if (real_x < 0 || real_x >= img_w || real_y < 0 || real_y >= img_h)
+          {
+            pixel += 4;
+            continue;
+          }
           pixel[3] = 0;
+          pixel += 4;
         }
       }
     }
@@ -417,13 +416,37 @@ namespace lev
   bool image::draw(drawable *src, int x, int y, unsigned char alpha)
   {
     if (! src) { return false; }
-    return src->draw_on(this, x, y, alpha);
+    return src->draw_on_image(this, x, y, alpha);
   }
 
-  bool image::draw_on(image *dst, int offset_x, int offset_y, unsigned char alpha)
+  bool image::draw_on_image(image *dst, int offset_x, int offset_y, unsigned char alpha)
   {
     if (! dst) { return false; }
     return dst->blit(offset_x, offset_y, this, 0, 0, get_w(), get_h(), alpha);
+  }
+
+  bool image::draw_on_screen(screen *dst, int offset_x, int offset_y, unsigned char alpha)
+  {
+    if (! dst) { return false; }
+    int w = get_w();
+    int h = get_h();
+    unsigned char *pixel = cast_image(_obj)->buf;
+    glBegin(GL_POINTS);
+      for (int y = 0; y < h; y++)
+      {
+        for (int x = 0; x < w; x++)
+        {
+          unsigned char a = (unsigned short)pixel[3] * alpha / 255;
+          if (a > 0)
+          {
+            glColor4ub(pixel[0], pixel[1], pixel[2], a);
+            glVertex2i(offset_x + x, offset_y + y);
+          }
+          pixel += 4;
+        }
+      }
+    glEnd();
+    return true;
   }
 
   bool image::draw_pixel(int x, int y, const color &c)
@@ -445,7 +468,7 @@ namespace lev
     {
       for (int x = 0; x < r->get_w(); x++)
       {
-        copy.set_a(orig.get_a() * (r->get_pixel(x, y) / 255.0));
+        copy.set_a((unsigned short)orig.get_a() * r->get_pixel(x, y) / 255);
         draw_pixel(offset_x + x, offset_y + y, copy);
       }
     }
@@ -479,9 +502,9 @@ namespace lev
 
         img->draw(src, x, y, a);
       }
-      else if (t["lev.image.layout1"])
+      else if (t["lev.layout1"])
       {
-        layout *src = object_cast<layout *>(t["lev.image.layout1"]);
+        layout *src = object_cast<layout *>(t["lev.layout1"]);
 
         img->draw(src, x, y, a);
       }
@@ -869,64 +892,125 @@ namespace lev
   }
 
 
-  screen::screen() : base() { }
-
-  screen::~screen()
+  class myTexture
   {
+    public:
+      myTexture(int w, int h) : img_w(w), img_h(h), tex_w(1), tex_h(1)
+      {
+        while(tex_w < w) { tex_w <<= 1; }
+        while(tex_h < h) { tex_h <<= 1; }
+        coord_x = (double)w / tex_w;
+        coord_y = (double)h / tex_h;
+      }
+
+      ~myTexture()
+      {
+        if (index > 0)
+        {
+printf("Rel: %d\n", index);
+          glDeleteTextures(1, &index);
+          index = 0;
+        }
+      }
+
+      static myTexture* Create(int w, int h)
+      {
+        if (w <= 0 || h <= 0) { return NULL; }
+        myTexture *tex = NULL;
+        try {
+          tex = new myTexture(w, h);
+          glGenTextures(1, &tex->index);
+printf("Gen: %d\n", tex->index);
+          if (tex->index == 0) { throw -1; }
+          return tex;
+        }
+        catch (...) {
+printf("ERROR!\n");
+          delete tex;
+          return NULL;
+        }
+      }
+
+      int img_w, img_h;
+      int tex_w, tex_h;
+      double coord_x, coord_y;
+      GLuint index;
+  };
+  static myTexture* cast_tex(void *obj) { return (myTexture *)obj; }
+
+  texture::texture() : _obj(NULL) { }
+
+  texture::~texture()
+  {
+    if (_obj) { delete cast_tex(_obj); }
   }
 
-  bool screen::clear_color(unsigned char r, unsigned char g,
-                   unsigned char b, unsigned char a)
+  texture* texture::create(const image *src)
   {
-    glClearColor(r / 255.0, g / 255.0, b / 255.0, a / 255.0);
-//    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glClear(GL_COLOR_BUFFER_BIT);
+    if (! src) { return NULL; }
+    texture *tex = NULL;
+    myTexture *obj = NULL;
+    try {
+      tex = new texture;
+      tex->_obj = obj = myTexture::Create(src->get_w(), src->get_h());
+      if (! tex->_obj) { throw -1; }
+
+      glBindTexture(GL_TEXTURE_2D, obj->index);
+      glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+      glTexImage2D(GL_TEXTURE_2D, 0 /* level */, GL_RGBA, obj->tex_w, obj->tex_h, 0 /* border */,
+                   GL_RGBA, GL_UNSIGNED_BYTE, NULL /* only buffer reservation */);
+      glTexSubImage2D(GL_TEXTURE_2D, 0, 0 /* x offset */, 0 /* y offset */,
+                      obj->img_w, obj->img_h, GL_RGBA, GL_UNSIGNED_BYTE,
+                      cast_image(src->get_rawobj())->buf);
+      return tex;
+    }
+    catch (...) {
+      delete tex;
+      return NULL;
+    }
+  }
+
+  bool texture::draw_on_screen(screen *target, int x, int y, unsigned char alpha)
+  {
+    if (! target) { return NULL; }
+
+    myTexture *tex = cast_tex(_obj);
+    glBindTexture(GL_TEXTURE_2D, tex->index);
+    glEnable(GL_TEXTURE_2D);
+    glBegin(GL_QUADS);
+      glColor4ub(255, 255, 255, alpha);
+      glTexCoord2d(0, 0);
+      glVertex2i(x, y);
+      glTexCoord2d(0, tex->coord_y);
+      glVertex2i(x, y + tex->img_h);
+      glTexCoord2d(tex->coord_x, tex->coord_y);
+      glVertex2i(x + tex->img_w, y + tex->img_h);
+      glTexCoord2d(tex->coord_x, 0);
+      glVertex2i(x + tex->img_w, y);
+
+//      glTexCoord2d(0, tex->coord_y);
+//      glVertex2i(x, y);
+//      glTexCoord2i(0, 0);
+//      glVertex2i(x, y + tex->img_h);
+//      glTexCoord2d(tex->coord_x, 0);
+//      glVertex2i(x + tex->img_w, y + tex->img_h);
+//      glTexCoord2d(tex->coord_x, tex->coord_y);
+//      glVertex2i(x + tex->img_w, y);
+    glEnd();
+    glDisable(GL_TEXTURE_2D);
     return true;
   }
 
-  bool screen::clear_color1(const color &c)
+  int texture::get_h() const
   {
-    return clear_color(c.get_r(), c.get_g(), c.get_b(), c.get_a());
+    return cast_tex(_obj)->img_h;
   }
 
-  bool screen::flip()
+  int texture::get_w() const
   {
-    SDL_Surface *screen = SDL_GetVideoSurface();
-    if (SDL_Flip(screen) == 0) { return true; }
-    else { return false; }
-  }
-
-  screen* screen::get()
-  {
-    static screen scr;
-    if (SDL_GetVideoSurface()) { return &scr; }
-//    if (scr._obj) { return &scr; }
-//    scr._obj = SDL_GetVideoSurface();
-//    if (! scr._obj) { return NULL; }
-//    return &scr;
-  }
-
-  screen* screen::set_mode(int width, int height, int depth)
-  {
-    SDL_GL_SetAttribute(SDL_GL_RED_SIZE,    8);
-    SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE,  8);
-    SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE,   8);
-    SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE,  8);
-    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
-    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-    SDL_GL_SetAttribute(SDL_GL_SWAP_CONTROL, 0);
-//    SDL_GL_SetAttribute(SDL_GL_BUFFER_SIZE, 24);
-//    SDL_GL_SetAttribute(SDL_GL_ACCELERATED_VISUAL, 1);
-    SDL_SetVideoMode(width, height, depth, SDL_OPENGL);
-//    SDL_SetVideoMode(width, height, depth, SDL_HWSURFACE | SDL_DOUBLEBUF);
-//    SDL_SetVideoMode(width, height, depth, SDL_SWSURFACE | SDL_DOUBLEBUF);
-    return get();
-  }
-
-  bool screen::swap()
-  {
-    SDL_GL_SwapBuffers();
-    return true;
+    return cast_tex(_obj)->img_w;
   }
 
 
@@ -1325,7 +1409,20 @@ namespace lev
           if (actives[i])
           {
             const vector &vec = coordinates[i];
-            actives[i]->draw_on(dst, x + vec.get_x(), y + vec.get_y(), alpha);
+            actives[i]->draw_on_image(dst, x + vec.get_x(), y + vec.get_y(), alpha);
+          }
+        }
+        return true;
+      }
+
+      bool DrawOn(screen *dst, int x, int y, unsigned char alpha)
+      {
+        for (int i = 0; i < actives.size(); i++)
+        {
+          if (actives[i])
+          {
+            const vector &vec = coordinates[i];
+            actives[i]->draw_on_screen(dst, x + vec.get_x(), y + vec.get_y(), alpha);
           }
         }
         return true;
@@ -1608,7 +1705,12 @@ namespace lev
     }
   }
 
-  bool layout::draw_on(image *dst, int x, int y, unsigned char alpha)
+  bool layout::draw_on_image(image *dst, int x, int y, unsigned char alpha)
+  {
+    return cast_lay(_obj)->DrawOn(dst, x, y, alpha);
+  }
+
+  bool layout::draw_on_screen(screen *dst, int x, int y, unsigned char alpha)
   {
     return cast_lay(_obj)->DrawOn(dst, x, y, alpha);
   }

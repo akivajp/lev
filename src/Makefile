@@ -1,15 +1,16 @@
 CXX = g++
-CXXFLAGS = -fPIC -O2 -I/usr/include/freetype2
+CXXFLAGS = -fPIC -O2 -I/usr/include/freetype2 `/usr/local/bin/sdl-config --cflags`
 SHARED= -shared
 SLIB = liblev.a
 OUT = a.out
 PCH = prec.h.gch
 RANLIB = ranlib
-CORE_SRC  = entry.cpp font.cpp image.cpp prim.cpp \
-	    sound.cpp string.cpp system.cpp util.cpp
+CORE_SRC  = draw.cpp entry.cpp font.cpp image.cpp prim.cpp \
+	    sound.cpp string.cpp system.cpp util.cpp window.cpp
 OBJS = $(CORE_SRC:%.cpp=%.o)
 DLIB = lev.so
-LIBS = -llua -lluabind -lSDL -lvorbisfile -lfreetype -lGL
+#LIBS = -llua -lluabind -lSDL -lvorbisfile -lfreetype -lGL
+LIBS = -llua -lluabind -lvorbisfile -lfreetype -lGL `/usr/local/bin/sdl-config --libs`
 
 all: pch tags bin lib
 
@@ -51,6 +52,7 @@ $(SLIB): $(OBJS)
 $(DLIB): $(OBJS)
 	$(CXX) $(SHARED) -o $(DLIB) $(OBJS) $(LIBS)
 
+draw.o: draw.cpp lev/draw.hpp
 entry.o: entry.cpp lev/entry.hpp
 font.o: font.cpp lev/font.hpp
 image.o: image.cpp lev/image.hpp
@@ -59,6 +61,7 @@ sound.o: sound.cpp lev/sound.hpp
 string.o: string.cpp lev/string.hpp
 system.o: system.cpp lev/system.hpp
 util.o: util.cpp lev/util.hpp
+window.o: window.cpp lev/window.hpp
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $<
 

@@ -8,13 +8,19 @@
 // Licence:     MIT License
 /////////////////////////////////////////////////////////////////////////////
 
+// pre-compiled header
 #include "prec.h"
 
+// declarations
 #include "lev/system.hpp"
+
+// dependencies
+#include "lev/draw.hpp"
+#include "lev/window.hpp"
 #include "register.hpp"
 
+// libraries
 #include <map>
-
 #include <luabind/luabind.hpp>
 #include <SDL/SDL.h>
 
@@ -50,6 +56,9 @@ int luaopen_lev_system(lua_State *L)
   using namespace lev;
 
   open(L);
+  // beginning to load
+  globals(L)["package"]["loaded"]["lev.system"] = true;
+  // pre-requirement
   globals(L)["require"]("lev.base");
   globals(L)["require"]("lev.image");
 
@@ -60,7 +69,6 @@ int luaopen_lev_system(lua_State *L)
     [
       class_<event, base>("event")
         .property("button", &event::get_button)
-        .property("device", &event::get_device)
         .property("dx", &event::get_dx)
         .property("dy", &event::get_dy)
         .property("is_pressed", &event::is_pressed)
@@ -68,11 +76,11 @@ int luaopen_lev_system(lua_State *L)
         .property("key", &event::get_key)
         .property("keycode", &event::get_key_code)
         .property("key_code", &event::get_key_code)
-        .property("left", &event::get_left)
-        .property("middle", &event::get_middle)
+        .property("left_is_down", &event::left_is_down)
+        .property("middle_is_down", &event::middle_is_down)
         .property("pressed", &event::is_pressed)
         .property("released", &event::is_released)
-        .property("right", &event::get_right)
+        .property("right_is_down", &event::right_is_down)
         .property("x", &event::get_x)
         .property("y", &event::get_y),
       class_<lev::system, base>("system")
@@ -106,6 +114,7 @@ int luaopen_lev_system(lua_State *L)
         .def("toggle_full_screen", &system::toggle_full_screen)
         .scope
         [
+          def("create_window_c", &window::create, adopt(result)),
           def("get_c", &system::get),
           def("init", &system::init)
         ],
@@ -119,9 +128,14 @@ int luaopen_lev_system(lua_State *L)
   object lev = globals(L)["lev"];
   object classes = lev["classes"];
   register_to(classes["system"], "get", &system::get_l);
+  register_to(classes["system"], "create_window", &window::create_l);
+  register_to(classes["system"], "window", &window::create_l);
   lev["system"] = classes["system"]["get"];
   lev["finalizer"] = classes["finalizer"]["create"];
 
+  // post-requirement
+  globals(L)["require"]("lev.window");
+  // end of loading
   globals(L)["package"]["loaded"]["lev.system"] = true;
   return 0;
 }
@@ -132,21 +146,43 @@ namespace lev
   class myEvent
   {
     public:
-      myEvent()
-        : x(0), y(0), dx(0), dy(0), device(-1), button(0),
-          left(false), middle(false), right(false),
-          pressed(false), released(false),
-          key_code(-1)
-      { }
+      myEvent() : evt() { }
 
       ~myEvent() { }
 
-      int x, y, dx, dy, button, device;
-      bool left, middle, right;
-      bool pressed, released;
-      long key_code;
+      SDL_Event evt;
+//      int x, y, dx, dy, button, device;
+//      bool left, middle, right;
+//      bool pressed, released;
+//      long key_code;
   };
   static myEvent* cast_evt(void *obj) { return (myEvent *)obj; }
+
+  static luabind::object safe_call(luabind::object func)
+  {
+    lua_State *L = func.interpreter();
+    func.push(L);
+    if (lua_pcall(L, 0 /* nargs */, 1 /* nreturns */, 0 /* std errror */))
+    {
+      fprintf(stderr, "%s\n", lua_tostring(L, -1));
+    }
+    luabind::object o(from_stack(L, -1));
+    lua_pop(L, 1);
+    return o;
+  }
+  static luabind::object safe_call(luabind::object func, luabind::object arg1)
+  {
+    lua_State *L = func.interpreter();
+    func.push(L);
+    arg1.push(L);
+    if (lua_pcall(L, 1 /* nargs */, 1 /* nreturns */, 0 /* std errror */))
+    {
+      fprintf(stderr, "%s\n", lua_tostring(L, -1));
+    }
+    luabind::object o(from_stack(L, -1));
+    lua_pop(L, 1);
+    return o;
+  }
 
   event::event() : base(), _obj(NULL)
   {
@@ -160,36 +196,49 @@ namespace lev
 
   std::string event::get_button() const
   {
-    switch (cast_evt(_obj)->button)
+    SDL_Event &evt = cast_evt(_obj)->evt;
+    if (evt.type == SDL_MOUSEBUTTONDOWN || evt.type == SDL_MOUSEBUTTONUP)
     {
-      case SDL_BUTTON_LEFT:
-        return "left";
-      case SDL_BUTTON_MIDDLE:
-        return "middle";
-      case SDL_BUTTON_RIGHT:
-        return "right";
-      case SDL_BUTTON_WHEELUP:
-        return "up";
-      case SDL_BUTTON_WHEELDOWN:
-        return "down";
-      default:
-        return "";
+      SDL_MouseButtonEvent &mouse = (SDL_MouseButtonEvent &)evt;
+      switch (mouse.button)
+      {
+        case SDL_BUTTON_LEFT:
+          return "left";
+        case SDL_BUTTON_MIDDLE:
+          return "middle";
+        case SDL_BUTTON_RIGHT:
+          return "right";
+        case SDL_BUTTON_WHEELUP:
+          return "up";
+        case SDL_BUTTON_WHEELDOWN:
+          return "down";
+        default:
+          return "";
+      }
     }
-  }
-
-  int event::get_device() const
-  {
-    return cast_evt(_obj)->device;
+    return "";
   }
 
   int event::get_dx() const
   {
-    return cast_evt(_obj)->dx;
+    SDL_Event &evt = cast_evt(_obj)->evt;
+    if (evt.type == SDL_MOUSEMOTION)
+    {
+      SDL_MouseMotionEvent &motion = (SDL_MouseMotionEvent &)evt;
+      return motion.xrel;
+    }
+    return 0;
   }
 
   int event::get_dy() const
   {
-    return cast_evt(_obj)->dy;
+    SDL_Event &evt = cast_evt(_obj)->evt;
+    if (evt.type == SDL_MOUSEMOTION)
+    {
+      SDL_MouseMotionEvent &motion = (SDL_MouseMotionEvent &)evt;
+      return motion.yrel;
+    }
+    return 0;
   }
 
   std::string event::get_key() const
@@ -199,114 +248,91 @@ namespace lev
 
   long event::get_key_code() const
   {
-    return cast_evt(_obj)->key_code;
-  }
-
-  bool event::get_left() const
-  {
-    return cast_evt(_obj)->left;
-  }
-
-  bool event::get_middle() const
-  {
-    return cast_evt(_obj)->middle;
-  }
-
-  bool event::get_right() const
-  {
-    return cast_evt(_obj)->right;
+    SDL_Event &evt = cast_evt(_obj)->evt;
+    if (evt.type == SDL_KEYDOWN || evt.type == SDL_KEYUP)
+    {
+      SDL_KeyboardEvent &key = (SDL_KeyboardEvent &)evt;
+      return key.keysym.unicode;
+    }
+    return -1;
   }
 
   int event::get_x() const
   {
-    return cast_evt(_obj)->x;
+    SDL_Event &evt = cast_evt(_obj)->evt;
+    if (evt.type == SDL_MOUSEMOTION)
+    {
+      SDL_MouseMotionEvent &motion = (SDL_MouseMotionEvent &)evt;
+      return motion.x;
+    }
+    return -1;
   }
 
   int event::get_y() const
   {
-    return cast_evt(_obj)->y;
+    SDL_Event &evt = cast_evt(_obj)->evt;
+    if (evt.type == SDL_MOUSEMOTION)
+    {
+      SDL_MouseMotionEvent &motion = (SDL_MouseMotionEvent &)evt;
+      return motion.y;
+    }
+    return -1;
   }
 
   bool event::is_pressed() const
   {
-    return cast_evt(_obj)->pressed;
+    SDL_Event &evt = cast_evt(_obj)->evt;
+    if (evt.type == SDL_MOUSEBUTTONDOWN || evt.type == SDL_MOUSEBUTTONUP)
+    {
+      SDL_MouseButtonEvent &mouse = (SDL_MouseButtonEvent &)evt;
+      return mouse.state == SDL_PRESSED;
+    }
+    return false;
   }
 
   bool event::is_released() const
   {
-    return cast_evt(_obj)->released;
+    SDL_Event &evt = cast_evt(_obj)->evt;
+    if (evt.type == SDL_MOUSEBUTTONDOWN || evt.type == SDL_MOUSEBUTTONUP)
+    {
+      SDL_MouseButtonEvent &mouse = (SDL_MouseButtonEvent &)evt;
+      return mouse.state == SDL_RELEASED;
+    }
+    return false;
   }
 
-  bool event::set_button_code(int button)
+  bool event::left_is_down() const
   {
-    cast_evt(_obj)->button = button;
-    return true;
+    SDL_Event &evt = cast_evt(_obj)->evt;
+    if (evt.type == SDL_MOUSEMOTION)
+    {
+      SDL_MouseMotionEvent &motion = (SDL_MouseMotionEvent &)evt;
+      return motion.state & SDL_BUTTON_LMASK;
+    }
+    return false;
   }
 
-  bool event::set_device(int device)
+  bool event::middle_is_down() const
   {
-    cast_evt(_obj)->device = device;
-    return true;
+    SDL_Event &evt = cast_evt(_obj)->evt;
+    if (evt.type == SDL_MOUSEMOTION)
+    {
+      SDL_MouseMotionEvent &motion = (SDL_MouseMotionEvent &)evt;
+      return motion.state & SDL_BUTTON_MMASK;
+    }
+    return false;
   }
 
-  bool event::set_dx(int dx)
+  bool event::right_is_down() const
   {
-    cast_evt(_obj)->dx = dx;
-    return true;
+    SDL_Event &evt = cast_evt(_obj)->evt;
+    if (evt.type == SDL_MOUSEMOTION)
+    {
+      SDL_MouseMotionEvent &motion = (SDL_MouseMotionEvent &)evt;
+      return motion.state & SDL_BUTTON_RMASK;
+    }
+    return false;
   }
-
-  bool event::set_dy(int dy)
-  {
-    cast_evt(_obj)->dy = dy;
-    return true;
-  }
-
-  bool event::set_key_code(long key)
-  {
-    cast_evt(_obj)->key_code = key;
-    return true;
-  }
-
-  bool event::set_left(bool pressed)
-  {
-    cast_evt(_obj)->left = pressed;
-    return true;
-  }
-
-  bool event::set_middle(bool pressed)
-  {
-    cast_evt(_obj)->middle = pressed;
-    return true;
-  }
-
-  bool event::set_pressed(bool pressed)
-  {
-    return cast_evt(_obj)->pressed = pressed;
-  }
-
-  bool event::set_released(bool released)
-  {
-    return cast_evt(_obj)->released = released;
-  }
-
-  bool event::set_right(bool pressed)
-  {
-    cast_evt(_obj)->right = pressed;
-    return true;
-  }
-
-  bool event::set_x(int x)
-  {
-    cast_evt(_obj)->x = x;
-    return true;
-  }
-
-  bool event::set_y(int y)
-  {
-    cast_evt(_obj)->y = y;
-    return true;
-  }
-
 
   class mySystem
   {
@@ -340,7 +366,7 @@ namespace lev
         return true;
       }
 
-      std::map<Uint8, luabind::object> funcs;
+      std::map<Uint32, luabind::object> funcs;
       luabind::object on_tick;
       luabind::object on_left_down,   on_left_up;
       luabind::object on_middle_down, on_middle_up;
@@ -388,21 +414,16 @@ namespace lev
     {
       mySystem *sys = cast_sys(_obj);
       luabind::object f = sys->funcs[sdl_evt.type];
+      cast_evt(e.get_rawobj())->evt = sdl_evt;
 
       if (sdl_evt.type == SDL_KEYDOWN || sdl_evt.type == SDL_KEYUP)
       {
         SDL_KeyboardEvent &keyboard = (SDL_KeyboardEvent &)sdl_evt;
-        e.set_key_code(keyboard.keysym.unicode);
+//        e.set_key_code(keyboard.keysym.unicode);
       }
       else if (sdl_evt.type == SDL_MOUSEBUTTONDOWN || sdl_evt.type == SDL_MOUSEBUTTONUP)
       {
         SDL_MouseButtonEvent &mouse = (SDL_MouseButtonEvent &)sdl_evt;
-        e.set_button_code(mouse.button);
-        e.set_device(mouse.which);
-        e.set_x(mouse.x);
-        e.set_y(mouse.y);
-        e.set_pressed(mouse.state == SDL_PRESSED);
-        e.set_released(mouse.state == SDL_RELEASED);
         if (mouse.button == SDL_BUTTON_LEFT)
         {
           if (mouse.state == SDL_PRESSED && sys->on_left_down)
@@ -428,13 +449,6 @@ namespace lev
       else if (sdl_evt.type == SDL_MOUSEMOTION)
       {
         SDL_MouseMotionEvent &motion = (SDL_MouseMotionEvent &)sdl_evt;
-        e.set_x(motion.x);
-        e.set_y(motion.y);
-        e.set_dx(motion.xrel);
-        e.set_dy(motion.yrel);
-        e.set_left(motion.state & SDL_BUTTON_LMASK);
-        e.set_middle(motion.state & SDL_BUTTON_MMASK);
-        e.set_right(motion.state & SDL_BUTTON_RMASK);
       }
       else if (sdl_evt.type == SDL_QUIT)
       {
@@ -447,7 +461,12 @@ namespace lev
 
       if (f && luabind::type(f) == LUA_TFUNCTION)
       {
-        f(&e);
+        try {
+          f(&e);
+        }
+        catch (...) {
+printf("ERROR!\n");
+        }
       }
       return true;
     }
@@ -534,6 +553,11 @@ namespace lev
     return cast_sys(_obj)->on_tick;
   }
 
+  screen* system::get_screen()
+  {
+    return screen::get();
+  }
+
   unsigned long system::get_ticks()
   {
     return SDL_GetTicks();
@@ -545,8 +569,16 @@ namespace lev
     if (sys._obj) { return &sys; }
 //printf("INITTING!\n");
     if (SDL_Init(SDL_INIT_EVERYTHING) < 0) { return NULL; }
-    SDL_EnableUNICODE(1);
 //printf("INITTED!\n");
+
+    SDL_EnableUNICODE(1);
+    SDL_GL_SetAttribute(SDL_GL_RED_SIZE,    8);
+    SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE,  8);
+    SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE,   8);
+    SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE,  8);
+    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+
     sys._obj = mySystem::Create();
     if (! sys._obj) { return NULL; }
     return &sys;
@@ -579,7 +611,7 @@ namespace lev
     {
       if (sys->on_tick && luabind::type(sys->on_tick) == LUA_TFUNCTION)
       {
-        sys->on_tick();
+        safe_call(sys->on_tick);
       }
       do_events();
     }

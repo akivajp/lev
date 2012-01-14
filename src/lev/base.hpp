@@ -30,9 +30,8 @@ namespace lev
 
           LEV_TDRAWABLE,
             LEV_TIMAGE,
-              LEV_TSCREEN,
-            LEV_TIMAGE_END,
             LEV_TLAYOUT,
+            LEV_TTEXTURE,
           LEV_TDRAWABLE_END,
 
           LEV_TEVENT,
@@ -42,11 +41,13 @@ namespace lev
           LEV_TPOINT,
           LEV_TRASTER,
           LEV_TRECT,
+          LEV_TSCREEN,
           LEV_TSIZE,
           LEV_TSOUND,
           LEV_TSYSTEM,
           LEV_TUNISTR,
           LEV_TVECTOR,
+          LEV_TWINDOW,
         LEV_TBASE_END,
       };
     protected:

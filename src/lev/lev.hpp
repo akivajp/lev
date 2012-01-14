@@ -11,6 +11,7 @@
 // Licence:     MIT License
 /////////////////////////////////////////////////////////////////////////////
 
+#include "draw.hpp"
 #include "entry.hpp"
 #include "font.hpp"
 #include "image.hpp"

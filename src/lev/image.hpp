@@ -12,6 +12,7 @@
 /////////////////////////////////////////////////////////////////////////////
 
 #include "base.hpp"
+#include "draw.hpp"
 #include "prim.hpp"
 #include <luabind/luabind.hpp>
 
@@ -25,20 +26,6 @@ namespace lev
   // class dependencies
   class font;
   class raster;
-  class image;
-
-  class drawable : public base
-  {
-    protected:
-      drawable() : base() { }
-    public:
-      virtual ~drawable() { }
-      virtual bool draw_on(image *dst, int x = 0, int y = 0, unsigned char alpha = 255) { return false; }
-      virtual bool draw_on1(image *dst) { return draw_on(dst); }
-      virtual bool draw_on3(image *dst, int x = 0, int y = 0) { return draw_on(dst); }
-      virtual type_id get_type_id() const { return LEV_TDRAWABLE; }
-      virtual const char *get_type_name() const { return "lev.drawable"; }
-  };
 
   class image : public drawable
   {
@@ -63,7 +50,8 @@ namespace lev
       image* clone();
       static image* create(int width, int height);
       bool draw(drawable *src, int x = 0, int y = 0, unsigned char alpha = 255);
-      virtual bool draw_on(image *target, int x = 0, int y = 0, unsigned char alpha = 255);
+      virtual bool draw_on_image(image *target, int x = 0, int y = 0, unsigned char alpha = 255);
+      virtual bool draw_on_screen(screen *target, int x = 0, int y = 0, unsigned char alpha = 255);
       bool draw_pixel(int x, int y, const color &c);
       bool draw_raster(const raster *r, int x = 0, int y = 0, const color *c = NULL);
       static int draw_l(lua_State *L);
@@ -71,7 +59,7 @@ namespace lev
       bool fill_rect(int x, int y, int w, int h, color *filling);
       virtual int get_h() const;
       color* get_pixel(int x, int y);
-      void* get_rawobj() { return _obj; }
+      void* get_rawobj() const { return _obj; }
       const rect get_rect() const;
       const size get_size() const;
       virtual type_id get_type_id() const { return LEV_TIMAGE; }
@@ -99,27 +87,23 @@ namespace lev
       bool swap(image *img);
     protected:
       void *_obj;
-      void *_status;
+//      void *_status;
   };
 
-  class screen : public base
+  class texture : public drawable
   {
     protected:
-      screen();
+      texture();
     public:
-      ~screen();
-      virtual bool clear() { return clear_color(0, 0, 0, 0); }
-      virtual bool clear_color(unsigned char r,
-                               unsigned char g,
-                               unsigned char b,
-                               unsigned char a);
-      virtual bool clear_color1(const color &c);
-      bool flip();
-      static screen *get();
-      virtual type_id get_type_id() const { return LEV_TSCREEN; }
-      virtual const char *get_type_name() const { return "lev.image.screen"; }
-      static screen *set_mode(int width, int height, int depth = 32);
-      bool swap();
+      ~texture();
+      static texture* create(const image *src);
+      virtual bool draw_on_screen(screen *target, int x = 0, int y = 0, unsigned char alpha = 255);
+      virtual type_id get_type_id() const { return LEV_TTEXTURE; }
+      virtual int get_h() const;
+      virtual int get_w() const;
+      virtual const char *get_type_name() const { return "lev.texture"; }
+    protected:
+      void *_obj;
   };
 
 //  class animation : public drawable
@@ -134,7 +118,7 @@ namespace lev
 //      static animation* create(bool repeating = true);
 //      static animation* create0() { return create(); }
 //      virtual type_id get_type_id() const { return LEV_TANIMATION; }
-//      virtual const char *get_type_name() const { return "lev.image.animation"; }
+//      virtual const char *get_type_name() const { return "lev.animation"; }
 //      virtual bool texturize(canvas *cv, bool force = false);
 //    protected:
 //      void *_obj;
@@ -152,7 +136,7 @@ namespace lev
 //      static transition* create(luabind::object img);
 //      static transition* create0() { return create(luabind::object()); }
 //      virtual type_id get_type_id() const { return LEV_TTRANSITION; }
-//      virtual const char *get_type_name() const { return "lev.image.transition"; }
+//      virtual const char *get_type_name() const { return "lev.transition"; }
 //      bool is_running();
 //      bool set_current(luabind::object current);
 //      bool set_next(luabind::object next, int duration = 1000, const std::string &type = "");
@@ -171,13 +155,14 @@ namespace lev
       virtual bool clear0() { return clear(color::transparent()); }
       bool complete();
       static layout* create(int width_stop = -1);
-      virtual bool draw_on(image *dst, int x = 0, int y = 0, unsigned char alpha = 255);
+      virtual bool draw_on_image(image *dst, int x = 0, int y = 0, unsigned char alpha = 255);
+      virtual bool draw_on_screen(screen *dst, int x = 0, int y = 0, unsigned char alpha = 255);
       color &get_fg_color();
       font *get_font();
       font *get_ruby_font();
       int get_spacing();
       virtual type_id get_type_id() const { return LEV_TLAYOUT; }
-      virtual const char *get_type_name() const { return "lev.image.layout"; }
+      virtual const char *get_type_name() const { return "lev.layout"; }
       bool is_done();
       bool on_hover(int x, int y);
       bool on_left_click(int x, int y);

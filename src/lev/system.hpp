@@ -12,7 +12,7 @@
 /////////////////////////////////////////////////////////////////////////////
 
 #include "base.hpp"
-#include "image.hpp"
+#include "draw.hpp"
 #include <luabind/luabind.hpp>
 
 extern "C" {
@@ -28,35 +28,27 @@ namespace lev
       event();
       virtual ~event();
       std::string get_button() const;
-      int get_device() const;
       int get_dx() const;
       int get_dy() const;
       std::string get_key() const;
       long get_key_code() const;
-      bool get_left() const;
-      bool get_middle() const;
-      bool get_right() const;
+      void *get_rawobj() { return _obj; }
       virtual type_id get_type_id() const { return LEV_TEVENT; }
       virtual const char *get_type_name() const { return "lev.event"; }
       int get_x() const;
       int get_y() const;
       bool is_pressed() const;
       bool is_released() const;
-      bool set_button_code(int button);
-      bool set_device(int device);
-      bool set_dx(int dx);
-      bool set_dy(int dy);
-      bool set_key_code(long key);
-      bool set_left(bool pressed = 0);
-      bool set_middle(bool pressed = 0);
-      bool set_pressed(bool pressed = 0);
-      bool set_released(bool released = 0);
-      bool set_right(bool pressed = 0);
-      bool set_x(int x);
-      bool set_y(int y);
+      bool left_is_down() const;
+      bool middle_is_down() const;
+      bool right_is_down() const;
     protected:
       void *_obj;
   };
+
+//  class window : public screen
+//  {
+//  };
 
   class system : public base
   {
@@ -83,7 +75,7 @@ namespace lev
       luabind::object get_on_right_down();
       luabind::object get_on_right_up();
       luabind::object get_on_tick();
-      screen* get_screen() { return screen::get(); }
+      screen* get_screen();
       unsigned long get_ticks();
       virtual type_id get_type_id() const { return LEV_TSYSTEM; }
       virtual const char *get_type_name() const { return "lev.system"; }

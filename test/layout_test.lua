@@ -32,22 +32,20 @@ screen = sys:set_video_mode(640, 480, 32)
 local start = sys.ticks
 local count = 1
 sys.on_tick = function()
-local current = sys.ticks
---  local start = sys.ticks
---  screen:clear();
-  screen:clear(255, 0, 0, 0);
+  local current = sys.ticks
+  screen:clear();
+--  screen:clear(255, 0, 0, 0);
 --  screen:clear(lev.prim.color('red'));
 --  print('clear:', sys.ticks - start)
 --  screen:blit(0, 0, img) 
---  screen:draw(0, 0, img, 128)
+  screen:draw(0, 0, img, 128)
 --  screen:blit(img3)
 --  screen:blit(100, 50, img2, 200)
 --  screen:draw(lay, 10, 10, 200)
---  screen:flip()
-  screen:swap()
-print('now', (sys.ticks - current))
-print('ave', (sys.ticks - start) / count)
-count = count + 1
+  screen:flip()
+  print('now', (sys.ticks - current))
+  print('ave', (sys.ticks - start) / count)
+  count = count + 1
 end
 
 sys.on_quit = function(e)

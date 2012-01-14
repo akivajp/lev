@@ -87,6 +87,15 @@ int luaopen_lev_sound(lua_State *L)
 namespace lev
 {
 
+//static void test(const char *str, SDL_AudioSpec &t)
+//{
+//  printf("%s\n", str);
+//  printf("freq: %d\n", t.freq);
+//  printf("format: %d\n", t.format);
+//  printf("channels: %d\n", t.channels);
+//  printf("samples: %d\n", t.samples);
+//}
+
   static SDL_AudioSpec& get_spec(class myMixer *mx);
 
   class audio_locker
@@ -404,6 +413,7 @@ namespace lev
           {
             SDL_AudioCVT cvt;
             SDL_AudioSpec &audio = get_spec(mx);
+//test("WAV SPEC", spec);
             SDL_BuildAudioCVT(&cvt, spec.format,  spec.channels,  spec.freq,
                                     audio.format, audio.channels, audio.freq);
             cvt.buf = (Uint8 *)malloc(wav_len * cvt.len_mult);
@@ -592,6 +602,7 @@ namespace lev
 //        else { return false; }
       }
 
+
       static myMixer *Create()
       {
         myMixer *mx = NULL;
@@ -606,6 +617,8 @@ namespace lev
           request.userdata = mx;
           if (system::init() == NULL) { throw -1; }
           if (SDL_OpenAudio(&request, &mx->spec) < 0) { throw -2; }
+//test("REQUEST", request);
+//test("ACCEPT",  mx->spec);
           SDL_PauseAudio(0);
           mx->active = true;
           return mx;
@@ -691,6 +704,7 @@ namespace lev
     myMixer *mx = cast_mx(udata);
 
     std::map<int, sound *>::iterator i;
+    memset(stream, 0, len);
     for (i = mx->slots.begin(); i != mx->slots.end(); i++)
     {
       if (! i->second) { continue; }

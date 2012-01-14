@@ -1,0 +1,49 @@
+#ifndef _WINDOW_HPP
+#define _WINDOW_HPP
+
+/////////////////////////////////////////////////////////////////////////////
+// Name:        lev/window.hpp
+// Purpose:     header for window managing class
+// Author:      Akiva Miura <akiva.miura@gmail.com>
+// Modified by:
+// Created:     01/14/2012
+// Copyright:   (C) 2010-2012 Akiva Miura
+// Licence:     MIT License
+/////////////////////////////////////////////////////////////////////////////
+
+#include "base.hpp"
+
+extern "C" {
+  int luaopen_lev_window(lua_State *L);
+}
+
+namespace lev
+{
+
+  class screen;
+
+  class window : public base
+  {
+    protected:
+      window();
+    public:
+      ~window();
+      bool close();
+      static window* create(const char *title, int x, int y, int w, int h, unsigned long flags);
+      static int create_l(lua_State *L);
+      screen* create_context();
+      int get_h();
+      void* get_rawobj() { return _obj; }
+      int get_w();
+      virtual type_id get_type_id() const { return LEV_TWINDOW; }
+      virtual const char *get_type_name() const { return "lev.window"; }
+      bool set_h(int h);
+      bool set_w(int w);
+    protected:
+      void* _obj;
+  };
+
+}
+
+#endif // _WINDOW_HPP
+
