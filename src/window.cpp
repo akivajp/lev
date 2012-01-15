@@ -44,7 +44,11 @@ int luaopen_lev_window(lua_State *L)
         .def("create_screen", &window::create_context, adopt(result))
         .property("h", &window::get_h, &window::set_h)
         .property("height", &window::get_h, &window::set_h)
+        .property("id", &window::get_id)
+        .def("hide", &window::hide)
         .def("screen", &window::create_context, adopt(result))
+        .def("show", &window::show)
+        .def("show", &window::show0)
         .property("w", &window::get_w, &window::set_w)
         .property("width", &window::get_w, &window::set_w)
     ]
@@ -58,13 +62,15 @@ int luaopen_lev_window(lua_State *L)
 namespace lev
 {
 
+  static SDL_Window* cast_win(void *obj) { return (SDL_Window *)obj; }
+
   window::window() : _obj(NULL) { }
 
   window::~window()
   {
     if (_obj)
     {
-      SDL_DestroyWindow((SDL_Window *)_obj);
+      SDL_DestroyWindow(cast_win(_obj));
     }
   }
 
@@ -133,7 +139,7 @@ namespace lev
       if (strstr(flags_str, "borderless"))    { flags |= SDL_WINDOW_BORDERLESS; }
       if (strstr(flags_str, "full"))          { flags |= SDL_WINDOW_FULLSCREEN; }
 //      if (strstr(flags_str, "fullscreen"))    { flags |= SDL_WINDOW_FULLSCREEN; }
-      if (strstr(flags_str, "hidden"))        { flags &= ~SDL_WINDOW_SHOWN; }
+      if (strstr(flags_str, "hidden"))        { flags |= SDL_WINDOW_HIDDEN; }
 //      if (strstr(flags_str, "input"))         { flags |= SDL_WINDOW_INPUT_GRABBED; }
       if (strstr(flags_str, "input_grabbed")) { flags |= SDL_WINDOW_INPUT_GRABBED; }
       if (strstr(flags_str, "max"))           { flags |= SDL_WINDOW_MAXIMIZED; }
@@ -161,11 +167,21 @@ namespace lev
     return h;
   }
 
+  long window::get_id()
+  {
+    return SDL_GetWindowID(cast_win(_obj));
+  }
+
   int window::get_w()
   {
     int w;
     SDL_GetWindowSize((SDL_Window *)_obj, &w, NULL);
     return w;
+  }
+
+  bool window::hide()
+  {
+    SDL_HideWindow(cast_win(_obj));
   }
 
   bool window::set_h(int h)
@@ -178,6 +194,16 @@ namespace lev
   {
     int h = get_h();
     SDL_SetWindowSize((SDL_Window *)_obj, w, h);
+  }
+
+  bool window::show(bool showing)
+  {
+    if (showing)
+    {
+      SDL_ShowWindow(cast_win(_obj));
+      return true;
+    }
+    return hide();
   }
 
 }

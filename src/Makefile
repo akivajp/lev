@@ -5,8 +5,8 @@ SLIB = liblev.a
 OUT = a.out
 PCH = prec.h.gch
 RANLIB = ranlib
-CORE_SRC  = draw.cpp entry.cpp font.cpp image.cpp prim.cpp \
-	    sound.cpp string.cpp system.cpp util.cpp window.cpp
+CORE_SRC  = draw.cpp entry.cpp font.cpp image.cpp package.cpp prim.cpp \
+	    sound.cpp string.cpp system.cpp timer.cpp util.cpp window.cpp
 OBJS = $(CORE_SRC:%.cpp=%.o)
 DLIB = lev.so
 #LIBS = -llua -lluabind -lSDL -lvorbisfile -lfreetype -lGL
@@ -56,10 +56,13 @@ draw.o: draw.cpp lev/draw.hpp
 entry.o: entry.cpp lev/entry.hpp
 font.o: font.cpp lev/font.hpp
 image.o: image.cpp lev/image.hpp
+main.o: main.cpp
+package.o: package.cpp lev/package.hpp
 prim.o: prim.cpp lev/prim.hpp
 sound.o: sound.cpp lev/sound.hpp
 string.o: string.cpp lev/string.hpp
 system.o: system.cpp lev/system.hpp
+timer.o: timer.cpp lev/timer.hpp
 util.o: util.cpp lev/util.hpp
 window.o: window.cpp lev/window.hpp
 %.o: %.cpp

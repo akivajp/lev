@@ -49,7 +49,7 @@ end
 
 system.on_motion = function(e)
 --  print('motion: ', e.left, e.right, e.middle)
---  print('motion!', e.x, e.y, e.dx, e.dy)
+  print('motion!', e.x, e.y, e.dx, e.dy)
 end
 
 system.on_left_down = function(e)

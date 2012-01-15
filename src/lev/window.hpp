@@ -33,12 +33,16 @@ namespace lev
       static int create_l(lua_State *L);
       screen* create_context();
       int get_h();
+      long get_id();
       void* get_rawobj() { return _obj; }
       int get_w();
       virtual type_id get_type_id() const { return LEV_TWINDOW; }
       virtual const char *get_type_name() const { return "lev.window"; }
+      bool hide();
       bool set_h(int h);
       bool set_w(int w);
+      bool show(bool showing = true);
+      bool show0() { return show(); }
     protected:
       void* _obj;
   };

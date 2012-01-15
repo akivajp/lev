@@ -15,10 +15,12 @@
 #include "entry.hpp"
 #include "font.hpp"
 #include "image.hpp"
+#include "package.hpp"
 #include "prim.hpp"
 #include "sound.hpp"
 #include "string.hpp"
 #include "system.hpp"
+#include "timer.hpp"
 #include "util.hpp"
 
 #endif // _LEV_HPP
