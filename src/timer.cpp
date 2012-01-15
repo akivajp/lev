@@ -250,11 +250,15 @@ namespace lev
     {
       if (t->notify && luabind::type(t->notify) == LUA_TFUNCTION)
       {
-        luabind::object result = t->notify();
-//printf("RESULT TYPE: %d\n", luabind::type(result));
-        if (luabind::type(result) == LUA_TBOOLEAN && result == false)
-        {
-          t->running = false;
+        try {
+          luabind::object result = t->notify();
+          if (luabind::type(result) == LUA_TBOOLEAN && result == false)
+          {
+            t->running = false;
+          }
+        }
+        catch (...) {
+          fprintf(stderr, "%s\n", lua_tostring(t->notify.interpreter(), -1));
         }
         if (t->one_shot)
         {

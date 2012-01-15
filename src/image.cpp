@@ -8,16 +8,21 @@
 // Licence:     MIT License
 /////////////////////////////////////////////////////////////////////////////
 
+// pre-compiled header
 #include "prec.h"
 
+// declarations
 #include "lev/image.hpp"
 
+// dependencies
 #include "lev/font.hpp"
 #include "lev/util.hpp"
 #include "lev/system.hpp"
+#include "lev/timer.hpp"
 #include "register.hpp"
 //#include "resource/levana.xpm"
 
+// libraries
 #include <luabind/adopt_policy.hpp>
 #include <luabind/luabind.hpp>
 #include <auto_ptr.h>
@@ -74,7 +79,6 @@ int luaopen_lev_image(lua_State *L)
 //        .def("stroke_line", &image::stroke_line6)
 //        .def("stroke_rect", &image::stroke_rect)
 //        .def("stroke_rectangle", &image::stroke_rect)
-        .def("texturize", &texture::create, adopt(result))
         .scope
         [
           def("create",  &image::create, adopt(result)),
@@ -87,7 +91,8 @@ int luaopen_lev_image(lua_State *L)
       class_<texture, drawable>("texture")
         .scope
         [
-          def("create", &texture::create, adopt(result))
+          def("create", &texture::create, adopt(result)),
+          def("create", &texture::load, adopt(result))
         ],
 //      class_<animation, drawable>("animation")
 //        .def("add", &animation::add_file)
@@ -97,15 +102,16 @@ int luaopen_lev_image(lua_State *L)
 //          def("create", &animation::create, adopt(result)),
 //          def("create", &animation::create0, adopt(result))
 //        ],
-//      class_<transition, drawable>("transition")
-//        .property("is_running", &transition::is_running)
-//        .def("set_current", &transition::set_current)
-//        .def("set_next", &transition::set_next)
-//        .scope
-//        [
-//          def("create", &transition::create, adopt(result)),
-//          def("create", &transition::create0, adopt(result))
-//        ],
+      class_<transition, drawable>("transition")
+        .property("is_running", &transition::is_running)
+        .def("rewind", &transition::rewind)
+        .def("set_current", &transition::set_current)
+        .def("set_next", &transition::set_next)
+        .scope
+        [
+          def("create", &transition::create, adopt(result)),
+          def("create", &transition::create0, adopt(result))
+        ],
       class_<layout, drawable>("layout")
         .def("clear", &layout::clear)
         .def("clear", &layout::clear0)
@@ -155,7 +161,8 @@ int luaopen_lev_image(lua_State *L)
   image["load"]        = classes["image"]["load"];
   image["string"]      = classes["image"]["string"];
   image["tex2d"]       = classes["texture"]["create"];
-//  image["transition"]  = classes["transition"]["create"];
+  image["texture"]       = classes["texture"]["create"];
+  image["transition"]  = classes["transition"]["create"];
 
   globals(L)["package"]["loaded"]["lev.image"] = image;
   return 0;
@@ -168,11 +175,12 @@ namespace lev
   class myImage
   {
     public:
-      myImage(int w, int h) : w(w), h(h) { }
+      myImage(int w, int h) : w(w), h(h), tex(NULL) { }
 
       virtual ~myImage()
       {
         if (buf) { delete [] buf; }
+        if (tex) { delete tex; }
       }
 
       static myImage* Create(int w, int h)
@@ -190,8 +198,27 @@ namespace lev
         }
       }
 
+      bool OnChange()
+      {
+        if (tex)
+        {
+          delete tex;
+          tex = NULL;
+        }
+        return true;
+      }
+
+      bool Texturize(image *orig, bool force = false)
+      {
+        if (tex) { return false; }
+        tex = texture::create(orig);
+        return true;
+      }
+
       int w, h;
       unsigned char *buf;
+
+      texture* tex;
   };
 
   static myImage *cast_image(void *obj) { return (myImage *)obj; }
@@ -314,6 +341,7 @@ namespace lev
         blend_pixel(&dst_buf[4 * (real_dst_y * dst_w + real_dst_x)], src_pixel);
       }
     }
+    cast_image(_obj)->OnChange();
     return true;
   }
 
@@ -367,6 +395,7 @@ namespace lev
         }
       }
     }
+    cast_image(_obj)->OnChange();
     return true;
   }
 
@@ -416,6 +445,7 @@ namespace lev
   bool image::draw(drawable *src, int x, int y, unsigned char alpha)
   {
     if (! src) { return false; }
+    cast_image(_obj)->OnChange();
     return src->draw_on_image(this, x, y, alpha);
   }
 
@@ -428,6 +458,8 @@ namespace lev
   bool image::draw_on_screen(screen *dst, int offset_x, int offset_y, unsigned char alpha)
   {
     if (! dst) { return false; }
+    if (is_texturized()) { return cast_image(_obj)->tex->draw_on_screen(dst); }
+
     int w = get_w();
     int h = get_h();
     unsigned char *pixel = cast_image(_obj)->buf;
@@ -454,6 +486,7 @@ namespace lev
     if (x < 0 || x >= get_w() || y < 0 || y >= get_h()) { return false; }
     unsigned char *buf = cast_image(_obj)->buf;
     unsigned char *pixel = &buf[4 * (y * get_w() + x)];
+    cast_image(_obj)->OnChange();
     return blend_pixel(pixel, c);
   }
 
@@ -472,6 +505,7 @@ namespace lev
         draw_pixel(offset_x + x, offset_y + y, copy);
       }
     }
+    cast_image(_obj)->OnChange();
     return true;
   }
 
@@ -588,6 +622,7 @@ namespace lev
         draw_pixel(offset_x + x, offset_y + y, *filling);
       }
     }
+    cast_image(_obj)->OnChange();
     return true;
   }
 
@@ -612,6 +647,14 @@ namespace lev
   int image::get_w() const
   {
     return cast_image(_obj)->w;
+  }
+
+  bool image::is_compiled() { return false; }
+
+  bool image::is_texturized()
+  {
+    if (cast_image(_obj)->tex) { return true; }
+    return false;
   }
 
 //  image* image::levana_icon()
@@ -673,6 +716,7 @@ namespace lev
     if (! img) { return false; }
     this->swap(img);
     delete img;
+    cast_image(_obj)->OnChange();
     return true;
   }
 
@@ -693,6 +737,7 @@ namespace lev
     pixel[1] = c.get_g();
     pixel[2] = c.get_b();
     pixel[3] = c.get_a();
+    cast_image(_obj)->OnChange();
     return true;
   }
 
@@ -888,7 +933,13 @@ namespace lev
     void *tmp  = this->_obj;
     this->_obj = img->_obj;
     img->_obj  = tmp;
+    cast_image(_obj)->OnChange();
     return true;
+  }
+
+  bool image::texturize(bool force)
+  {
+    return cast_image(_obj)->Texturize(this, force);
   }
 
 
@@ -1013,6 +1064,17 @@ namespace lev
     return cast_tex(_obj)->img_w;
   }
 
+  texture* texture::load(const std::string &file)
+  {
+    try {
+      std::auto_ptr<image> img(image::load(file));
+      if (! img.get()) { throw -1; }
+      return texture::create(img.get());
+    }
+    catch (...) {
+      return NULL;
+    }
+  }
 
   /*
   class myAnimation
@@ -1128,6 +1190,8 @@ namespace lev
   }
 
 
+*/
+
   class myTransition
   {
     public:
@@ -1135,37 +1199,65 @@ namespace lev
       enum transition_type
       {
         LEV_TRAN_NONE = 0,
-        LEV_TRAN_FADE,
+        LEV_TRAN_CROSS_FADE,
         LEV_TRAN_FADE_OUT,
       };
 
-      myTransition(luabind::object img)
-       : imgs()
+    protected:
+
+      myTransition() : imgs(), sw(NULL), texturized(false) { }
+
+    public:
+
+      ~myTransition()
       {
-        sw.Start();
-        if (! img) { imgs.push_back(luabind::object()); }
-        else if (luabind::type(img) == LUA_TSTRING)
+        if (sw)
         {
-          luabind::object data = globals(img.interpreter())["lev"]["image"]["load"](img);
-          imgs.push_back(data);
+          delete sw;
         }
-        else if (base::is_type_of(img, base::LEV_TFILE_PATH))
-        {
-          luabind::object data = globals(img.interpreter())["lev"]["image"]["load"](img["full"]);
-          imgs.push_back(data);
-        }
-        else if (base::is_type_of(img, base::LEV_TDRAWABLE, base::LEV_TDRAWABLE_END)) { imgs.push_back(img); }
-        else { imgs.push_back(luabind::object()); }
       }
 
-      ~myTransition() { }
+      static myTransition *Create(luabind::object img)
+      {
+        myTransition *tran = NULL;
+        try {
+          tran = new myTransition;
+          tran->sw = stop_watch::create();
+          if (! tran->sw) { throw -1; }
 
-      bool DrawOn(canvas *cv, int x, int y, unsigned char alpha)
+          tran->sw->start();
+          if (! img) { tran->imgs.push_back(luabind::object()); }
+          else if (luabind::type(img) == LUA_TSTRING)
+          {
+            luabind::object data = globals(img.interpreter())["lev"]["image"]["load"](img);
+            tran->imgs.push_back(data);
+          }
+  //        else if (base::is_type_of(img, base::LEV_TFILE_PATH))
+  //        {
+  //          luabind::object data = globals(img.interpreter())["lev"]["image"]["load"](img["full"]);
+  //          imgs.push_back(data);
+  //        }
+          else if (base::is_type_of(img, base::LEV_TDRAWABLE, base::LEV_TDRAWABLE_END))
+          {
+            tran->imgs.push_back(img);
+          }
+          else { tran->imgs.push_back(luabind::object()); }
+
+          return tran;
+        }
+        catch (...) {
+          delete tran;
+          return NULL;
+        }
+      }
+
+      bool DrawOn(screen *cv, int x, int y, unsigned char alpha)
       {
         double grad = 1.0;
+
         if (durations.size() >= 1 && durations[0] > 0)
         {
-          grad = ((double)sw.Time()) / durations[0];
+          grad = ((double)sw->get_time()) / durations[0];
           if (grad > 1.0) { grad = 1.0; }
         }
 
@@ -1174,7 +1266,8 @@ namespace lev
         {
           if (types.size() >= 1 && types[0] == LEV_TRAN_FADE_OUT)
           {
-            imgs[0]["draw_on"](imgs[0], cv, x, y, 255 - (int)(alpha * grad));
+//            imgs[0]["draw_on"](imgs[0], cv, x, y, 255 - (int)(alpha * grad));
+            imgs[0]["draw_on"](imgs[0], cv, x, y, alpha);
           }
           else { imgs[0]["draw_on"](imgs[0], cv, x, y, alpha); }
         }
@@ -1182,15 +1275,15 @@ namespace lev
         if (imgs.size() == 1) { return true; }
         if (imgs[1])
         {
-          if (types[0] == LEV_TRAN_FADE)
+          if (types[0] == LEV_TRAN_CROSS_FADE)
           {
             imgs[1]["draw_on"](imgs[1], cv, x, y, alpha * grad);
           }
         }
 
-        if (sw.Time() >= durations[0])
+        if (sw->get_time() >= durations[0])
         {
-          sw.Start(sw.Time() - durations[0]);
+          sw->start(sw->get_time() - durations[0]);
           imgs.erase(imgs.begin());
           durations.erase(durations.begin());
           types.erase(types.begin());
@@ -1198,8 +1291,20 @@ namespace lev
         return true;
       }
 
+      bool OnChange()
+      {
+        texturized = false;
+        return true;
+      }
+
+      bool Rewind()
+      {
+        return sw->start(0);
+      }
+
       bool SetCurrent(luabind::object img)
       {
+        OnChange();
         imgs.resize(0);
         durations.resize(0);
         if (! img) { imgs.push_back(luabind::object()); }
@@ -1208,17 +1313,18 @@ namespace lev
           luabind::object data = globals(img.interpreter())["lev"]["image"]["load"](img);
           imgs.push_back(data);
         }
-        else if (base::is_type_of(img, base::LEV_TFILE_PATH))
-        {
-          luabind::object data = globals(img.interpreter())["lev"]["image"]["load"](img["full"]);
-          imgs.push_back(data);
-        }
+//        else if (base::is_type_of(img, base::LEV_TFILE_PATH))
+//        {
+//          luabind::object data = globals(img.interpreter())["lev"]["image"]["load"](img["full"]);
+//          imgs.push_back(data);
+//        }
         else if (base::is_type_of(img, base::LEV_TDRAWABLE, base::LEV_TDRAWABLE_END)) { imgs.push_back(img); }
         else { imgs.push_back(luabind::object()); }
       }
 
       bool SetNext(luabind::object img, int duration, const std::string &type)
       {
+        OnChange();
         if (duration < 0) { return false; }
         if (! img) { imgs.push_back(luabind::object()); }
         else if (luabind::type(img) == LUA_TSTRING)
@@ -1226,39 +1332,46 @@ namespace lev
           luabind::object data = globals(img.interpreter())["lev"]["image"]["load"](img);
           imgs.push_back(data);
         }
-        else if (base::is_type_of(img, base::LEV_TFILE_PATH))
-        {
-          luabind::object data = globals(img.interpreter())["lev"]["image"]["load"](img["full"]);
-          imgs.push_back(data);
-        }
+//        else if (base::is_type_of(img, base::LEV_TFILE_PATH))
+//        {
+//          luabind::object data = globals(img.interpreter())["lev"]["image"]["load"](img["full"]);
+//          imgs.push_back(data);
+//        }
         else if (base::is_type_of(img, base::LEV_TDRAWABLE, base::LEV_TDRAWABLE_END)) { imgs.push_back(img); }
         else { imgs.push_back(luabind::object()); }
 
         durations.push_back(duration);
 
-        if (type == "fade") { types.push_back(LEV_TRAN_FADE); }
+        if (type == "cross_fade") { types.push_back(LEV_TRAN_CROSS_FADE); }
+        else if (type == "fade") { types.push_back(LEV_TRAN_CROSS_FADE); }
         else if (type == "fade_out") { types.push_back(LEV_TRAN_FADE_OUT); }
-        else { types.push_back(LEV_TRAN_FADE); }
+        else { types.push_back(LEV_TRAN_CROSS_FADE); }
 
-        return false;
-      }
-
-      bool TexturizeAll(canvas *cv, bool force)
-      {
-        for (int i = 0; i < imgs.size(); i++)
-        {
-          if (base::is_type_of(imgs[i], base::LEV_TDRAWABLE, base::LEV_TDRAWABLE_END))
-          {
-            imgs[i]["texturize"](imgs[i], cv, force);
-          }
-        }
         return true;
       }
 
+      bool TexturizeAll(bool force)
+      {
+        if (! texturized)
+        {
+          for (int i = 0; i < imgs.size(); i++)
+          {
+            if (base::is_type_of(imgs[i], base::LEV_TDRAWABLE, base::LEV_TDRAWABLE_END))
+            {
+              imgs[i]["texturize"](imgs[i]);
+            }
+          }
+          texturized = true;
+          return true;
+        }
+        return false;
+      }
+
+      bool texturized;
       std::vector<luabind::object> imgs;
       std::vector<long> durations;
       std::vector<transition_type> types;
-      wxStopWatch sw;
+      stop_watch *sw;
   };
   static myTransition* cast_tran(void *obj) { return (myTransition *)obj; }
 
@@ -1274,7 +1387,8 @@ namespace lev
     transition* tran = NULL;
     try {
       tran = new transition;
-      tran->_obj = new myTransition(img);
+      tran->_obj = myTransition::Create(img);
+      if (! tran->_obj) { throw -1; }
       return tran;
     }
     catch (...) {
@@ -1283,7 +1397,7 @@ namespace lev
     }
   }
 
-  bool transition::draw_on(canvas *cv, int x, int y, unsigned char alpha)
+  bool transition::draw_on_screen(screen *cv, int x, int y, unsigned char alpha)
   {
     return cast_tran(_obj)->DrawOn(cv, x, y, alpha);
   }
@@ -1292,6 +1406,11 @@ namespace lev
   {
     if (cast_tran(_obj)->imgs.size() <= 1) { return false; }
     else { return true; }
+  }
+
+  bool transition::rewind()
+  {
+    return cast_tran(_obj)->Rewind();
   }
 
   bool transition::set_current(luabind::object current)
@@ -1304,12 +1423,10 @@ namespace lev
     return cast_tran(_obj)->SetNext(next, duration, type);
   }
 
-  bool transition::texturize(canvas *cv, bool force)
+  bool transition::texturize(bool force)
   {
-    return cast_tran(_obj)->TexturizeAll(cv, force);
+    return cast_tran(_obj)->TexturizeAll(force);
   }
-
-  */
 
   class myLayout
   {

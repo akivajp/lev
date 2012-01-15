@@ -34,6 +34,8 @@ namespace lev
       drawable() : base() { }
     public:
       virtual ~drawable() { }
+      virtual bool compile(bool force = false) { return false; }
+      virtual bool compile0() { return compile(); }
       virtual bool draw_on_image(image *dst, int x = 0, int y = 0, unsigned char alpha = 255) { return false; }
       virtual bool draw_on_image1(image *dst) { return draw_on_image(dst); }
       virtual bool draw_on_image3(image *dst, int x, int y) { return draw_on_image(dst, x, y); }
@@ -44,6 +46,10 @@ namespace lev
       virtual type_id get_type_id() const { return LEV_TDRAWABLE; }
       virtual const char *get_type_name() const { return "lev.drawable"; }
       virtual int get_w() const { return 0; }
+      virtual bool is_compiled() { false; }
+      virtual bool is_texturized() { false; }
+      virtual bool texturize(bool force = false) { return false; }
+      virtual bool texturize0() { return texturize(); }
   };
 
   // screen (graphic context manager) class

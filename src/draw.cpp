@@ -38,6 +38,8 @@ int luaopen_lev_draw(lua_State *L)
     namespace_("classes")
     [
       class_<drawable, base>("drawable")
+        .def("compile", &drawable::compile)
+        .def("compile", &drawable::compile0)
         .def("draw_on", &drawable::draw_on_image)
         .def("draw_on", &drawable::draw_on_image1)
         .def("draw_on", &drawable::draw_on_image3)
@@ -46,6 +48,10 @@ int luaopen_lev_draw(lua_State *L)
         .def("draw_on", &drawable::draw_on_screen3)
         .property("h", &drawable::get_h)
         .property("height", &drawable::get_h)
+        .property("is_compiled", &drawable::is_compiled)
+        .property("is_texturized", &drawable::is_texturized)
+        .def("texturize", &drawable::texturize)
+        .def("texturize", &drawable::texturize0)
         .property("w", &drawable::get_w)
         .property("width", &drawable::get_w),
       class_<screen, base>("screen")
@@ -233,6 +239,12 @@ namespace lev
       else if (t["lev.texture1"])
       {
         texture *src = object_cast<texture *>(t["lev.texture1"]);
+
+        s->draw(src, x, y, a);
+      }
+      else if (t["lev.transition1"])
+      {
+        transition *src = object_cast<transition *>(t["lev.transition1"]);
 
         s->draw(src, x, y, a);
       }

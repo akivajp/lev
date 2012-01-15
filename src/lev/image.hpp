@@ -65,8 +65,8 @@ namespace lev
       virtual type_id get_type_id() const { return LEV_TIMAGE; }
       virtual const char *get_type_name() const { return "lev.image"; }
       virtual int get_w() const;
-      bool is_compiled();
-      bool is_texturized();
+      virtual bool is_compiled();
+      virtual bool is_texturized();
       static image* levana_icon();
       static image* load(const std::string &filename);
       bool reload(const std::string &filename);
@@ -84,10 +84,10 @@ namespace lev
       bool stroke_rect(int x, int y, int w, int h, color *border, int width);
       image* sub_image(int x, int y, int w, int h);
       static int sub_image_l(lua_State *L);
+      virtual bool texturize(bool force = false);
       bool swap(image *img);
     protected:
       void *_obj;
-//      void *_status;
   };
 
   class texture : public drawable
@@ -102,6 +102,8 @@ namespace lev
       virtual int get_h() const;
       virtual int get_w() const;
       virtual const char *get_type_name() const { return "lev.texture"; }
+      virtual bool is_texturized() { return true; }
+      static texture* load(const std::string &file);
     protected:
       void *_obj;
   };
@@ -124,26 +126,27 @@ namespace lev
 //      void *_obj;
 //  };
 
-//  class transition : public drawable
-//  {
-//    protected:
-//      transition();
-//    public:
-//      virtual ~transition();
-//      virtual bool draw_on(canvas *cv, int x = 0, int y = 0, unsigned char alpha = 255);
-//      virtual bool draw_on1(canvas *cv) { return draw_on(cv); }
-//      virtual bool draw_on3(canvas *cv, int x = 0, int y = 0) { return draw_on(cv, x, y); }
-//      static transition* create(luabind::object img);
-//      static transition* create0() { return create(luabind::object()); }
-//      virtual type_id get_type_id() const { return LEV_TTRANSITION; }
-//      virtual const char *get_type_name() const { return "lev.transition"; }
-//      bool is_running();
-//      bool set_current(luabind::object current);
-//      bool set_next(luabind::object next, int duration = 1000, const std::string &type = "");
-//      virtual bool texturize(canvas *cv, bool force = false);
-//    protected:
-//      void *_obj;
-//  };
+  class transition : public drawable
+  {
+    protected:
+      transition();
+    public:
+      virtual ~transition();
+      virtual bool draw_on_screen(screen *cv, int x = 0, int y = 0, unsigned char alpha = 255);
+      virtual bool draw_on_screen1(screen *cv) { return draw_on_screen(cv); }
+      virtual bool draw_on_screen3(screen *cv, int x = 0, int y = 0) { return draw_on_screen(cv, x, y); }
+      static transition* create(luabind::object img);
+      static transition* create0() { return create(luabind::object()); }
+      virtual type_id get_type_id() const { return LEV_TTRANSITION; }
+      virtual const char *get_type_name() const { return "lev.transition"; }
+      bool is_running();
+      bool rewind();
+      bool set_current(luabind::object current);
+      bool set_next(luabind::object next, int duration = 1000, const std::string &type = "");
+      virtual bool texturize(bool force = false);
+    protected:
+      void *_obj;
+  };
 
   class layout : public drawable
   {

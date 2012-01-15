@@ -723,7 +723,7 @@ namespace lev
           f(&e);
         }
         catch (...) {
-printf("ERROR!\n");
+          fprintf(stderr, "%s\n", lua_tostring(f.interpreter(), -1));
         }
       }
       return true;
