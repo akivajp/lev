@@ -59,6 +59,7 @@ int luaopen_lev_string(lua_State *L)
 
   string["concat"] = classes["unistr"]["concat"];
   string["create"] = classes["unistr"]["create"];
+  string["unicode"] = classes["unistr"]["create"];
   string["unistr"] = classes["unistr"]["create"];
 
   globals(L)["package"]["loaded"]["lev.string"] = string;

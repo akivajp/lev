@@ -12,7 +12,6 @@
 /////////////////////////////////////////////////////////////////////////////
 
 #include "base.hpp"
-#include "draw.hpp"
 #include <luabind/luabind.hpp>
 
 extern "C" {
@@ -21,6 +20,10 @@ extern "C" {
 
 namespace lev
 {
+
+  // class dependencies
+  class screen;
+  class timer;
 
   class input
   {
@@ -59,6 +62,8 @@ namespace lev
       system();
     public:
       virtual ~system();
+      timer* create_timer(double interval = 1000);
+      timer* create_timer0() { return create_timer(); }
       bool delay(unsigned long msec = 1000);
       bool do_event();
       bool do_events();

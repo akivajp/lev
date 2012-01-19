@@ -10,8 +10,13 @@
 
 // pre-compiled header
 #include "prec.h"
+
 // declarations
 #include "lev/timer.hpp"
+
+// dependencies
+#include "lev/system.hpp"
+
 // libraries
 #include <SDL/SDL.h>
 
@@ -23,7 +28,9 @@ int luaopen_lev_timer(lua_State *L)
   open(L);
   // beginning to load
   globals(L)["package"]["loaded"]["lev.timer"] = true;
+  // dependencies
   globals(L)["require"]("lev.base");
+  globals(L)["require"]("lev.system");
 
   module(L, "lev")
   [
@@ -40,26 +47,22 @@ int luaopen_lev_timer(lua_State *L)
           def("create", &stop_watch::create, adopt(result))
         ],
       class_<timer, base>("timer")
-        .def("start", &timer::start)
-        .def("start", &timer::start0)
-        .def("start", &timer::start1)
-        .def("stop", &timer::stop)
         .property("is_one_shot", &timer::is_one_shot)
         .property("is_running", &timer::is_running)
         .property("interval", &timer::get_interval)
         .property("notify", &timer::get_notify, &timer::set_notify)
         .property("on_notify", &timer::get_notify, &timer::set_notify)
         .property("on_tick", &timer::get_notify, &timer::set_notify)
-        .scope
-        [
-          def("create", &timer::create, adopt(result))
-        ]
+        .def("probe", &timer::probe)
+        .def("start", &timer::start)
+        .def("start", &timer::start0)
+        .def("start", &timer::start1)
+        .def("stop", &timer::stop)
     ]
   ];
   object lev = globals(L)["lev"];
 
   lev["stop_watch"] = lev["classes"]["stop_watch"]["create"];
-  lev["timer"] = lev["classes"]["timer"]["create"];
 
   globals(L)["package"]["loaded"]["lev.timer"] = true;
   return 0;
@@ -166,25 +169,23 @@ namespace lev
   }
 
 
-  // prototype of timer callback function
-  static Uint32 timer_callback(Uint32 interval, void *param);
+//  // prototype of timer callback function
+//  static Uint32 timer_callback(Uint32 interval, void *param);
 
   class myTimer
   {
 
     public:
 
-      myTimer() : id((SDL_TimerID)NULL), interval(1000), notify(), one_shot(false), running(false) { }
+      myTimer(system *sys) :
+        base_time(0), interval(1000), notify(), one_shot(false),
+        running(false), sys(sys) { }
 
       ~myTimer()
       {
-        if (id)
-        {
-          SDL_RemoveTimer(id);
-        }
       }
 
-      long GetInterval() { return interval; }
+      double GetInterval() { return interval; }
 
       luabind::object GetNotify()
       {
@@ -201,9 +202,29 @@ namespace lev
         return running;
       }
 
-      void Notify()
+      bool Probe()
       {
-        if (notify && luabind::type(notify) == LUA_TFUNCTION) { notify(); }
+        if (running)
+        {
+          if (sys->get_ticks() - base_time > interval)
+          {
+            Notify();
+            base_time = sys->get_ticks();
+            if (one_shot) { running = false; }
+            return true;
+          }
+        }
+        return false;
+      }
+
+      bool Notify()
+      {
+        if (notify && luabind::type(notify) == LUA_TFUNCTION)
+        {
+          notify();
+          return true;
+        }
+        return false;
       }
 
       bool SetNotify(luabind::object func)
@@ -214,15 +235,9 @@ namespace lev
 
       bool Start(long new_interval = -1, bool one_shot = false)
       {
-        if (new_interval > 0) { interval = new_interval; }
+        if (new_interval >= 0) { interval = new_interval; }
 
-        if (! id)
-        {
-          id = SDL_AddTimer(interval, timer_callback, this);
-          if (! id) { return false; }
-        }
-
-        this->interval = interval;
+        base_time = sys->get_ticks();
         this->one_shot = one_shot;
         running = true;
         return true;
@@ -234,40 +249,41 @@ namespace lev
         return true;
       }
 
-      SDL_TimerID id;
-      long interval;
+      long base_time;
+      double interval;
       bool one_shot;
       bool running;
       luabind::object notify;
+      system *sys;
   };
 
-  static Uint32 timer_callback(Uint32 interval, void *param)
-  {
-    myTimer *t= (myTimer *)param;
-
-//printf("CALLBACK!\n");
-    if (t->running)
-    {
-      if (t->notify && luabind::type(t->notify) == LUA_TFUNCTION)
-      {
-        try {
-          luabind::object result = t->notify();
-          if (luabind::type(result) == LUA_TBOOLEAN && result == false)
-          {
-            t->running = false;
-          }
-        }
-        catch (...) {
-          fprintf(stderr, "%s\n", lua_tostring(t->notify.interpreter(), -1));
-        }
-        if (t->one_shot)
-        {
-          t->running = false;
-        }
-      }
-    }
-    return t->interval;
-  }
+//  static Uint32 timer_callback(Uint32 interval, void *param)
+//  {
+//    myTimer *t= (myTimer *)param;
+//
+////printf("CALLBACK!\n");
+//    if (t->running)
+//    {
+//      if (t->notify && luabind::type(t->notify) == LUA_TFUNCTION)
+//      {
+//        try {
+//          luabind::object result = t->notify();
+//          if (luabind::type(result) == LUA_TBOOLEAN && result == false)
+//          {
+//            t->running = false;
+//          }
+//        }
+//        catch (...) {
+//          fprintf(stderr, "%s\n", lua_tostring(t->notify.interpreter(), -1));
+//        }
+//        if (t->one_shot)
+//        {
+//          t->running = false;
+//        }
+//      }
+//    }
+//    return t->interval;
+//  }
 
   static myTimer* cast_timer(void *obj) { return (myTimer *)obj; }
 
@@ -281,13 +297,13 @@ namespace lev
     }
   }
 
-  timer* timer::create()
+  timer* timer::create(system *sys, double interval)
   {
     timer* t = NULL;
-    myTimer *obj = NULL;
     try {
       t = new timer;
-      t->_obj = obj = new myTimer;
+      t->_obj = new myTimer(sys);
+      t->start(interval, false);
       return t;
     }
     catch (...) {
@@ -296,7 +312,7 @@ namespace lev
     }
   }
 
-  int timer::get_interval()
+  double timer::get_interval()
   {
     return cast_timer(_obj)->GetInterval();
   }
@@ -314,6 +330,11 @@ namespace lev
   bool timer::is_running()
   {
     return cast_timer(_obj)->IsRunning();
+  }
+
+  bool timer::probe()
+  {
+    return cast_timer(_obj)->Probe();
   }
 
   bool timer::set_notify(luabind::object func)

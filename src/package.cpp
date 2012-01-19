@@ -16,7 +16,7 @@
 
 // dependencies
 //#include "lev/archive.hpp"
-//#include "lev/fs.hpp"
+#include "lev/fs.hpp"
 #include "lev/util.hpp"
 //#include "lev/system.hpp"
 #include "register.hpp"
@@ -58,17 +58,6 @@ int luaopen_lev_package(lua_State *L)
 
 namespace lev
 {
-
-  static bool file_exists(const char *path)
-  {
-    FILE *f = fopen(path, "r");
-    if (f)
-    {
-      fclose(f);
-      return true;
-    }
-    return false;
-  }
 
   static bool purge_path(std::string &path)
   {
@@ -269,7 +258,7 @@ namespace lev
     {
       if (luaL_dofile(L, path.c_str()))
       {
-printf("ERROR!\n");
+        fprintf(stderr, "%s\n", lua_tostring(L, -1));
 //        wxMessageBox(wxString(lua_tostring(L, -1), wxConvUTF8), _("Lua runtime error"));
         lua_pushnil(L);
         return 1;
@@ -312,7 +301,7 @@ printf("ERROR!\n");
           std::string real_path = path + "/" + search + "/" + file;
           purge_path(real_path);
 
-          if (file_exists(real_path.c_str()))
+          if (file_system::file_exists(real_path))
           {
             return real_path;
           }
@@ -471,14 +460,14 @@ printf("ERROR!\n");
     globals(L)["require"]("lev.font");
     object dirs = globals(L)["lev"]["package"]["font_dirs"];
 
-    if (file_exists(filename.c_str()))
+    if (file_system::file_exists(filename))
     {
       return globals(L)["lev"]["font"]["load"](filename);
     }
     for (iterator i(dirs), end; i != end; i++)
     {
       std::string path = object_cast<const char *>(*i);
-      if (file_exists((path + "/" + filename).c_str()))
+      if (file_system::file_exists(path + "/" + filename))
       {
         return globals(L)["lev"]["font"]["load"](path + "/" + filename);
       }

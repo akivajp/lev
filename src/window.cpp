@@ -15,6 +15,7 @@
 #include "lev/window.hpp"
 
 // dependencies
+#include "lev/draw.hpp"
 #include "lev/system.hpp"
 #include "lev/util.hpp"
 #include "register.hpp"

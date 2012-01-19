@@ -458,7 +458,10 @@ namespace lev
   bool image::draw_on_screen(screen *dst, int offset_x, int offset_y, unsigned char alpha)
   {
     if (! dst) { return false; }
-    if (is_texturized()) { return cast_image(_obj)->tex->draw_on_screen(dst); }
+    if (is_texturized())
+    {
+      return cast_image(_obj)->tex->draw_on_screen(dst, offset_x, offset_y, alpha);
+    }
 
     int w = get_w();
     int h = get_h();
@@ -1842,6 +1845,11 @@ namespace lev
     return cast_lay(_obj)->font_text.get();
   }
 
+  int layout::get_h() const
+  {
+    return cast_lay(_obj)->CalcMaxWidth();
+  }
+
   font *layout::get_ruby_font()
   {
     return cast_lay(_obj)->font_ruby.get();
@@ -1850,6 +1858,11 @@ namespace lev
   int layout::get_spacing()
   {
     return cast_lay(_obj)->spacing;
+  }
+
+  int layout::get_w() const
+  {
+    return cast_lay(_obj)->CalcTotalHeight();
   }
 
   bool layout::is_done()

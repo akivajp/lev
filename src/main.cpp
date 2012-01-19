@@ -8,15 +8,19 @@
 // Licence:     MIT License
 /////////////////////////////////////////////////////////////////////////////
 
+// pre-compiled header
 #include "prec.h"
 
+// dependencies
 //#include "lev/archive.hpp"
 #include "lev/entry.hpp"
-//#include "lev/fs.hpp"
-//#include "lev/package.hpp"
+#include "lev/fs.hpp"
+#include "lev/package.hpp"
 #include "lev/system.hpp"
 #include "register.hpp"
 
+// libraries
+#include <iostream>
 #include <string>
 
 using namespace lev;
@@ -120,28 +124,28 @@ int main(int argc, char **argv)
         break;
       default:
         set_args(L, argc, argv, i);
-//        if (wxFileName::DirExists(wxString(argv[i], wxConvUTF8)))
-//        {
-//          // argv[i] is directory
-//          // run entry program in argv[i] directory
+        if (file_system::dir_exists(argv[i]))
+        {
+          // argv[i] is directory
+          // run entry program in argv[i] directory
 //          package::add_path(L, file_system::to_full_path(argv[i]));
-//          for (int j = 0; j < len; j++)
-//          {
-//            std::string filename = argv[i];
-//            filename = filename + "/" + entry[j];
-//            if (access(filename.c_str(), 0) < 0) { continue; }
-//            if (! do_file(L, filename.c_str())) { return -1; }
-//            done_something = true;
-//            break;
-//          }
-//          if (! done_something)
-//          {
-//            wxString msg = _("Usage: create \"entry.txt\" file and put in \"") + wxString(argv[i], wxConvUTF8) + _("\" directory");
-//            wxMessageBox(msg, _("About usage"));
-//            return -1;
-//          }
-//        }
-//        else
+          package::add_path(L, argv[i]);
+          for (int j = 0; j < len; j++)
+          {
+            std::string filename = argv[i];
+            filename = filename + "/" + entry[j];
+            if (! file_system::file_exists(filename)) { continue; }
+            if (! do_file(L, filename.c_str())) { return -1; }
+            done_something = true;
+            break;
+          }
+          if (! done_something)
+          {
+            fprintf(stderr, "%s\n", lua_tostring(L, -1));
+            return -1;
+          }
+        }
+        else
         {
 //          // argv[i] is archive or script file
 //          if (lev::archive::is_archive(argv[i]))
@@ -180,7 +184,7 @@ int main(int argc, char **argv)
   for (int i = 0; i < len; i++)
   {
     if (done_something) { break; }
-    if (access(entry[i], 0) < 0) { continue; }
+    if (! file_system::file_exists(argv[i])) { continue; }
     if (! do_file(L, entry[i])) { return -1; }
     done_something = true;
   }

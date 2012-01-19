@@ -15,17 +15,17 @@ none:
 	@echo "where PLATFORM is one of these:"
 	@echo "  linux mac mingw"
 
-linux: build bin lib
+linux: build-all bin lib
 
 mac:
-	make -f make/Makefile.macosx build \
+	make -f build/Makefile.macosx build-all \
 		VERSION=$(VERSION)
 
 mingw:
-	make -f make/Makefile.mingw build \
+	make -f build/Makefile.mingw build-all \
 		VERSION=$(VERSION)
 
-build:
+build-all:
 	cd src && make all
 
 bin: src/$(OUT)

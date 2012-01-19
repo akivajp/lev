@@ -63,9 +63,14 @@ int luaopen_lev_draw(lua_State *L)
         .def("clear", &screen::clear)
         .def("clear", &screen::clear_color)
         .def("clear", &screen::clear_color1)
+        .def("clear", &screen::clear_color3)
         .def("draw_pixel", &screen::draw_pixel)
         .def("draw_raster", &screen::draw_raster)
+        .def("enable_alpha_blending", &screen::enable_alpha_blending0)
+        .def("enable_alpha_blending", &screen::enable_alpha_blending)
         .def("flip", &screen::flip)
+        .def("map2d", &screen::map2d)
+        .def("map2d", &screen::map2d_auto)
         .def("set_current", &screen::set_current)
         .def("swap", &screen::swap)
         .scope
@@ -116,6 +121,8 @@ int luaopen_lev_draw(lua_State *L)
 
 namespace lev
 {
+
+  static SDL_GLContext cast_ctx(void *obj) { return (SDL_GLContext)obj; }
 
   screen::screen() : base(), _obj(NULL) { }
 
@@ -339,6 +346,21 @@ namespace lev
     return true;
   }
 
+  bool screen::enable_alpha_blending(bool enable)
+  {
+    set_current();
+    if (enable)
+    {
+      glEnable(GL_BLEND);
+      glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    }
+    else
+    {
+      glDisable(GL_BLEND);
+    }
+    return true;
+  }
+
   bool screen::flip()
   {
     SDL_GL_SwapBuffers();
@@ -355,6 +377,24 @@ namespace lev
     scr._obj = SDL_GetVideoSurface();
     if (! scr._obj) { return NULL; }
     return &scr;
+  }
+
+  bool screen::map2d_auto()
+  {
+    int w = holder->get_w();
+    int h = holder->get_h();
+    set_current();
+    glLoadIdentity();
+    glOrtho(0, w, h, 0, -1, 1);
+    return true;
+  }
+
+  bool screen::map2d(int left, int right, int top, int bottom)
+  {
+    set_current();
+    glLoadIdentity();
+    glOrtho(left, right, bottom, top, -1, 1);
+    return true;
   }
 
   bool screen::set_current()

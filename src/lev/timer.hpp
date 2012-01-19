@@ -22,6 +22,9 @@ extern "C"
 namespace lev
 {
 
+  // class dependencies
+  class system;
+
   class stop_watch : public base
   {
     protected:
@@ -47,13 +50,14 @@ namespace lev
       timer();
     public:
       virtual ~timer();
-      static timer* create();
-      int get_interval();
+      static timer* create(system *sys, double interval = 1000);
+      double get_interval();
       luabind::object get_notify();
       virtual type_id get_type_id() const { return LEV_TTIMER; }
       virtual const char *get_type_name() const { return "lev.timer"; }
       bool is_one_shot();
       bool is_running();
+      bool probe();
       bool set_notify(luabind::object func);
       bool start(int milliseconds = -1, bool one_shot = false);
       bool start0() { return start(); }

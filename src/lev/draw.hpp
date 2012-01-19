@@ -66,22 +66,30 @@ namespace lev
       bool blit2(image *src, unsigned char alpha) { return blit(0, 0, src, 0, 0, -1, -1, alpha); }
       bool blit3(int x, int y, image *src) { return blit(x, y, src); }
       bool blit4(int x, int y, image *src, unsigned char alpha) { return blit(x, y, src, 0, 0, -1, -1, alpha); }
+
       virtual bool clear() { return clear_color(0, 0, 0, 0); }
       virtual bool clear_color(unsigned char r,
                                unsigned char g,
                                unsigned char b,
-                               unsigned char a);
+                               unsigned char a = 255);
       virtual bool clear_color1(const color &c);
+      virtual bool clear_color3(unsigned char r, unsigned char g, unsigned char b)
+      { return clear_color(r, g, b); }
+
       static screen* create(window *holder);
       bool draw(drawable *src, int x = 0, int y = 0, unsigned char alpha = 255);
       static int draw_l(lua_State *L);
       bool draw_pixel(int x, int y, const color &c);
       bool draw_raster(const raster *r, int x = 0, int y = 0, const color *c = NULL);
+      bool enable_alpha_blending(bool enable = true);
+      bool enable_alpha_blending0() { return enable_alpha_blending(); }
       bool flip();
       static screen *get();
       void* get_rawobj() { return _obj; }
       virtual type_id get_type_id() const { return LEV_TSCREEN; }
       virtual const char *get_type_name() const { return "lev.screen"; }
+      bool map2d_auto();
+      bool map2d(int left, int right, int top, int bottom);
       bool set_current();
       static screen *set_mode(int width, int height, int depth = 32);
       bool swap();

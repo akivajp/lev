@@ -14,6 +14,7 @@
 #include "draw.hpp"
 #include "entry.hpp"
 #include "font.hpp"
+#include "fs.hpp"
 #include "image.hpp"
 #include "package.hpp"
 #include "prim.hpp"

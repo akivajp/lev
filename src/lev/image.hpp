@@ -162,10 +162,12 @@ namespace lev
       virtual bool draw_on_screen(screen *dst, int x = 0, int y = 0, unsigned char alpha = 255);
       color &get_fg_color();
       font *get_font();
+      virtual int get_h() const;
       font *get_ruby_font();
       int get_spacing();
       virtual type_id get_type_id() const { return LEV_TLAYOUT; }
       virtual const char *get_type_name() const { return "lev.layout"; }
+      virtual int get_w() const;
       bool is_done();
       bool on_hover(int x, int y);
       bool on_left_click(int x, int y);

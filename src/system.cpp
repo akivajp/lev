@@ -16,6 +16,7 @@
 
 // dependencies
 #include "lev/draw.hpp"
+#include "lev/timer.hpp"
 #include "lev/window.hpp"
 #include "register.hpp"
 
@@ -24,31 +25,36 @@
 #include <luabind/luabind.hpp>
 #include <SDL/SDL.h>
 
-namespace lev
-{
-  class finalizer : public base
-  {
-    protected:
-      finalizer() : base() { }
-    public:
-      virtual ~finalizer() { system::get()->done(); }
-      static finalizer* create()
-      {
-        finalizer *f = NULL;
-        try {
-          f = new finalizer;
-          return f;
-        }
-        catch (...) {
-          delete f;
-          return NULL;
-        }
-      }
-
-      virtual type_id get_type_id() const { return LEV_TFINALIZER; }
-      virtual const char *get_type_name() const { return "lev.system.finalizer"; }
-  };
-}
+//namespace lev
+//{
+//  class finalizer : public base
+//  {
+//    protected:
+//      finalizer() : base() { }
+//    public:
+//      virtual ~finalizer()
+//      {
+//printf("FINALIZE!\n");
+//        system::get()->done();
+//      }
+//
+//      static finalizer* create()
+//      {
+//        finalizer *f = NULL;
+//        try {
+//          f = new finalizer;
+//          return f;
+//        }
+//        catch (...) {
+//          delete f;
+//          return NULL;
+//        }
+//      }
+//
+//      virtual type_id get_type_id() const { return LEV_TFINALIZER; }
+//      virtual const char *get_type_name() const { return "lev.system.finalizer"; }
+//  };
+//}
 
 int luaopen_lev_system(lua_State *L)
 {
@@ -61,6 +67,7 @@ int luaopen_lev_system(lua_State *L)
   // pre-requirement
   globals(L)["require"]("lev.base");
   globals(L)["require"]("lev.image");
+  globals(L)["require"]("lev.timer");
 
   module(L, "lev")
   [
@@ -87,6 +94,8 @@ int luaopen_lev_system(lua_State *L)
         .property("y", &event::get_y),
       class_<lev::system, base>("system")
         .def("close", &system::done)
+        .def("create_timer", &system::create_timer, adopt(result))
+        .def("create_timer", &system::create_timer0, adopt(result))
         .def("delay", &system::delay)
         .def("do_event", &system::do_event)
         .def("do_events", &system::do_events)
@@ -113,18 +122,20 @@ int luaopen_lev_system(lua_State *L)
         .def("set_video_mode", &system::set_video_mode)
         .def("set_video_mode", &system::set_video_mode2)
         .property("ticks", &system::get_ticks)
+        .def("timer", &system::create_timer, adopt(result))
+        .def("timer", &system::create_timer0, adopt(result))
         .def("toggle_full_screen", &system::toggle_full_screen)
         .scope
         [
           def("create_window_c", &window::create, adopt(result)),
           def("get_c", &system::get),
           def("init", &system::init)
-        ],
-      class_<lev::finalizer, base>("finalizer")
-        .scope
-        [
-          def("create", &finalizer::create, adopt(result))
         ]
+//      class_<lev::finalizer, base>("finalizer")
+//        .scope
+//        [
+//          def("create", &finalizer::create, adopt(result))
+//        ]
     ]
   ];
   object lev = globals(L)["lev"];
@@ -133,7 +144,7 @@ int luaopen_lev_system(lua_State *L)
   register_to(classes["system"], "create_window", &window::create_l);
   register_to(classes["system"], "window", &window::create_l);
   lev["system"] = classes["system"]["get"];
-  lev["finalizer"] = classes["finalizer"]["create"];
+//  lev["finalizer"] = classes["finalizer"]["create"];
 
   // post-requirement
   globals(L)["require"]("lev.window");
@@ -643,6 +654,11 @@ namespace lev
     done();
   }
 
+  timer* system::create_timer(double interval)
+  {
+    return timer::create(this, interval);
+  }
+
   bool system::delay(unsigned long msec)
   {
     SDL_Delay(msec);
@@ -651,16 +667,16 @@ namespace lev
 
   bool system::done()
   {
-//printf("QUITING1\n");
+printf("QUITING1\n");
     if (_obj)
     {
-//printf("QUITING2\n");
+printf("QUITING2\n");
       SDL_Quit();
       delete cast_sys(_obj);
       _obj = NULL;
       return true;
     }
-//printf("QUITING3\n");
+printf("QUITING3\n");
     return false;
   }
 
@@ -741,7 +757,7 @@ namespace lev
   {
     using namespace luabind;
     object o = globals(L)["lev"]["classes"]["system"]["get_c"]();
-    o["finalizer"] = globals(L)["lev"]["classes"]["finalizer"]["create"]();
+//    o["finalizer"] = globals(L)["lev"]["classes"]["finalizer"]["create"]();
     o.push(L);
     return 1;
   }
@@ -825,9 +841,9 @@ namespace lev
   {
     static system sys;
     if (sys._obj) { return &sys; }
-//printf("INITTING!\n");
+printf("INITTING!\n");
     if (SDL_Init(SDL_INIT_EVERYTHING) < 0) { return NULL; }
-//printf("INITTED!\n");
+printf("INITTED!\n");
 
     SDL_EnableUNICODE(1);
     SDL_GL_SetAttribute(SDL_GL_RED_SIZE,    8);
@@ -867,11 +883,16 @@ namespace lev
     mySystem *sys = cast_sys(_obj);
     while (is_running())
     {
+//printf("RUNNING NOW!\n");
       if (sys->on_tick && luabind::type(sys->on_tick) == LUA_TFUNCTION)
       {
+//printf("BEGIN CALL!\n");
         safe_call(sys->on_tick);
+//printf("END CALL!\n");
       }
+//printf("BEGIN EVENT!\n");
       do_events();
+//printf("END EVENT!\n\n");
     }
     return true;
   }

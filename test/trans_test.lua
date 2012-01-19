@@ -8,7 +8,7 @@ tran:set_next('test.png', 2000, 'cross_fade')
 tran:texturize()
 
 system.on_tick = function()
-  print('tick: ', system.ticks)
+  print('ticks: ', system.ticks)
   screen:clear()
   screen:draw(tran)
   screen:swap()

@@ -349,17 +349,26 @@ namespace lev
 
       FT_Bitmap &bmp = face->glyph->bitmap;
       int h = get_pixel_size();
-      int w = bmp.width + spacing;
-      int offset_y = h - bmp.rows;
+//      int h = get_pixel_size() + (bmp.rows - face->glyph->bitmap_top);
+//      int h = bmp.rows;
+//      int h = bmp.rows + get_pixel_size();
+//      int w = bmp.width + spacing;
+      int w = face->glyph->advance.x >> 6;
+      int offset_x = face->glyph->bitmap_left;
+//      int offset_y = h - bmp.rows;
+//      int offset_y = h - face->glyph->bitmap_top - bmp.rows;;
+//      int offset_y = face->glyph->bitmap_top;
+      int offset_y = h - face->glyph->bitmap_top;
       if (bmp.width <= 0) { w = get_pixel_size() / 2; }
-      r = raster::create(w, h);
+//      r = raster::create(w, h);
+      r = raster::create(w, h * 1.3);
       if (! r) { throw -3; }
 
       for (int y = 0; y < bmp.rows; y++)
       {
         for (int x = 0; x < bmp.width; x++)
         {
-          r->set_pixel(x, offset_y + y, bmp.buffer[y * bmp.pitch + x]);
+          r->set_pixel(offset_x + x, offset_y + y, bmp.buffer[y * bmp.pitch + x]);
         }
       }
       return r;

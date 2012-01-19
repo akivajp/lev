@@ -7,14 +7,20 @@
 // Licence:     MIT License
 /////////////////////////////////////////////////////////////////////////////
 
+// pre-compiled header
 #include "prec.h"
-//#include "lev/fs.hpp"
+
+// declartions
 #include "lev/util.hpp"
+
+// dependencies
+//#include "lev/fs.hpp"
+#include "lev/string.hpp"
 #include "register.hpp"
 
+// libraries
 #include <boost/format.hpp>
 #include <luabind/luabind.hpp>
-//#include <wx/mimetype.h>
 
 static const char *code_using =
 "-- looking up of varnames\n\
@@ -444,12 +450,18 @@ namespace lev
     }
     else if (type(var) == LUA_TSTRING)
     {
-//      wxString str(object_cast<const char *>(var), wxConvUTF8);
+//      unistr str(object_cast<const char *>(var));
+//      std::string str(object_cast<const char *>(var));
 //      str.Replace(wxT("\\"), wxT("\\\\"), true);
+      var = var["gsub"](var, "\\", "\\\\");
 //      str.Replace(wxT("\""), wxT("\\\""), true);
+      var = var["gsub"](var, "\"", "\\\"");
 //      str.Replace(wxT("\'"), wxT("\\\'"), true);
+      var = var["gsub"](var, "\'", "\\\'");
 //      str.Replace(wxT("\n"), wxT("\\\n"), true);
-//      return std::string("\"") + (const char *)str.mb_str() + "\"";
+      var = var["gsub"](var, "\n", "\\n");
+      std::string str(object_cast<const char *>(var));
+      return "\"" + str + "\"";
     }
     else if (type(var) == LUA_TTABLE)
     {
