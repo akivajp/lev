@@ -1,0 +1,43 @@
+CXXFLAGS = `/usr/mingw32/usr/bin/sdl-config --cflags` -I/usr/mingw32/usr/include/freetype2
+#LIBS = -L/usr/mingw32/usr/lib `/usr/mingw32/usr/bin/wx-config --libs std gl` -lglu32 -llua -lluabind -static
+LIBS = -llua -lluabind -lvorbisfile -lvorbis -logg -lfreetype -lopengl32 -lz \
+	`/usr/mingw32/usr/bin/sdl-config --libs`
+#CORE_LIBS =-L/usr/mingw32/usr/lib -lsqlite3 -larchive -llzma \
+#	-lluabind -llua -lws2_32 \
+#	`/usr/mingw32/usr/bin/wx-config --libs std,gl,media,stc` -lgdiplus -lglu32 -lpsapi \
+#	-static
+CXX=mingw32-g++
+WINDRES=mingw32-windres
+WIN_OUT=lev.exe
+DLIB=lev.dll
+RANLIB = mingw32-ranlib
+PACK_DIR=lev-win32-$(VERSION)
+
+all: build-all
+
+build-all:
+#	cd src && make pch lib win-bin \
+
+	cd src && make pch slib win-bin \
+		CXX=$(CXX) CXXFLAGS="$(CXXFLAGS)" LIBS="$(LIBS)" \
+		WINDRES=$(WINDRES) RANLIB=$(RANLIB) \
+		WIN_OUT=$(WIN_OUT) DLIB=$(DLIB)
+	install -d $(PACK_DIR)
+	install -d $(PACK_DIR)/doc
+	install -d $(PACK_DIR)/test
+	install src/$(WIN_OUT) $(PACK_DIR)/$(WIN_OUT)
+	install COPYRIGHT     $(PACK_DIR)/doc/COPYRIGHT.txt
+	install MANUAL-ja     $(PACK_DIR)/doc/MANUAL-ja.txt
+	install README-ja     $(PACK_DIR)/doc/README-ja.txt
+	install REFERENCE.ja  $(PACK_DIR)/doc/REFERENCE.ja.txt
+	install entry.lua  $(PACK_DIR)/entry.txt
+	install test/* $(PACK_DIR)/test
+	unix2dos $(PACK_DIR)/*.txt $(PACK_DIR)/test/*
+
+clean:
+	cd src && make clean
+
+distclean:
+	cd src && make distclean
+	rm -rf $(PACK_DIR)
+

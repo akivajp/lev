@@ -754,9 +754,9 @@ namespace lev
   mixer::~mixer()
   {
     if (_obj) { delete (myMixer *)_obj; }
-//printf("CLOSING AUDIO!\n");
-    SDL_CloseAudio();
-//printf("CLOSED AUDIO!\n");
+printf("CLOSING AUDIO!\n");
+//    SDL_CloseAudio();
+printf("CLOSED AUDIO!\n");
   }
 
   bool mixer::activate(bool active)

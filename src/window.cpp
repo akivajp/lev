@@ -104,7 +104,7 @@ namespace lev
   int window::create_l(lua_State *L)
   {
     using namespace luabind;
-    const char *title = "Seraf Application";
+    const char *title = "Lev Application";
     int x = SDL_WINDOWPOS_UNDEFINED, y = SDL_WINDOWPOS_UNDEFINED;
     int w = 640, h = 480;
     const char *flags_str = NULL;

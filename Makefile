@@ -2,7 +2,7 @@ CXX = g++
 PREFIX=/tmp
 VERSION=0.1.0
 OUT = a.out
-BIN = seraf
+BIN = lev
 DLIB = lev.so
 SLIB = liblev.a
 LUA_VERSION = 5.1
@@ -54,7 +54,7 @@ clean:
 distclean:
 	cd src && make distclean
 	rm -rf bin lib
-	rm -rf seraf-win32-$(VERSION)
+	rm -rf lev-win32-$(VERSION)
 
 src/$(OUT): build
 src/$(DLIB): build
