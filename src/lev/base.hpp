@@ -47,7 +47,11 @@ namespace lev
           LEV_TSOUND,
           LEV_TSTOP_WATCH,
           LEV_TSYSTEM,
+
           LEV_TTIMER,
+            LEV_TCLOCK,
+          LEV_TTIMER_END,
+
           LEV_TUNISTR,
           LEV_TVECTOR,
           LEV_TWINDOW,

@@ -49,7 +49,7 @@ int luaopen_lev_timer(lua_State *L)
       class_<timer, base>("timer")
         .property("is_one_shot", &timer::is_one_shot)
         .property("is_running", &timer::is_running)
-        .property("interval", &timer::get_interval)
+        .property("interval", &timer::get_interval, &timer::set_interval)
         .property("notify", &timer::get_notify, &timer::set_notify)
         .property("on_notify", &timer::get_notify, &timer::set_notify)
         .property("on_tick", &timer::get_notify, &timer::set_notify)
@@ -57,7 +57,13 @@ int luaopen_lev_timer(lua_State *L)
         .def("start", &timer::start)
         .def("start", &timer::start0)
         .def("start", &timer::start1)
-        .def("stop", &timer::stop)
+        .def("stop", &timer::stop),
+      class_<lev::clock, timer>("clock")
+        .property("fps", &clock::get_freq, &clock::set_freq)
+        .property("freq", &clock::get_freq, &clock::set_freq)
+        .property("frequency", &clock::get_freq, &clock::set_freq)
+        .def("start", &clock::start)
+        .def("start", &clock::start0)
     ]
   ];
   object lev = globals(L)["lev"];
@@ -181,9 +187,7 @@ namespace lev
         base_time(0), interval(1000), notify(), one_shot(false),
         running(false), sys(sys) { }
 
-      ~myTimer()
-      {
-      }
+      ~myTimer() { }
 
       double GetInterval() { return interval; }
 
@@ -202,7 +206,17 @@ namespace lev
         return running;
       }
 
-      bool Probe()
+      bool Notify()
+      {
+        if (notify && luabind::type(notify) == LUA_TFUNCTION)
+        {
+          notify();
+          return true;
+        }
+        return false;
+      }
+
+      virtual bool Probe()
       {
         if (running)
         {
@@ -213,16 +227,6 @@ namespace lev
             if (one_shot) { running = false; }
             return true;
           }
-        }
-        return false;
-      }
-
-      bool Notify()
-      {
-        if (notify && luabind::type(notify) == LUA_TFUNCTION)
-        {
-          notify();
-          return true;
         }
         return false;
       }
@@ -249,8 +253,7 @@ namespace lev
         return true;
       }
 
-      long base_time;
-      double interval;
+      double base_time, interval;
       bool one_shot;
       bool running;
       luabind::object notify;
@@ -293,6 +296,7 @@ namespace lev
   {
     if (_obj)
     {
+      cast_timer(_obj)->sys->detach_timer(this);
       delete cast_timer(_obj);
     }
   }
@@ -312,7 +316,7 @@ namespace lev
     }
   }
 
-  double timer::get_interval()
+  double timer::get_interval() const
   {
     return cast_timer(_obj)->GetInterval();
   }
@@ -337,6 +341,13 @@ namespace lev
     return cast_timer(_obj)->Probe();
   }
 
+  bool timer::set_interval(double new_interval)
+  {
+    if (new_interval < 0) { return false; }
+    cast_timer(_obj)->interval = new_interval;
+    return true;
+  }
+
   bool timer::set_notify(luabind::object func)
   {
     return cast_timer(_obj)->SetNotify(func);
@@ -351,6 +362,83 @@ namespace lev
   {
     cast_timer(_obj)->Stop();
     return true;
+  }
+
+
+  class myClock : public myTimer
+  {
+    public:
+
+      myClock(system *sys) : myTimer(sys) { }
+
+      virtual ~myClock() { }
+
+      virtual bool Probe()
+      {
+        if (running)
+        {
+          if (sys->get_ticks() - base_time > interval)
+          {
+            base_time = base_time + interval;
+            Notify();
+            if (one_shot) { running = false; }
+            return true;
+          }
+        }
+        return false;
+      }
+  };
+  static myClock *cast_clk(void *obj) { return (myClock *)obj; }
+
+  clock::clock() : timer() { }
+
+  clock::~clock()
+  {
+    if (_obj)
+    {
+      cast_clk(_obj)->sys->detach_timer(this);
+      delete cast_clk(_obj);
+      _obj = NULL;
+    }
+  }
+
+  clock* clock::create(system *sys, double freq)
+  {
+    clock *c = NULL;
+    try {
+      c = new clock;
+      c->_obj = new myClock(sys);
+      c->start(1000 / freq);
+      return c;
+    }
+    catch (...) {
+      delete c;
+      return NULL;
+    }
+  }
+
+  double clock::get_freq() const
+  {
+    return 1000 / get_interval();
+  }
+
+  bool clock::probe()
+  {
+    return cast_clk(_obj)->Probe();
+  }
+
+  bool clock::set_freq(double freq)
+  {
+    return set_interval(1000 / freq);
+  }
+
+  bool clock::start(double freq)
+  {
+    if (freq <= 0)
+    {
+      return cast_clk(_obj)->Start(-1, false);
+    }
+    return cast_clk(_obj)->Start(1000 / freq, false);
   }
 
 }

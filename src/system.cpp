@@ -24,6 +24,7 @@
 #include <map>
 #include <luabind/luabind.hpp>
 #include <SDL/SDL.h>
+#include <vector>
 
 //namespace lev
 //{
@@ -93,7 +94,11 @@ int luaopen_lev_system(lua_State *L)
         .property("x", &event::get_x)
         .property("y", &event::get_y),
       class_<lev::system, base>("system")
+        .def("clock", &system::create_clock, adopt(result))
+        .def("clock", &system::create_clock0, adopt(result))
         .def("close", &system::done)
+        .def("create_clock", &system::create_clock, adopt(result))
+        .def("create_clock", &system::create_clock0, adopt(result))
         .def("create_timer", &system::create_timer, adopt(result))
         .def("create_timer", &system::create_timer0, adopt(result))
         .def("delay", &system::delay)
@@ -612,7 +617,8 @@ namespace lev
           on_tick(),
           on_left_down(),   on_left_up(),
           on_middle_down(), on_middle_up(),
-          on_right_down(),  on_right_up()
+          on_right_down(),  on_right_up(),
+          timers()
       { }
     public:
       ~mySystem() { }
@@ -642,6 +648,7 @@ namespace lev
       luabind::object on_middle_down, on_middle_up;
       luabind::object on_right_down,  on_right_up;
       bool running;
+      std::vector<timer *> timers;
   };
   static mySystem *cast_sys(void *obj) { return (mySystem *)obj; }
 
@@ -654,9 +661,32 @@ namespace lev
     done();
   }
 
+  clock* system::create_clock(double fps)
+  {
+    clock *c = clock::create(this, fps);
+    if (! c) { return NULL; }
+    try {
+      cast_sys(_obj)->timers.push_back(c);
+      return c;
+    }
+    catch (...) {
+      delete c;
+      return NULL;
+    }
+  }
+
   timer* system::create_timer(double interval)
   {
-    return timer::create(this, interval);
+    timer *t = timer::create(this, interval);
+    if (! t) { return NULL; }
+    try {
+      cast_sys(_obj)->timers.push_back(t);
+      return t;
+    }
+    catch (...) {
+      delete t;
+      return NULL;
+    }
   }
 
   bool system::delay(unsigned long msec)
@@ -680,10 +710,35 @@ printf("QUITING3\n");
     return false;
   }
 
+  bool system::detach_timer(timer *t)
+  {
+    if (! _obj) { return NULL; }
+    std::vector<timer *> &timers = cast_sys(_obj)->timers;
+    std::vector<timer *>::iterator i = timers.begin();
+
+    for ( ; i != timers.end(); i++)
+    {
+      if (*i == t)
+      {
+printf("DETACHING TIMER!\n");
+        timers.erase(i);
+        return true;
+      }
+    }
+    return false;
+  }
+
   bool system::do_event()
   {
     SDL_Event sdl_evt;
     event e;
+    std::vector<timer *> &timers = cast_sys(_obj)->timers;
+    std::vector<timer *>::iterator i = timers.begin();
+
+    for ( ; i != timers.end(); i++)
+    {
+      (*i)->probe();
+    }
 
     if (SDL_PollEvent(&sdl_evt))
     {

@@ -22,6 +22,7 @@ namespace lev
 {
 
   // class dependencies
+  class clock;
   class screen;
   class timer;
 
@@ -62,9 +63,12 @@ namespace lev
       system();
     public:
       virtual ~system();
+      clock* create_clock(double fps = 50);
+      clock* create_clock0() { return create_clock(); }
       timer* create_timer(double interval = 1000);
       timer* create_timer0() { return create_timer(); }
       bool delay(unsigned long msec = 1000);
+      bool detach_timer(timer *t);
       bool do_event();
       bool do_events();
       bool done();

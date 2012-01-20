@@ -51,20 +51,37 @@ namespace lev
     public:
       virtual ~timer();
       static timer* create(system *sys, double interval = 1000);
-      double get_interval();
+      double get_interval() const;
       luabind::object get_notify();
       virtual type_id get_type_id() const { return LEV_TTIMER; }
       virtual const char *get_type_name() const { return "lev.timer"; }
       bool is_one_shot();
       bool is_running();
-      bool probe();
+      virtual bool probe();
+      bool set_interval(double new_interval);
       bool set_notify(luabind::object func);
-      bool start(int milliseconds = -1, bool one_shot = false);
-      bool start0() { return start(); }
-      bool start1(int milliseconds) { return start(milliseconds); }
+      virtual bool start(int milliseconds = -1, bool one_shot = false);
+      virtual bool start0() { return start(); }
+      virtual bool start1(double milliseconds) { return start(milliseconds); }
       bool stop();
     protected:
       void *_obj;
+  };
+
+  class clock : public timer
+  {
+    protected:
+      clock();
+    public:
+      virtual ~clock();
+      static clock* create(system *sys, double freq = 50);
+      double get_freq() const;
+      virtual type_id get_type_id() const { return LEV_TCLOCK; }
+      virtual const char *get_type_name() const { return "lev.clock"; }
+      virtual bool probe();
+      bool set_freq(double freq);
+      virtual bool start(double freq = -1);
+      virtual bool start0() { return start(); }
   };
 
 }
