@@ -661,9 +661,9 @@ namespace lev
     done();
   }
 
-  clock* system::create_clock(double fps)
+  clock* system::create_clock(double freq)
   {
-    clock *c = clock::create(this, fps);
+    clock *c = clock::create(this, freq);
     if (! c) { return NULL; }
     try {
       cast_sys(_obj)->timers.push_back(c);

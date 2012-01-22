@@ -611,7 +611,7 @@ namespace lev
 #else
     if (::mkdir(path.c_str(), 0755) != 0) { return true; }
 #endif
-    return true;
+    return false;
 //    if (force) { flags = wxPATH_MKDIR_FULL; }
  //   return wxFileName::Mkdir(wxString(path.c_str(), wxConvUTF8), 0755, flags);
   }

@@ -26,6 +26,7 @@ namespace lev
         LEV_TNONE = -1,
         LEV_TBASE = 1,
 
+          LEV_TARCHIVE,
           LEV_TCOLOR,
 
           LEV_TDRAWABLE,

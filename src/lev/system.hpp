@@ -63,7 +63,7 @@ namespace lev
       system();
     public:
       virtual ~system();
-      clock* create_clock(double fps = 50);
+      clock* create_clock(double freq = 50);
       clock* create_clock0() { return create_clock(); }
       timer* create_timer(double interval = 1000);
       timer* create_timer0() { return create_timer(); }

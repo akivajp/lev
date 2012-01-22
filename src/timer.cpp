@@ -408,7 +408,7 @@ namespace lev
     try {
       c = new clock;
       c->_obj = new myClock(sys);
-      c->start(1000 / freq);
+      c->start(freq);
       return c;
     }
     catch (...) {
