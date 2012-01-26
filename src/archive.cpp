@@ -42,25 +42,21 @@ int luaopen_lev_archive(lua_State *L)
 //        .def("add_data", &lev::archive::add_data)
 //        .def("add_file", &lev::archive::add_file)
 //        .def("add_file_to", &lev::archive::add_file_to)
-//        .property("compression", &lev::archive::get_compression_name)
-//        .property("compression_name", &lev::archive::get_compression_name)
         .def("flush", &lev::archive::flush)
-//        .property("format", &lev::archive::get_format_name)
-//        .property("format_name", &lev::archive::get_format_name)
-//        .def("entry_exists", &lev::archive::entry_exists)
+        .def("entry_exists", &lev::archive::entry_exists)
 //        .def("extract", &lev::archive::extract)
 //        .def("extract_to", &lev::archive::extract_to)
-//        .def("set_compression_gzip", &lev::archive::set_compression_gzip)
-//        .def("set_compression_none", &lev::archive::set_compression_none)
-//        .def("set_compression_xz", &lev::archive::set_compression_xz)
-//        .def("set_format_tar", &lev::archive::set_format_tar)
-//        .def("set_format_zip", &lev::archive::set_format_zip)
+        .def("get_size", &lev::archive::get_uncompressed_size)
+        .def("get_size", &lev::archive::get_uncompressed_size_current)
+        .def("get_uncompressed_size", &lev::archive::get_uncompressed_size)
+        .def("get_uncompressed_size", &lev::archive::get_uncompressed_size_current)
         .scope
         [
-//          def("entry_exists_direct", &lev::archive::entry_exists_direct),
+          def("entry_exists_direct", &lev::archive::entry_exists_direct),
 //          def("extract_direct", &lev::archive::extract_direct),
 //          def("extract_direct_to", &lev::archive::extract_direct_to),
-//          def("is_archive", &lev::archive::is_archive),
+          def("get_uncompressed_size_direct", &lev::archive::get_uncompressed_size_direct),
+          def("is_archive", &lev::archive::is_archive),
           def("open", &lev::archive::open, adopt(result))
         ]
     ]
@@ -70,25 +66,43 @@ int luaopen_lev_archive(lua_State *L)
   object arch = lev["archive"];
 
   register_to(classes["archive"], "add_data", &lev::archive::add_data_l);
-//  register_to(classes["archive"], "find", &lev::archive::find_l);
-//  register_to(classes["archive"], "find_direct", &lev::archive::find_direct_l);
-//  register_to(classes["archive"], "find_next", &lev::archive::find_next_l);
-//  register_to(classes["archive"], "read", &lev::archive::read_l);
-//  register_to(classes["archive"], "read_direct", &lev::archive::read_direct_l);
+  register_to(classes["archive"], "find", &lev::archive::find_l);
+  register_to(classes["archive"], "find_direct", &lev::archive::find_direct_l);
+  register_to(classes["archive"], "find_next", &lev::archive::find_next_l);
+  register_to(classes["archive"], "read", &lev::archive::read_l);
+  register_to(classes["archive"], "read_direct", &lev::archive::read_direct_l);
 //
-//  arch["entry_exists"] = classes["archive"]["entry_exists_direct"];
+  arch["entry_exists"] = classes["archive"]["entry_exists_direct"];
 //  arch["extract"] = classes["archive"]["extract_direct"];
 //  arch["extract_to"] = classes["archive"]["extract_direct_to"];
-//  arch["find"] = classes["archive"]["find_direct"];
-//  arch["is_archive"] = classes["archive"]["is_archive"];
+  arch["find"] = classes["archive"]["find_direct"];
+  arch["get_size"] = classes["archive"]["get_uncompressed_size_direct"];
+  arch["get_uncompressed_size"] = classes["archive"]["get_uncompressed_size_direct"];
+  arch["is_archive"] = classes["archive"]["is_archive"];
   arch["open"] = classes["archive"]["open"];
-//  arch["read"] = classes["archive"]["read_direct"];
+  arch["read"] = classes["archive"]["read_direct"];
 
   globals(L)["package"]["loaded"]["lev.archive"] = true;
 }
 
 namespace lev
 {
+
+  bool strmatch(const char *pattern, const char *str)
+  {
+    switch (*pattern)
+    {
+      case '\0':
+        return *str == '\0';
+      case '*':
+        return strmatch(pattern + 1, str)
+               || ((*str != '\0') && strmatch(pattern, str + 1));
+      case '?':
+        return (*str != '\0') && strmatch(pattern + 1, str + 1);
+      default:
+        return (*pattern == *str) && strmatch(pattern + 1, str + 1);
+    }
+  }
 
   class myArchive
   {
@@ -129,12 +143,10 @@ namespace lev
           if (file_system::file_exists(archive_path))
           {
             z = zipOpen64(archive_path.c_str(), APPEND_STATUS_ADDINZIP);
-//if (z) { printf("APPEND MODE!\n"); }
           }
           else
           {
             z = zipOpen64(archive_path.c_str(), APPEND_STATUS_CREATE);
-//if (z) { printf("CREATE MODE!\n"); }
           }
           if (! z) { throw -1; }
 
@@ -144,30 +156,59 @@ namespace lev
           return arc;
         }
         catch (...) {
-//printf("ERROR!\n");
+          fprintf(stderr, "error on myArchive creation");
           delete arc;
           return NULL;
         }
       }
 
-//      archive_entry* Find(const std::string &pattern)
-//      {
-//        archive_entry *entry;
-//
-//        while (archive_read_next_header(r, &entry) == ARCHIVE_OK)
-//        {
-//          wxString path(archive_entry_pathname(entry), wxConvUTF8);
-//          if (path.Matches(wxString(pattern.c_str(), wxConvUTF8)))
-//          {
-//            return entry;
-//          }
-//          else
-//          {
-//            continue;
-//          }
-//        }
-//        return NULL;
-//      }
+      bool FindNext(std::string &entry_name)
+      {
+        const int buffer_size = 1024;
+        char buffer[buffer_size];
+
+        if (last_find.empty()) { return false; }
+        for ( ; ; )
+        {
+          if (unzGoToNextFile(r) != UNZ_OK)
+          {
+            last_find = "";
+            return false;
+          }
+          if (unzGetCurrentFileInfo64(r, /* info */ NULL, buffer, buffer_size,
+                /* extra */ NULL, /* extra size */ 0,
+                /* comment */ NULL, /* comment size */ 0) == UNZ_OK)
+          {
+//printf("CURRENT FILE: %s\n", buffer);
+            if (strmatch(last_find.c_str(), buffer))
+            {
+              entry_name = buffer;
+              return true;
+            }
+          }
+        }
+      }
+
+      bool FindNew(const std::string &pattern, std::string &entry_name)
+      {
+        const int buffer_size = 1024;
+        char buffer[buffer_size];
+
+        if (! StartReading()) { return NULL; }
+        last_find = pattern;
+
+        if (unzGetCurrentFileInfo64(r, /* info */ NULL, buffer, buffer_size,
+              /* extra */ NULL, /* extra size */ 0,
+              /* comment */ NULL, /* comment size */ 0) == UNZ_OK)
+        {
+          if (strmatch(last_find.c_str(), buffer))
+          {
+            entry_name = buffer;
+            return true;
+          }
+        }
+        return FindNext(entry_name);
+      }
 //
 //      bool Extract(const std::string &entry_name)
 //      {
@@ -210,51 +251,16 @@ namespace lev
 //          return false;
 //        }
 //      }
-//
-//      bool SetCompression()
-//      {
-//        switch (compress)
-//        {
-//          case ARCHIVE_COMPRESSION_NONE:
-//            archive_write_set_compression_none(w);
-//            return true;
-//          case ARCHIVE_COMPRESSION_GZIP:
-//            archive_write_set_compression_gzip(w);
-//            return true;
-//          case ARCHIVE_COMPRESSION_XZ:
-//            archive_write_set_compression_xz(w);
-//            return true;
-//          default:
-//            return false;
-//        }
-//      }
-//
-//      bool StartReading()
-//      {
-//        Clean();
-//
-//        /*
-//        if (file_system::dir_exists(filename.c_str()))
-//        {
-//          // filename is (existing) directory
-//          r = archive_read_disk_new();
-//          if (r == NULL) { return false; }
-//          archive_read_disk_set_standard_lookup(r);
-//          return true;
-//        }
-//        */
-//
-//        r = archive_read_new();
-//        archive_read_support_compression_all(r);
-//        archive_read_support_format_all(r);
-//
-//        if (archive_read_open_filename(r, filename.c_str(), 10240) != ARCHIVE_OK)
-//        {
-//          return false;
-//        }
-//        return true;
-//      }
-//
+
+      bool StartReading()
+      {
+        Clean();
+        r = unzOpen64(archive_path.c_str());
+
+        if (! r) { return false; }
+        return true;
+      }
+
       bool StartWriting()
       {
         Clean();
@@ -440,25 +446,24 @@ namespace lev
 //  }
 //
 //
-//  bool archive::entry_exists(const std::string &entry_name)
-//  {
-//    if (! cast_arc(_obj)->StartReading()) { return false; }
-//    if (cast_arc(_obj)->Find(entry_name)) { return true; }
-//    return false;
-//  }
-//
-//  bool archive::entry_exists_direct(const std::string &archive_file,
-//                                    const std::string &entry_name)
-//  {
-//    try {
-//      boost::shared_ptr<lev::archive> arc(lev::archive::open(archive_file));
-//      return arc->entry_exists(entry_name);
-//    }
-//    catch (...) {
-//      return false;
-//    }
-//  }
-//
+  bool archive::entry_exists(const std::string &pattern)
+  {
+    std::string tmp;
+    return find(pattern, tmp);
+  }
+
+  bool archive::entry_exists_direct(const std::string &archive_file,
+                                    const std::string &entry_name)
+  {
+    try {
+      boost::scoped_ptr<lev::archive> arc(lev::archive::open(archive_file));
+      return arc->entry_exists(entry_name);
+    }
+    catch (...) {
+      return false;
+    }
+  }
+
 //  bool archive::extract(const std::string &entry_name)
 //  {
 //    return cast_arc(_obj)->Extract(entry_name);
@@ -494,162 +499,141 @@ namespace lev
 //    return cast_arc(_obj)->ExtractTo(entry_name, target);
 //  }
 //
-//  bool archive::find(const std::string &pattern, std::string &entry_name)
-//  {
-//    myArchive *arc = cast_arc(_obj);
-//    arc->last_find = pattern;
-//    if (!arc->StartReading()) { return false; }
-//
-//    return this->find_next(entry_name);
-//  }
-//
-//  int archive::find_l(lua_State *L)
-//  {
-//    using namespace luabind;
-//    const char *pattern = "*";
-//
-//    luaL_checktype(L, 1, LUA_TUSERDATA);
-//    lev::archive *arc = object_cast<lev::archive *>(object(from_stack(L, 1)));
-//    if (arc == NULL) { luaL_error(L, "object (lev.archive) is not specified"); }
+  bool archive::find(const std::string &pattern, std::string &entry_name)
+  {
+    return cast_arc(_obj)->FindNew(pattern, entry_name);
+  }
+
+  int archive::find_l(lua_State *L)
+  {
+    using namespace luabind;
+    const char *pattern = "*";
+
+    luaL_checktype(L, 1, LUA_TUSERDATA);
+    lev::archive *arc = object_cast<lev::archive *>(object(from_stack(L, 1)));
+    if (arc == NULL) { luaL_error(L, "object (lev.archive) is not specified"); }
+    object t = util::get_merged(L, 2, -1);
+
+    if (t["pattern"]) { pattern = object_cast<const char *>(t["pattern"]); }
+    else if (t["lua.string1"]) { pattern = object_cast<const char *>(t["lua.string1"]); }
+
+    std::string name;
+    bool res = arc->find(pattern, name);
+    if (res) { lua_pushstring(L, name.c_str()); }
+    else { lua_pushnil(L); }
+    return 1;
+  }
+
+
+  bool archive::find_direct(const std::string &archive_file,
+                            const std::string &pattern,
+                            std::string &entry_name)
+  {
+    try {
+      boost::scoped_ptr<lev::archive> arc(lev::archive::open(archive_file));
+      if (arc.get() == NULL) { throw -1; }
+      return arc->find(pattern, entry_name);
+    }
+    catch (...) {
+      return false;
+    }
+  }
+
+  int archive::find_direct_l(lua_State *L)
+  {
+    using namespace luabind;
+    const char *archive = NULL;
+    const char *pattern = "*";
+
+    object t = util::get_merged(L, 1, -1);
+
+    if (t["archive_file"]) { archive = object_cast<const char *>(t["archive_file"]); }
+    else if (t["archive"]) { archive = object_cast<const char *>(t["archive"]); }
+    else if (t["arc"]) { archive = object_cast<const char *>(t["arc"]); }
+    else if (t["a"]) { archive = object_cast<const char *>(t["a"]); }
+    else if (t["lua.string1"]) { archive = object_cast<const char *>(t["lua.string1"]); }
+    if (archive == NULL) { luaL_error(L, "archive (string) is not specified."); }
+
+    if (t["pattern"]) { pattern = object_cast<const char *>(t["pattern"]); }
+    else if (t["lua.string2"]) { pattern= object_cast<const char *>(t["lua.string2"]); }
+
+    std::string entry;
+    if (archive::find_direct(archive, pattern, entry))
+    {
+      lua_pushstring(L, entry.c_str());
+      return 1;
+    }
+    else
+    {
+      lua_pushnil(L);
+      return 1;
+    }
+  }
+
+
+  bool archive::find_next(std::string &entry_name)
+  {
+    myArchive *arc = cast_arc(_obj);
+    if (arc->last_find.empty()) { return false; }
+    return arc->FindNext(entry_name);
+  }
+
+  int archive::find_next_l(lua_State *L)
+  {
+    using namespace luabind;
+
+    luaL_checktype(L, 1, LUA_TUSERDATA);
+    lev::archive *arc = object_cast<lev::archive *>(object(from_stack(L, 1)));
+    if (arc == NULL) { luaL_error(L, "object (lev.archive) is not specified"); }
 //    object t = util::get_merged(L, 2, -1);
-//
-//    if (t["pattern"]) { pattern = object_cast<const char *>(t["pattern"]); }
-//    else if (t["lua.string1"]) { pattern = object_cast<const char *>(t["lua.string1"]); }
-//
-//    std::string name;
-//    bool res = arc->find(pattern, name);
-//    if (res) { lua_pushstring(L, name.c_str()); }
-//    else { lua_pushnil(L); }
-//    return 1;
-//  }
-//
-//
-//  bool archive::find_direct(const std::string &archive_file,
-//                            const std::string &pattern,
-//                            std::string &entry_name)
-//  {
-//    try {
-//      boost::shared_ptr<lev::archive> arc(lev::archive::open(archive_file));
-//      if (arc.get() == NULL) { throw -1; }
-//      return arc->find(pattern, entry_name);
-//    }
-//    catch (...) {
-//      return false;
-//    }
-//  }
-//
-//  int archive::find_direct_l(lua_State *L)
-//  {
-//    using namespace luabind;
-//    const char *archive = NULL;
-//    const char *pattern = "*";
-//
-//    object t = util::get_merged(L, 1, -1);
-//
-//    if (t["archive_file"]) { archive = object_cast<const char *>(t["archive_file"]); }
-//    else if (t["archive"]) { archive = object_cast<const char *>(t["archive"]); }
-//    else if (t["arc"]) { archive = object_cast<const char *>(t["arc"]); }
-//    else if (t["a"]) { archive = object_cast<const char *>(t["a"]); }
-//    else if (t["lua.string1"]) { archive = object_cast<const char *>(t["lua.string1"]); }
-//    if (archive == NULL) { luaL_error(L, "archive (string) is not specified."); }
-//
-//    if (t["pattern"]) { pattern = object_cast<const char *>(t["pattern"]); }
-//    else if (t["lua.string2"]) { pattern= object_cast<const char *>(t["lua.string2"]); }
-//
-//    std::string entry;
-//    if (archive::find_direct(archive, pattern, entry))
-//    {
-//      lua_pushstring(L, entry.c_str());
-//      return 1;
-//    }
-//    else
-//    {
-//      lua_pushnil(L);
-//      return 1;
-//    }
-//  }
-//
-//
-//  bool archive::find_next(std::string &entry_name)
-//  {
-//    myArchive *arc = cast_arc(_obj);
-//    if (arc->last_find.empty()) { return false; }
-//    archive_entry *entry = arc->Find(arc->last_find.c_str());
-//    if (entry == NULL)
-//    {
-//      arc->last_find = "";
-//      return false;
-//    }
-//    entry_name = archive_entry_pathname(entry);
-//    return true;
-//  }
-//
-//  int archive::find_next_l(lua_State *L)
-//  {
-//    using namespace luabind;
-//
-//    luaL_checktype(L, 1, LUA_TUSERDATA);
-//    lev::archive *arc = object_cast<lev::archive *>(object(from_stack(L, 1)));
-//    if (arc == NULL) { luaL_error(L, "object (lev.archive) is not specified"); }
-////    object t = util::get_merged(L, 2, -1);
-//
-//    std::string name;
-//    bool res = arc->find_next(name);
-//    if (res) { lua_pushstring(L, name.c_str()); }
-//    else { lua_pushnil(L); }
-//    return 1;
-//  }
+
+    std::string name;
+    bool res = arc->find_next(name);
+    if (res) { lua_pushstring(L, name.c_str()); }
+    else { lua_pushnil(L); }
+    return 1;
+  }
 
   bool archive::flush()
   {
     return cast_arc(_obj)->Clean();
   }
 
-//
-//  std::string archive::get_compression_name()
-//  {
-//    if (cast_arc(_obj)->r == NULL)
-//    {
-//      if (! cast_arc(_obj)->StartReading()) { return ""; }
-//    }
-//    const char *compress = archive_compression_name(cast_arc(_obj)->r);
-//    if (compress) { return compress; }
-//    return "";
-//  }
-//
-//  std::string archive::get_format_name()
-//  {
-//    if (cast_arc(_obj)->r == NULL)
-//    {
-//      if (! cast_arc(_obj)->StartReading()) { return ""; }
-//    }
-//    const char *format = archive_format_name(cast_arc(_obj)->r);
-//    if (format) { return format; }
-//    return "";
-//  }
-//
-//  bool archive::is_archive(const std::string &filename)
-//  {
-//    ::archive *r = archive_read_new();
-//    archive_read_support_compression_all(r);
-//    archive_read_support_format_all(r);
-//    int res = archive_read_open_filename(r, filename.c_str(), 10240);
-//    if (res != ARCHIVE_OK)
-//    {
-//      archive_read_finish(r);
-//      return false;
-//    }
-//
-//    archive_entry *ent;
-//    res = archive_read_next_header(r, &ent);
-//    archive_read_finish(r);
-//    if (res != ARCHIVE_OK)
-//    {
-//      return false;
-//    }
-//    return true;
-//  }
-//
+  long archive::get_uncompressed_size(const std::string &entry_name)
+  {
+    if (! entry_exists(entry_name)) { return -1; }
+    return get_uncompressed_size_current();
+  }
+
+  long archive::get_uncompressed_size_current()
+  {
+    unz_file_info64 info;
+
+    if (unzGetCurrentFileInfo64(cast_arc(_obj)->r, &info,
+          NULL, 0, NULL, 0, NULL, 0) != UNZ_OK) { return -1; }
+    return info.uncompressed_size;
+  }
+
+  long archive::get_uncompressed_size_direct(const std::string &archive_file,
+                                             const std::string &entry_name)
+  {
+    try {
+      boost::scoped_ptr<lev::archive> arc(archive::open(archive_file));
+      if (! arc.get()) { throw -1; }
+      return arc->get_uncompressed_size(entry_name);
+    }
+    catch (...) {
+      return -1;
+    }
+  }
+
+  bool archive::is_archive(const std::string &filename)
+  {
+    unzFile r = unzOpen64(filename.c_str());
+    if (! r) { return false; }
+    return true;
+  }
+
   archive* archive::open(const std::string &archive_path)
   {
     archive *arc = NULL;
@@ -664,148 +648,150 @@ namespace lev
       return NULL;
     }
   }
-//
-//  bool archive::read(const std::string &entry_name, std::string &data, int block_size)
-//  {
-//    myArchive *arc = cast_arc(_obj);
-//    archive_entry *entry;
-//
-//    if (!arc->StartReading()) { return NULL; }
-//    while (arc->Find(entry_name))
-//    {
-//      data = "";
-//      char buffer[block_size];
-//      for ( ; ; )
-//      {
-//        int size = archive_read_data(arc->r, buffer, block_size);
-//        if (size < 0) { break; }
-//        else if (size == 0) { return true; }
-//        else // if (size > 0)
-//        { data.append(buffer, size); }
-//      }
-//    }
-//    return false;
-//  }
-//
-//  int archive::read_l(lua_State *L)
-//  {
-//    using namespace luabind;
-//    const char *entry = NULL;
-//    int bs = 4096;
-//
-//    luaL_checktype(L, 1, LUA_TUSERDATA);
-//    lev::archive *arc = object_cast<lev::archive *>(object(from_stack(L, 1)));
-//    if (arc == NULL) { return 0; }
-//    object t = util::get_merged(L, 2, -1);
-//
-//    if (t["entry_name"]) { entry = object_cast<const char *>(t["entry_name"]); }
-//    else if (t["entry"]) { entry = object_cast<const char *>(t["entry"]); }
-//    else if (t["e"]) { entry = object_cast<const char *>(t["e"]); }
-//    else if (t["lua.string1"]) { entry = object_cast<const char *>(t["lua.string1"]); }
+
+  bool archive::read(const std::string &entry_name, std::string &data, int block_size, const char *password)
+  {
+    if (! entry_exists(entry_name)) { return false; }
+    return read_current(data, block_size, password);
+  }
+
+  bool archive::read_current(std::string &data, int block_size, const char *password)
+  {
+    char buffer[block_size];
+
+    if (unzOpenCurrentFile(cast_arc(_obj)->r) == UNZ_OK)
+    {
+      int readed = unzReadCurrentFile(cast_arc(_obj)->r, buffer, block_size);
+      if (readed >= 0)
+      {
+        data.assign(buffer, readed);
+        return true;
+      }
+    }
+    if (unzOpenCurrentFilePassword(cast_arc(_obj)->r, password) == UNZ_OK)
+    {
+      int readed = unzReadCurrentFile(cast_arc(_obj)->r, buffer, block_size);
+      if (readed >= 0)
+      {
+        data.assign(buffer, readed);
+        return true;
+      }
+    }
+    data = "";
+    return false;
+  }
+
+  int archive::read_l(lua_State *L)
+  {
+    using namespace luabind;
+    const char *entry = NULL;
+    const char *pass = NULL;
+    int bs = 4096;
+
+    luaL_checktype(L, 1, LUA_TUSERDATA);
+    lev::archive *arc = object_cast<lev::archive *>(object(from_stack(L, 1)));
+    if (arc == NULL) { return 0; }
+    object t = util::get_merged(L, 2, -1);
+
+    if (t["entry_name"]) { entry = object_cast<const char *>(t["entry_name"]); }
+    else if (t["entry"]) { entry = object_cast<const char *>(t["entry"]); }
+    else if (t["e"]) { entry = object_cast<const char *>(t["e"]); }
+    else if (t["lua.string1"]) { entry = object_cast<const char *>(t["lua.string1"]); }
 //    if (entry == NULL) { luaL_error(L, "entry (string) is not specified."); }
-//
-//    if (t["block_size"]) { bs = object_cast<int>(t["block_size"]); }
-//    else if (t["block"]) { bs = object_cast<int>(t["block"]); }
-//    else if (t["bs"]) { bs = object_cast<int>(t["bs"]); }
-//    else if (t["lua.number1"]) { bs = object_cast<int>(t["lua.number1"]); }
-//
-//    std::string data;
-//    if (arc->read(entry, data, bs))
-//    {
-//      lua_pushstring(L, data.c_str());
-//      return 1;
-//    }
-//    else
-//    {
-//      lua_pushnil(L);
-//      return 1;
-//    }
-//  }
-//
-//  bool archive::read_direct(const std::string &archive_file,
-//                            const std::string &entry_name,
-//                            std::string &data,
-//                            int block_size)
-//  {
-//    try {
-//      boost::shared_ptr<lev::archive> arc(lev::archive::open(archive_file));
-//      if (arc.get() == NULL) { throw -1; }
-//      return arc->read(entry_name, data, block_size);
-//    }
-//    catch (...) {
-//      return false;
-//    }
-//  }
-//
-//  int archive::read_direct_l(lua_State *L)
-//  {
-//    using namespace luabind;
-//    const char *archive = NULL;
-//    const char *entry = NULL;
-//    int bs = 4096;
-//
-//    object t = util::get_merged(L, 1, -1);
-//
-//    if (t["archive_file"]) { archive = object_cast<const char *>(t["archive_file"]); }
-//    else if (t["archive"]) { archive = object_cast<const char *>(t["archive"]); }
-//    else if (t["arc"]) { archive = object_cast<const char *>(t["arc"]); }
-//    else if (t["a"]) { archive = object_cast<const char *>(t["a"]); }
-//    else if (t["lua.string1"]) { archive = object_cast<const char *>(t["lua.string1"]); }
-//    if (archive == NULL) { luaL_error(L, "archive (string) is not specified."); }
-//
-//    if (t["entry_name"]) { entry = object_cast<const char *>(t["entry_name"]); }
-//    else if (t["entry"]) { entry = object_cast<const char *>(t["entry"]); }
-//    else if (t["e"]) { entry = object_cast<const char *>(t["e"]); }
-//    else if (t["lua.string2"]) { entry = object_cast<const char *>(t["lua.string2"]); }
-//    if (entry == NULL) { luaL_error(L, "entry (string) is not specified."); }
-//
-//    if (t["block_size"]) { bs = object_cast<int>(t["block_size"]); }
-//    else if (t["block"]) { bs = object_cast<int>(t["block"]); }
-//    else if (t["bs"]) { bs = object_cast<int>(t["bs"]); }
-//    else if (t["lua.number1"]) { bs = object_cast<int>(t["lua.number1"]); }
-//
-//    std::string data;
-//    if (archive::read_direct(archive, entry, data, bs))
-//    {
-//      lua_pushstring(L, data.c_str());
-//      return 1;
-//    }
-//    else
-//    {
-//      lua_pushnil(L);
-//      return 1;
-//    }
-//  }
-//
-//  bool archive::set_compression_gzip()
-//  {
-//    cast_arc(_obj)->compress = ARCHIVE_COMPRESSION_GZIP;
-//    return true;
-//  }
-//
-//  bool archive::set_compression_none()
-//  {
-//    cast_arc(_obj)->compress = ARCHIVE_COMPRESSION_NONE;
-//    return true;
-//  }
-//
-//  bool archive::set_compression_xz()
-//  {
-//    cast_arc(_obj)->compress = ARCHIVE_COMPRESSION_XZ;
-//    return true;
-//  }
-//
-//  bool archive::set_format_tar()
-//  {
-//    cast_arc(_obj)->format = ARCHIVE_FORMAT_TAR_PAX_RESTRICTED;
-//    return true;
-//  }
-//
-//  bool archive::set_format_zip()
-//  {
-//    cast_arc(_obj)->format = ARCHIVE_FORMAT_ZIP;
-//    return true;
-//  }
+
+    if (t["password"]) { pass = object_cast<const char *>(t["password"]); }
+    else if (t["pass"]) { pass = object_cast<const char *>(t["pass"]); }
+    else if (t["p"]) { pass = object_cast<const char *>(t["p"]); }
+    else if (t["lua.string2"]) { pass = object_cast<const char *>(t["lua.string2"]); }
+
+    if (t["block_size"]) { bs = object_cast<int>(t["block_size"]); }
+    else if (t["block"]) { bs = object_cast<int>(t["block"]); }
+    else if (t["bs"]) { bs = object_cast<int>(t["bs"]); }
+    else if (t["lua.number1"]) { bs = object_cast<int>(t["lua.number1"]); }
+
+    std::string data;
+    if (entry)
+    {
+      if (arc->read(entry, data, bs, pass))
+      {
+        lua_pushstring(L, data.c_str());
+        return 1;
+      }
+    }
+    else
+    {
+      if (arc->read_current(data, bs, pass))
+      {
+        lua_pushstring(L, data.c_str());
+        return 1;
+      }
+    }
+
+    lua_pushnil(L);
+    return 1;
+  }
+
+  bool archive::read_direct(const std::string &archive_file,
+                            const std::string &entry_name,
+                            std::string &data,
+                            int block_size,
+                            const char *password)
+  {
+    try {
+      boost::scoped_ptr<lev::archive> arc(lev::archive::open(archive_file));
+      if (arc.get() == NULL) { throw -1; }
+      return arc->read(entry_name, data, block_size, password);
+    }
+    catch (...) {
+      return false;
+    }
+  }
+
+  int archive::read_direct_l(lua_State *L)
+  {
+    using namespace luabind;
+    const char *archive = NULL;
+    const char *entry = NULL;
+    const char *pass = NULL;
+    int bs = 4096;
+
+    object t = util::get_merged(L, 1, -1);
+
+    if (t["archive_file"]) { archive = object_cast<const char *>(t["archive_file"]); }
+    else if (t["archive"]) { archive = object_cast<const char *>(t["archive"]); }
+    else if (t["arc"]) { archive = object_cast<const char *>(t["arc"]); }
+    else if (t["a"]) { archive = object_cast<const char *>(t["a"]); }
+    else if (t["lua.string1"]) { archive = object_cast<const char *>(t["lua.string1"]); }
+    if (archive == NULL) { luaL_error(L, "archive (string) is not specified."); }
+
+    if (t["entry_name"]) { entry = object_cast<const char *>(t["entry_name"]); }
+    else if (t["entry"]) { entry = object_cast<const char *>(t["entry"]); }
+    else if (t["e"]) { entry = object_cast<const char *>(t["e"]); }
+    else if (t["lua.string2"]) { entry = object_cast<const char *>(t["lua.string2"]); }
+    if (entry == NULL) { luaL_error(L, "entry (string) is not specified."); }
+
+    if (t["password"]) { pass = object_cast<const char *>(t["password"]); }
+    else if (t["pass"]) { pass = object_cast<const char *>(t["pass"]); }
+    else if (t["p"]) { pass = object_cast<const char *>(t["p"]); }
+    else if (t["lua.string3"]) { pass = object_cast<const char *>(t["lua.string3"]); }
+
+    if (t["block_size"]) { bs = object_cast<int>(t["block_size"]); }
+    else if (t["block"]) { bs = object_cast<int>(t["block"]); }
+    else if (t["bs"]) { bs = object_cast<int>(t["bs"]); }
+    else if (t["lua.number1"]) { bs = object_cast<int>(t["lua.number1"]); }
+
+    std::string data;
+    if (archive::read_direct(archive, entry, data, bs, pass))
+    {
+      lua_pushstring(L, data.c_str());
+      return 1;
+    }
+    else
+    {
+      lua_pushnil(L);
+      return 1;
+    }
+  }
 
 }
 

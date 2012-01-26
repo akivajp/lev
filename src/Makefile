@@ -26,7 +26,7 @@ lib: minizip/libminizip.a $(SLIB) $(DLIB)
 dlib: $(DLIB)
 slib: $(SLIB)
 
-minizip/libminizip.a:
+minizip/libminizip.a: minizip
 	cd minizip && make MINIZIP_CFLAGS="$(MINIZIP_CFLAGS)"
 
 win-bin: $(WIN_OUT)
