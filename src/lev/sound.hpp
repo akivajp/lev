@@ -13,6 +13,7 @@
 
 #include "base.hpp"
 
+#include <boost/shared_ptr.hpp>
 #include <luabind/luabind.hpp>
 #include <map>
 #include <string>
@@ -22,6 +23,8 @@ extern "C" { int luaopen_lev_sound(lua_State *L); }
 
 namespace lev
 {
+
+  class system;
 
   class sound : public base
   {
@@ -62,7 +65,8 @@ namespace lev
       bool activate(bool active = true);
       bool activate0() { return activate(); }
       bool clear_slot(int slot_num);
-      static mixer* get() { return init(); }
+//      static mixer* get() { return init(); }
+      static boost::shared_ptr<mixer> get() { return singleton; }
       int get_channels();
       int get_freq();
       void *get_rawobj() { return _obj; }
@@ -72,12 +76,14 @@ namespace lev
       bool get_playing();
       virtual type_id get_type_id() const { return LEV_TMIXER; }
       virtual const char *get_type_name() const { return "lev.sound.mixer"; }
-      static mixer* init();
+//      static mixer* init();
+      static boost::shared_ptr<mixer> init(boost::shared_ptr<system> sys);
       bool is_active();
       bool start() { return activate(true); }
       bool stop() { return activate(false); }
     protected:
       void *_obj;
+      static boost::shared_ptr<mixer> singleton;
   };
 
 }

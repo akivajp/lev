@@ -12,6 +12,7 @@
 /////////////////////////////////////////////////////////////////////////////
 
 #include "base.hpp"
+#include <boost/shared_ptr.hpp>
 
 extern "C" {
   int luaopen_lev_window(lua_State *L);
@@ -29,9 +30,10 @@ namespace lev
     public:
       ~window();
       bool close();
-      static window* create(const char *title, int x, int y, int w, int h, unsigned long flags);
+//      static window* create(const char *title, int x, int y, int w, int h, unsigned long flags);
+      static boost::shared_ptr<window> create(const char *title, int x, int y, int w, int h, unsigned long flags);
       static int create_l(lua_State *L);
-      screen* create_context();
+//      screen* create_context();
       int get_h();
       long get_id();
       void* get_rawobj() { return _obj; }

@@ -13,6 +13,7 @@
 
 #include "base.hpp"
 #include <luabind/luabind.hpp>
+#include <boost/shared_ptr.hpp>
 
 extern "C" {
   int luaopen_lev_system(lua_State *L);
@@ -23,7 +24,6 @@ namespace lev
 
   // class dependencies
   class clock;
-  class screen;
   class timer;
 
   class input
@@ -72,8 +72,9 @@ namespace lev
       bool do_event();
       bool do_events();
       bool done();
-      static system* get() { return init(); }
-      static int get_l(lua_State *L);
+//      static system* get() { return singleton; }
+      static boost::shared_ptr<system> get() { return singleton; }
+//      static int get_l(lua_State *L);
       luabind::object get_on_button_down();
       luabind::object get_on_button_up();
       luabind::object get_on_key_down();
@@ -87,11 +88,11 @@ namespace lev
       luabind::object get_on_right_down();
       luabind::object get_on_right_up();
       luabind::object get_on_tick();
-      screen* get_screen();
       unsigned long get_ticks();
       virtual type_id get_type_id() const { return LEV_TSYSTEM; }
       virtual const char *get_type_name() const { return "lev.system"; }
-      static system* init();
+//      static system* init();
+      static boost::shared_ptr<system> init();
       bool is_running();
       bool quit(bool force = false);
       bool quit0() { return quit(); }
@@ -110,11 +111,10 @@ namespace lev
       bool set_on_right_up(luabind::object func);
       bool set_on_tick(luabind::object func);
       bool set_running(bool run = true);
-      screen* set_video_mode(int width, int height, int depth = 32);
-      screen* set_video_mode2(int width, int height) { return set_video_mode(width, height); }
-      bool toggle_full_screen();
     protected:
       void *_obj;
+//      static system *singleton;
+      static boost::shared_ptr<system> singleton;
   };
 
 };

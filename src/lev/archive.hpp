@@ -11,6 +11,7 @@
 /////////////////////////////////////////////////////////////////////////////
 
 #include "base.hpp"
+#include <boost/shared_ptr.hpp>
 
 extern "C"
 {
@@ -65,7 +66,8 @@ namespace lev
       virtual type_id get_type_id() const { return LEV_TARCHIVE; }
       virtual const char *get_type_name() const { return "lev.archive"; }
       static bool is_archive(const std::string &filename);
-      static archive* open(const std::string &archive_path);
+//      static archive* open(const std::string &archive_path);
+      static boost::shared_ptr<archive> open(const std::string &archive_path);
       bool read(const std::string &entry_name, std::string &data,
                 int block_size = 4096, const char *password = NULL);
       bool read_current(std::string &data, int block_size = 4096, const char *password = NULL);

@@ -23,6 +23,8 @@ extern "C" {
   #include <unzip.h>
   #include <zip.h>
 }
+#include <boost/shared_ptr.hpp>
+#include <boost/weak_ptr.hpp>
 #include <luabind/luabind.hpp>
 
 int luaopen_lev_archive(lua_State *L)
@@ -30,59 +32,67 @@ int luaopen_lev_archive(lua_State *L)
   using namespace lev;
   using namespace luabind;
 
-  open(L);
-  globals(L)["require"]("lev.base");
+  try {
+    open(L);
+    globals(L)["package"]["loaded"]["lev.archive"] = true;
+    globals(L)["require"]("lev.base");
 
-  module(L, "lev")
-  [
-    namespace_("archive"),
-    namespace_("classes")
+    module(L, "lev")
     [
-      class_<lev::archive, base>("archive")
-//        .def("add_data", &lev::archive::add_data)
-//        .def("add_file", &lev::archive::add_file)
-//        .def("add_file_to", &lev::archive::add_file_to)
-        .def("flush", &lev::archive::flush)
-        .def("entry_exists", &lev::archive::entry_exists)
-//        .def("extract", &lev::archive::extract)
-//        .def("extract_to", &lev::archive::extract_to)
-        .def("get_size", &lev::archive::get_uncompressed_size)
-        .def("get_size", &lev::archive::get_uncompressed_size_current)
-        .def("get_uncompressed_size", &lev::archive::get_uncompressed_size)
-        .def("get_uncompressed_size", &lev::archive::get_uncompressed_size_current)
-        .scope
-        [
-          def("entry_exists_direct", &lev::archive::entry_exists_direct),
-//          def("extract_direct", &lev::archive::extract_direct),
-//          def("extract_direct_to", &lev::archive::extract_direct_to),
-          def("get_uncompressed_size_direct", &lev::archive::get_uncompressed_size_direct),
-          def("is_archive", &lev::archive::is_archive),
-          def("open", &lev::archive::open, adopt(result))
-        ]
-    ]
-  ];
-  object lev = globals(L)["lev"];
-  object classes = lev["classes"];
-  object arch = lev["archive"];
+      namespace_("archive"),
+      namespace_("classes")
+      [
+        class_<lev::archive, base, boost::shared_ptr<base> >("archive")
+  //        .def("add_data", &lev::archive::add_data)
+  //        .def("add_file", &lev::archive::add_file)
+  //        .def("add_file_to", &lev::archive::add_file_to)
+          .def("flush", &lev::archive::flush)
+          .def("entry_exists", &lev::archive::entry_exists)
+  //        .def("extract", &lev::archive::extract)
+  //        .def("extract_to", &lev::archive::extract_to)
+          .def("get_size", &lev::archive::get_uncompressed_size)
+          .def("get_size", &lev::archive::get_uncompressed_size_current)
+          .def("get_uncompressed_size", &lev::archive::get_uncompressed_size)
+          .def("get_uncompressed_size", &lev::archive::get_uncompressed_size_current)
+          .scope
+          [
+            def("entry_exists_direct", &lev::archive::entry_exists_direct),
+  //          def("extract_direct", &lev::archive::extract_direct),
+  //          def("extract_direct_to", &lev::archive::extract_direct_to),
+            def("get_uncompressed_size_direct", &lev::archive::get_uncompressed_size_direct),
+            def("is_archive", &lev::archive::is_archive),
+            def("open", &lev::archive::open)
+          ]
+      ]
+    ];
+    object lev = globals(L)["lev"];
+    object classes = lev["classes"];
+    object arch = lev["archive"];
 
-  register_to(classes["archive"], "add_data", &lev::archive::add_data_l);
-  register_to(classes["archive"], "find", &lev::archive::find_l);
-  register_to(classes["archive"], "find_direct", &lev::archive::find_direct_l);
-  register_to(classes["archive"], "find_next", &lev::archive::find_next_l);
-  register_to(classes["archive"], "read", &lev::archive::read_l);
-  register_to(classes["archive"], "read_direct", &lev::archive::read_direct_l);
-//
-  arch["entry_exists"] = classes["archive"]["entry_exists_direct"];
-//  arch["extract"] = classes["archive"]["extract_direct"];
-//  arch["extract_to"] = classes["archive"]["extract_direct_to"];
-  arch["find"] = classes["archive"]["find_direct"];
-  arch["get_size"] = classes["archive"]["get_uncompressed_size_direct"];
-  arch["get_uncompressed_size"] = classes["archive"]["get_uncompressed_size_direct"];
-  arch["is_archive"] = classes["archive"]["is_archive"];
-  arch["open"] = classes["archive"]["open"];
-  arch["read"] = classes["archive"]["read_direct"];
+    register_to(classes["archive"], "add_data", &lev::archive::add_data_l);
+    register_to(classes["archive"], "find", &lev::archive::find_l);
+    register_to(classes["archive"], "find_direct", &lev::archive::find_direct_l);
+    register_to(classes["archive"], "find_next", &lev::archive::find_next_l);
+    register_to(classes["archive"], "read", &lev::archive::read_l);
+    register_to(classes["archive"], "read_direct", &lev::archive::read_direct_l);
 
-  globals(L)["package"]["loaded"]["lev.archive"] = true;
+    arch["entry_exists"] = classes["archive"]["entry_exists_direct"];
+  //  arch["extract"] = classes["archive"]["extract_direct"];
+  //  arch["extract_to"] = classes["archive"]["extract_direct_to"];
+    arch["find"] = classes["archive"]["find_direct"];
+    arch["get_size"] = classes["archive"]["get_uncompressed_size_direct"];
+    arch["get_uncompressed_size"] = classes["archive"]["get_uncompressed_size_direct"];
+    arch["is_archive"] = classes["archive"]["is_archive"];
+    arch["open"] = classes["archive"]["open"];
+    arch["read"] = classes["archive"]["read_direct"];
+
+    globals(L)["package"]["loaded"]["lev.archive"] = true;
+  }
+  catch (...) {
+    fprintf(stderr, "error on initializing \"lev.archive\" library\n");
+    fprintf(stderr, "error message: %s\n", lua_tostring(L, -1));
+  }
+  return 0;
 }
 
 namespace lev
@@ -456,7 +466,8 @@ namespace lev
                                     const std::string &entry_name)
   {
     try {
-      boost::scoped_ptr<lev::archive> arc(lev::archive::open(archive_file));
+//      boost::scoped_ptr<lev::archive> arc(lev::archive::open(archive_file));
+      boost::shared_ptr<archive> arc(lev::archive::open(archive_file));
       return arc->entry_exists(entry_name);
     }
     catch (...) {
@@ -530,7 +541,8 @@ namespace lev
                             std::string &entry_name)
   {
     try {
-      boost::scoped_ptr<lev::archive> arc(lev::archive::open(archive_file));
+//      boost::scoped_ptr<lev::archive> arc(lev::archive::open(archive_file));
+      boost::shared_ptr<archive> arc(lev::archive::open(archive_file));
       if (arc.get() == NULL) { throw -1; }
       return arc->find(pattern, entry_name);
     }
@@ -618,7 +630,8 @@ namespace lev
                                              const std::string &entry_name)
   {
     try {
-      boost::scoped_ptr<lev::archive> arc(archive::open(archive_file));
+//      boost::scoped_ptr<lev::archive> arc(archive::open(archive_file));
+      boost::shared_ptr<archive> arc(archive::open(archive_file));
       if (! arc.get()) { throw -1; }
       return arc->get_uncompressed_size(entry_name);
     }
@@ -634,19 +647,22 @@ namespace lev
     return true;
   }
 
-  archive* archive::open(const std::string &archive_path)
+//  archive* archive::open(const std::string &archive_path)
+  boost::shared_ptr<archive> archive::open(const std::string &archive_path)
   {
-    archive *arc = NULL;
+//    archive *arc = NULL;
+    boost::shared_ptr<archive> arc;
     try {
-      arc = new archive;
+      arc.reset(new archive);
+      if (! arc) { throw -1; }
       arc->_obj = myArchive::Create(archive_path);
-      if (! arc->_obj) { throw -1; }
-      return arc;
+      if (! arc->_obj) { throw -2; }
     }
     catch (...) {
-      delete arc;
-      return NULL;
+      arc.reset();
+      fprintf(stderr, "error on archive instance creation\n");
     }
+    return arc;
   }
 
   bool archive::read(const std::string &entry_name, std::string &data, int block_size, const char *password)
@@ -738,8 +754,9 @@ namespace lev
                             const char *password)
   {
     try {
-      boost::scoped_ptr<lev::archive> arc(lev::archive::open(archive_file));
-      if (arc.get() == NULL) { throw -1; }
+//      boost::scoped_ptr<lev::archive> arc(lev::archive::open(archive_file));
+      boost::shared_ptr<archive> arc(lev::archive::open(archive_file));
+      if (! arc) { throw -1; }
       return arc->read(entry_name, data, block_size, password);
     }
     catch (...) {

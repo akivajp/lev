@@ -184,7 +184,7 @@ int main(int argc, char **argv)
   for (int i = 0; i < len; i++)
   {
     if (done_something) { break; }
-    if (! file_system::file_exists(argv[i])) { continue; }
+    if (! file_system::file_exists(entry[i])) { continue; }
     if (! do_file(L, entry[i])) { return -1; }
     done_something = true;
   }
@@ -195,7 +195,11 @@ int main(int argc, char **argv)
     return -1;
   }
 
+//printf("GC START\n");
+  lua_gc(L, LUA_GCCOLLECT, 0);
+//printf("BEGIN ALL CLOSING!\n");
   lua_close(L);
+//printf("END ALL CLOSING!\n");
 
   return 0;
 }

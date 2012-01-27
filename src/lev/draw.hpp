@@ -14,6 +14,8 @@
 #include "base.hpp"
 #include "prim.hpp"
 
+#include <boost/shared_ptr.hpp>
+#include <boost/weak_ptr.hpp>
 #include <lua.h>
 
 extern "C" {
@@ -36,12 +38,20 @@ namespace lev
       virtual ~drawable() { }
       virtual bool compile(bool force = false) { return false; }
       virtual bool compile0() { return compile(); }
-      virtual bool draw_on_image(image *dst, int x = 0, int y = 0, unsigned char alpha = 255) { return false; }
+
+      virtual bool draw_on_image(image *dst, int x = 0, int y = 0, unsigned char alpha = 255)
+      { return false; }
+
       virtual bool draw_on_image1(image *dst) { return draw_on_image(dst); }
       virtual bool draw_on_image3(image *dst, int x, int y) { return draw_on_image(dst, x, y); }
-      virtual bool draw_on_screen(screen *dst, int x = 0, int y = 0, unsigned char alpha = 255) { return false; }
+
+      virtual bool draw_on_screen(screen *dst, int x = 0, int y = 0, unsigned char alpha = 255)
+      { return false; }
+
       virtual bool draw_on_screen1(screen *dst) { return draw_on_screen(dst); }
-      virtual bool draw_on_screen3(screen *dst, int x, int y) { return draw_on_screen(dst, x, y); }
+      virtual bool draw_on_screen3(screen *dst, int x, int y)
+      { return draw_on_screen(dst, x, y); }
+
       virtual int get_h() const { return 0; }
       virtual type_id get_type_id() const { return LEV_TDRAWABLE; }
       virtual const char *get_type_name() const { return "lev.drawable"; }
@@ -76,7 +86,8 @@ namespace lev
       virtual bool clear_color3(unsigned char r, unsigned char g, unsigned char b)
       { return clear_color(r, g, b); }
 
-      static screen* create(window *holder);
+//      static screen* create(window *holder);
+      static boost::shared_ptr<screen> create(boost::shared_ptr<window> holder);
       bool draw(drawable *src, int x = 0, int y = 0, unsigned char alpha = 255);
       static int draw_l(lua_State *L);
       bool draw_pixel(int x, int y, const color &c);
@@ -84,17 +95,16 @@ namespace lev
       bool enable_alpha_blending(bool enable = true);
       bool enable_alpha_blending0() { return enable_alpha_blending(); }
       bool flip();
-      static screen *get();
       void* get_rawobj() { return _obj; }
       virtual type_id get_type_id() const { return LEV_TSCREEN; }
       virtual const char *get_type_name() const { return "lev.screen"; }
       bool map2d_auto();
       bool map2d(int left, int right, int top, int bottom);
       bool set_current();
-      static screen *set_mode(int width, int height, int depth = 32);
       bool swap();
     protected:
-      window *holder;
+//      window *holder;
+      boost::weak_ptr<window> holder;
       void *_obj;
   };
 

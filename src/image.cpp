@@ -23,9 +23,10 @@
 //#include "resource/levana.xpm"
 
 // libraries
+#include <boost/scoped_ptr.hpp>
+#include <boost/shared_ptr.hpp>
 #include <luabind/adopt_policy.hpp>
 #include <luabind/luabind.hpp>
-#include <auto_ptr.h>
 
 #include "stb_image.c"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
@@ -48,7 +49,7 @@ int luaopen_lev_image(lua_State *L)
     namespace_("image"),
     namespace_("classes")
     [
-      class_<image, drawable>("image")
+      class_<image, drawable, boost::shared_ptr<base> >("image")
         .def("blit", &image::blit)
         .def("blit", &image::blit1)
         .def("blit", &image::blit2)
@@ -58,7 +59,7 @@ int luaopen_lev_image(lua_State *L)
         .def("clear", &image::clear0)
         .def("clear", &image::clear_rect)
         .def("clear", &image::clear_rect1)
-        .def("clone", &image::clone, adopt(result))
+        .def("clone", &image::clone)
         .def("draw_pixel", &image::draw_pixel)
         .def("draw_raster", &image::draw_raster)
 //        .def("fill_circle", &image::fill_circle)
@@ -81,18 +82,18 @@ int luaopen_lev_image(lua_State *L)
 //        .def("stroke_rectangle", &image::stroke_rect)
         .scope
         [
-          def("create",  &image::create, adopt(result)),
+          def("create",  &image::create),
 //          def("draw_text_c", &image::draw_text),
 //          def("levana_icon", &image::levana_icon),
-          def("load",    &image::load, adopt(result)),
-          def("string_c",  &image::string, adopt(result)),
-          def("sub_image_c", &image::sub_image, adopt(result))
+          def("load",    &image::load),
+          def("string_c",  &image::string),
+          def("sub_image_c", &image::sub_image)
         ],
-      class_<texture, drawable>("texture")
+      class_<texture, drawable, boost::shared_ptr<base> >("texture")
         .scope
         [
-          def("create", &texture::create, adopt(result)),
-          def("create", &texture::load, adopt(result))
+          def("create", &texture::create),
+          def("create", &texture::load)
         ],
 //      class_<animation, drawable>("animation")
 //        .def("add", &animation::add_file)
@@ -102,7 +103,7 @@ int luaopen_lev_image(lua_State *L)
 //          def("create", &animation::create, adopt(result)),
 //          def("create", &animation::create0, adopt(result))
 //        ],
-      class_<transition, drawable>("transition")
+      class_<transition, drawable, boost::shared_ptr<base> >("transition")
         .property("is_running", &transition::is_running)
         .def("rewind", &transition::rewind)
         .def("set_current", &transition::set_current)
@@ -112,7 +113,7 @@ int luaopen_lev_image(lua_State *L)
           def("create", &transition::create, adopt(result)),
           def("create", &transition::create0, adopt(result))
         ],
-      class_<layout, drawable>("layout")
+      class_<layout, drawable, boost::shared_ptr<base> >("layout")
         .def("clear", &layout::clear)
         .def("clear", &layout::clear0)
         .property("color",  &layout::get_fg_color, &layout::set_fg_color)
@@ -175,12 +176,11 @@ namespace lev
   class myImage
   {
     public:
-      myImage(int w, int h) : w(w), h(h), tex(NULL) { }
+      myImage(int w, int h) : w(w), h(h), tex() { }
 
       virtual ~myImage()
       {
         if (buf) { delete [] buf; }
-        if (tex) { delete tex; }
       }
 
       static myImage* Create(int w, int h)
@@ -202,15 +202,14 @@ namespace lev
       {
         if (tex)
         {
-          delete tex;
-          tex = NULL;
+          tex.reset();
         }
         return true;
       }
 
       bool Texturize(image *orig, bool force = false)
       {
-        if (tex) { return false; }
+        if (tex && !force) { return false; }
         tex = texture::create(orig);
         return true;
       }
@@ -218,7 +217,8 @@ namespace lev
       int w, h;
       unsigned char *buf;
 
-      texture* tex;
+//      texture* tex;
+      boost::shared_ptr<texture> tex;
   };
 
   static myImage *cast_image(void *obj) { return (myImage *)obj; }
@@ -404,13 +404,15 @@ namespace lev
     return clear_rect(r.get_x(), r.get_y(), r.get_w(), r.get_h(), c);
   }
 
-  image* image::clone()
+//  image* image::clone()
+  boost::shared_ptr<image> image::clone()
   {
-    image* img = NULL;
+    boost::shared_ptr<image> img;
     try {
-      img = new image;
+      img.reset(new image);
+      if (! img) { throw -1; }
       img->_obj = myImage::Create(get_w(), get_h());
-      if (! img->_obj) { throw -1; }
+      if (! img->_obj) { throw -2; }
       long length = 4 * get_w() * get_h();
       unsigned char *src_buf = cast_image(_obj)->buf;
       unsigned char *new_buf = cast_image(img->_obj)->buf;
@@ -418,28 +420,32 @@ namespace lev
       {
         new_buf[i] = src_buf[i];
       }
-      return img;
     }
     catch (...) {
-      delete img;
-      return NULL;
+      img.reset();
+      fprintf(stderr, "error on image memory allocation or copying\n");
     }
+    return img;
   }
 
-  image* image::create(int width, int height)
+//  image* image::create(int width, int height)
+  boost::shared_ptr<image> image::create(int width, int height)
   {
-    image *img = NULL;
+//    image *img = NULL;
+    boost::shared_ptr<image> img;
+    if (width <= 0 || height <= 0) { return img; }
     try {
-      img = new image;
+      img.reset(new image);
+      if (! img) { throw -1; }
       img->_obj = myImage::Create(width, height);
-      if (! img->_obj) { throw -1; }
+      if (! img->_obj) { throw -2; }
       img->clear();
-      return img;
     }
     catch (...) {
-      delete img;
-      return NULL;
+      img.reset();
+      fprintf(stderr, "error on image memory allocation\n");
     }
+    return img;
   }
 
   bool image::draw(drawable *src, int x, int y, unsigned char alpha)
@@ -576,8 +582,8 @@ namespace lev
 
         if (! str) { throw -1; }
 
-        std::auto_ptr<raster> r(f->rasterize_utf8(str, spacing));
-        if (! r.get()) { throw -2; }
+        boost::scoped_ptr<raster> r(f->rasterize_utf8(str, spacing));
+        if (! r) { throw -2; }
         img->draw_raster(r.get(), x, y, c);
       }
       else
@@ -678,23 +684,25 @@ namespace lev
 //    }
 //  }
 
-  image* image::load(const std::string &filename)
+//  image* image::load(const std::string &filename)
+  boost::shared_ptr<image> image::load(const std::string &filename)
   {
-    image *img = NULL;
-    unsigned char *buf = NULL;
+    boost::shared_ptr<image> img;
+//    unsigned char *buf = NULL;
     try {
       int w, h;
-      buf = stbi_load(filename.c_str(), &w, &h, NULL, 4);
+//      buf = stbi_load(filename.c_str(), &w, &h, NULL, 4);
+      boost::shared_ptr<unsigned char> buf(stbi_load(filename.c_str(), &w, &h, NULL, 4), stbi_image_free);
       if (! buf) { throw -1; }
-
       img = image::create(w, h);
       if (! img) { throw -2; }
-      unsigned char *pixel = buf;
+
+//      unsigned char *pixel = buf.get();
       for (int y = 0; y < h; y++)
       {
         for (int x = 0; x < w; x++)
         {
-          unsigned char *pixel = buf + (y * w + x) * 4;
+          unsigned char *pixel = buf.get() + (y * w + x) * 4;
           unsigned char r, g, b, a;
           r = pixel[0];
           g = pixel[1];
@@ -703,23 +711,22 @@ namespace lev
           img->set_pixel(x, y, color(r, g, b, a));
         }
       }
-      stbi_image_free(buf);
-      return img;
+//      stbi_image_free(buf);
     }
     catch (...) {
-      stbi_image_free(buf);
-      delete img;
-      return NULL;
+      img.reset();
+      fprintf(stderr, "error on image data loading\n");
     }
+    return img;
   }
 
   bool image::reload(const std::string &filename)
   {
-    image *img = image::load(filename);
+//    image *img = image::load(filename);
+    boost::shared_ptr<image> img = image::load(filename);
     if (! img) { return false; }
     this->swap(img);
-    delete img;
-    cast_image(_obj)->OnChange();
+//    delete img;
     return true;
   }
 
@@ -745,30 +752,33 @@ namespace lev
   }
 
 
-  image* image::string(font *f, const std::string &str, const color *fore, const color *back, int spacing)
+//  image* image::string(font *f, const std::string &str, const color *fore, const color *back, int spacing)
+  boost::shared_ptr<image> image::string(font *f, const std::string &str,
+                                         const color *fore, const color *back,
+                                         int spacing)
   {
-    if (! f) { return NULL; }
+    boost::shared_ptr<image> img;
+    if (! f) { return img; }
 
-    image *img = NULL;
-    raster *r = NULL;
     color fg = color::white();
     color bg = color::transparent();
     if (fore) { fg = *fore; }
     if (back) { bg = *back; }
+
     try {
-      r = f->rasterize_utf8(str, spacing);
+      boost::scoped_ptr<raster> r(f->rasterize_utf8(str, spacing));
       if (! r) { throw -1; }
       img = image::create(r->get_w(), r->get_h());
       if (! img) { throw -2; }
       img->clear(bg);
-      img->draw_raster(r, 0, 0, &fg);
+      img->draw_raster(r.get(), 0, 0, &fg);
       return img;
     }
     catch (...) {
-      delete r;
-      delete img;
-      return NULL;
+      img.reset();
+      fprintf(stderr, "error on string image instance creation\n");
     }
+    return img;
   }
 
   int image::string_l(lua_State *L)
@@ -882,20 +892,20 @@ namespace lev
 //    }
 //    return image_draw_mask(this, &tmp, border);
 //  }
-//
-  image* image::sub_image(int x, int y, int w, int h)
+
+  boost::shared_ptr<image> image::sub_image(int x, int y, int w, int h)
   {
-    image* img = NULL;
+    boost::shared_ptr<image> img;
     try {
       img = image::create(w, h);
       if (! img) { throw -1; }
       img->blit(0, 0, this, x, y, w, h);
-      return img;
     }
     catch (...) {
-      delete img;
-      return NULL;
+      img.reset();
+      fprintf(stderr, "error on sub image instance creation\n");
     }
+    return img;
   }
 
   int image::sub_image_l(lua_State *L)
@@ -929,7 +939,8 @@ namespace lev
     return 1;
   }
 
-  bool image::swap(image *img)
+//  bool image::swap(image *img)
+  bool image::swap(boost::shared_ptr<image> img)
   {
     if (! img) { return false; }
     // swap the images
@@ -937,6 +948,7 @@ namespace lev
     this->_obj = img->_obj;
     img->_obj  = tmp;
     cast_image(_obj)->OnChange();
+    cast_image(img->get_rawobj())->OnChange();
     return true;
   }
 
@@ -999,15 +1011,16 @@ namespace lev
     if (_obj) { delete cast_tex(_obj); }
   }
 
-  texture* texture::create(const image *src)
+  boost::shared_ptr<texture> texture::create(const image *src)
   {
-    if (! src) { return NULL; }
-    texture *tex = NULL;
-    myTexture *obj = NULL;
+    boost::shared_ptr<texture> tex;
+    if (! src) { return tex; }
     try {
-      tex = new texture;
+      myTexture *obj = NULL;
+      tex.reset(new texture);
+      if (! tex) { throw -1; }
       tex->_obj = obj = myTexture::Create(src->get_w(), src->get_h());
-      if (! tex->_obj) { throw -1; }
+      if (! tex->_obj) { throw -2; }
 
       glBindTexture(GL_TEXTURE_2D, obj->index);
       glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
@@ -1018,12 +1031,12 @@ namespace lev
       glTexSubImage2D(GL_TEXTURE_2D, 0, 0 /* x offset */, 0 /* y offset */,
                       obj->img_w, obj->img_h, GL_RGBA, GL_UNSIGNED_BYTE,
                       cast_image(src->get_rawobj())->buf);
-      return tex;
     }
     catch (...) {
-      delete tex;
-      return NULL;
+      tex.reset();
+      fprintf(stderr, "error on texture instance creation\n");
     }
+    return tex;
   }
 
   bool texture::draw_on_screen(screen *target, int x, int y, unsigned char alpha)
@@ -1067,15 +1080,16 @@ namespace lev
     return cast_tex(_obj)->img_w;
   }
 
-  texture* texture::load(const std::string &file)
+  boost::shared_ptr<texture> texture::load(const std::string &file)
   {
     try {
-      std::auto_ptr<image> img(image::load(file));
-      if (! img.get()) { throw -1; }
+      boost::shared_ptr<image> img(image::load(file));
+      if (! img) { throw -1; }
       return texture::create(img.get());
     }
     catch (...) {
-      return NULL;
+      fprintf(stderr, "error on texture image loading\n");
+      return boost::shared_ptr<texture>();
     }
   }
 
@@ -1208,7 +1222,7 @@ namespace lev
 
     protected:
 
-      myTransition() : imgs(), sw(NULL), texturized(false) { }
+      myTransition() : imgs(), sw(), texturized(false) { }
 
     public:
 
@@ -1216,7 +1230,6 @@ namespace lev
       {
         if (sw)
         {
-          delete sw;
         }
       }
 
@@ -1374,7 +1387,7 @@ namespace lev
       std::vector<luabind::object> imgs;
       std::vector<long> durations;
       std::vector<transition_type> types;
-      stop_watch *sw;
+      boost::shared_ptr<stop_watch> sw;
   };
   static myTransition* cast_tran(void *obj) { return (myTransition *)obj; }
 
@@ -1382,7 +1395,9 @@ namespace lev
 
   transition::~transition()
   {
+//printf("DELETING TRANSITION!\n");
     if (_obj) { delete cast_tran(_obj); }
+//printf("END DELETE!\n");
   }
 
   transition* transition::create(luabind::object img)
@@ -1645,10 +1660,10 @@ namespace lev
           boost::shared_ptr<image> img;
           boost::shared_ptr<image> hover_img;
 
-          img.reset(image::string(font_text.get(), text, &color_fg, NULL, spacing));
+          img = image::string(font_text.get(), text, &color_fg, NULL, spacing);
 //          img->stroke_line(0, img->get_h() - 1,
 //                           img->get_w() - 1, img->get_h() - 1, c, 1, "dot");
-          hover_img.reset(image::string(font_text.get(), text, &hover_fg, &hover_bg));
+          hover_img = image::string(font_text.get(), text, &hover_fg, &hover_bg);
           return ReserveClickable(name, img, hover_img, lclick_func);
         }
         catch (...) {
@@ -1696,7 +1711,7 @@ namespace lev
         try {
           boost::shared_ptr<image> img;
           if (ruby.empty()) {
-            img.reset(image::string(font_text.get(), word, &color_fg, NULL, spacing));
+            img = image::string(font_text.get(), word, &color_fg, NULL, spacing);
             return ReserveImage(word, img);
           }
           else
@@ -1708,7 +1723,7 @@ namespace lev
             int w = img_ruby->get_w();
             if (img_word->get_w() > w) { w = img_word->get_w(); }
 
-            img.reset(image::create(w, h));
+            img = image::create(w, h);
             img->draw(img_ruby.get(), (w - img_ruby->get_w()) / 2, 0);
             img->draw(img_word.get(), (w - img_word->get_w()) / 2, img_ruby->get_h());
             return ReserveImage((boost::format("{ruby,%s,%s}") % word % ruby).str(), img);

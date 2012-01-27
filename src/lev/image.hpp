@@ -14,6 +14,7 @@
 #include "base.hpp"
 #include "draw.hpp"
 #include "prim.hpp"
+#include <boost/shared_ptr.hpp>
 #include <luabind/luabind.hpp>
 
 extern "C" {
@@ -47,8 +48,10 @@ namespace lev
       bool clear_rect1(const rect &r) { return clear_rect2(r); }
       bool clear_rect2(const rect &r, const color &c = color::transparent());
       bool clear_rect4(int x, int y, int w, int h) { return clear_rect(x, y, w, h); }
-      image* clone();
-      static image* create(int width, int height);
+//      image* clone();
+      boost::shared_ptr<image> clone();
+//      static image* create(int width, int height);
+      static boost::shared_ptr<image> create(int width, int height);
       bool draw(drawable *src, int x = 0, int y = 0, unsigned char alpha = 255);
       virtual bool draw_on_image(image *target, int x = 0, int y = 0, unsigned char alpha = 255);
       virtual bool draw_on_screen(screen *target, int x = 0, int y = 0, unsigned char alpha = 255);
@@ -68,12 +71,17 @@ namespace lev
       virtual bool is_compiled();
       virtual bool is_texturized();
       static image* levana_icon();
-      static image* load(const std::string &filename);
+//      static image* load(const std::string &filename);
+      static boost::shared_ptr<image> load(const std::string &filename);
       bool reload(const std::string &filename);
       bool save(const std::string &filename) const;
       bool set_pixel(int x, int y, const color &c);
-      static image* string(font *f, const std::string &str, const color *fore = NULL, const color *back = NULL, int spacing = 1);
-      static image* string2(font *f, const std::string &str) { return string(f, str); }
+//      static image* string(font *f, const std::string &str, const color *fore = NULL, const color *back = NULL, int spacing = 1);
+      static boost::shared_ptr<image> string(font *f, const std::string &str,
+                                             const color *fore = NULL,
+                                             const color *back = NULL,
+                                             int spacing = 1);
+//      static image* string2(font *f, const std::string &str) { return string(f, str); }
       static int string_l(lua_State *L);
       bool stroke_circle(int x, int y, int radius, color *border, int width);
       bool stroke_line(int x1, int y1, int x2, int y2, color *border, int width,
@@ -82,10 +90,11 @@ namespace lev
       { return stroke_line(x1, y1, x2, y2, border, width); }
 
       bool stroke_rect(int x, int y, int w, int h, color *border, int width);
-      image* sub_image(int x, int y, int w, int h);
+      boost::shared_ptr<image> sub_image(int x, int y, int w, int h);
       static int sub_image_l(lua_State *L);
       virtual bool texturize(bool force = false);
-      bool swap(image *img);
+//      bool swap(image *img);
+      bool swap(boost::shared_ptr<image> img);
     protected:
       void *_obj;
   };
@@ -96,14 +105,14 @@ namespace lev
       texture();
     public:
       ~texture();
-      static texture* create(const image *src);
+      static boost::shared_ptr<texture> create(const image *src);
       virtual bool draw_on_screen(screen *target, int x = 0, int y = 0, unsigned char alpha = 255);
       virtual type_id get_type_id() const { return LEV_TTEXTURE; }
       virtual int get_h() const;
       virtual int get_w() const;
       virtual const char *get_type_name() const { return "lev.texture"; }
       virtual bool is_texturized() { return true; }
-      static texture* load(const std::string &file);
+      static boost::shared_ptr<texture> load(const std::string &file);
     protected:
       void *_obj;
   };

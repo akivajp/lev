@@ -126,6 +126,13 @@ int luaopen_lev_util(lua_State *L)
 namespace lev
 {
 
+  luabind::object util::copy_function(luabind::object func)
+  {
+    using namespace luabind;
+    lua_State *L = func.interpreter();
+    return globals(L)["loadstring"](globals(L)["string"]["dump"](func));
+  }
+
   bool util::execute(const std::string &target)
   {
 //    wxString exe = wxStandardPaths::Get().GetExecutablePath();

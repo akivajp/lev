@@ -68,6 +68,7 @@ int luaopen_lev(lua_State *L)
 
   globals(L)["require"]("lev.base");
   globals(L)["package"]["loaded"]["lev"] = globals(L)["lev"];
+  set_preloaders(L);
   return 0;
 }
 
@@ -89,7 +90,7 @@ int luaopen_lev_base(lua_State *L)
     namespace_("classes")
     [
       // base of all
-      class_<base>("base")
+      class_<base, boost::shared_ptr<base> >("base")
         .def("__tostring", &base::tostring)
         .property("type_id", &base::get_type_id)
         .property("type_name", &base::get_type_name)
@@ -106,36 +107,43 @@ int luaopen_lev_std(lua_State *L)
   using namespace luabind;
   using namespace lev;
 
-  open(L);
-  globals(L)["require"]("debug");
-  globals(L)["require"]("io");
-  globals(L)["require"]("math");
-  globals(L)["require"]("os");
-  globals(L)["require"]("string");
-  globals(L)["require"]("table");
+  try {
+    open(L);
+    globals(L)["require"]("debug");
+    globals(L)["require"]("io");
+    globals(L)["require"]("math");
+    globals(L)["require"]("os");
+    globals(L)["require"]("string");
+    globals(L)["require"]("table");
 
-  globals(L)["require"]("lev");
-//  globals(L)["require"]("lev.archive");
-//  globals(L)["require"]("lev.db");
-  globals(L)["require"]("lev.draw");
-//  globals(L)["require"]("lev.gui");
-  globals(L)["require"]("lev.font");
-  globals(L)["require"]("lev.fs");
-//  globals(L)["require"]("lev.gl");
-  globals(L)["require"]("lev.image");
-//  globals(L)["require"]("lev.info");
-//  globals(L)["require"]("lev.net");
-  globals(L)["require"]("lev.package");
-  globals(L)["require"]("lev.sound");
-  globals(L)["require"]("lev.string");
-  globals(L)["require"]("lev.system");
-  globals(L)["require"]("lev.timer");
-  globals(L)["require"]("lev.util");
+    globals(L)["require"]("lev");
+    globals(L)["require"]("lev.archive");
+  //  globals(L)["require"]("lev.db");
+    globals(L)["require"]("lev.draw");
+  //  globals(L)["require"]("lev.gui");
+    globals(L)["require"]("lev.font");
+    globals(L)["require"]("lev.fs");
+  //  globals(L)["require"]("lev.gl");
+    globals(L)["require"]("lev.image");
+  //  globals(L)["require"]("lev.info");
+  //  globals(L)["require"]("lev.net");
+    globals(L)["require"]("lev.package");
+    globals(L)["require"]("lev.sound");
+    globals(L)["require"]("lev.string");
+    globals(L)["require"]("lev.system");
+    globals(L)["require"]("lev.timer");
+    globals(L)["require"]("lev.util");
 
-  globals(L)["system"] = globals(L)["lev"]["system"]();
-  globals(L)["mixer"] = globals(L)["lev"]["sound"]["mixer"]();
-  globals(L)["package"]["loaded"]["lev.std"] = globals(L)["lev"];
-  globals(L)["collectgarbage"]();
+    globals(L)["system"] = globals(L)["lev"]["system"]();
+//    globals(L)["mixer"] = globals(L)["lev"]["sound"]["mixer"]();
+    globals(L)["mixer"] = globals(L)["system"]["create_mixer"](globals(L)["system"]);
+    globals(L)["package"]["loaded"]["lev.std"] = globals(L)["lev"];
+    globals(L)["collectgarbage"]();
+  }
+  catch (...) {
+    fprintf(stderr, "error on initializing \"lev.std\" library\n");
+    fprintf(stderr, "error message: %s\n", lua_tostring(L, -1));
+  }
   return 0;
 }
 
@@ -147,7 +155,7 @@ namespace lev
   {
     using namespace luabind;
     register_to(globals(L)["package"]["preload"], "lev", luaopen_lev);
-//    register_to(globals(L)["package"]["preload"], "lev.archive", luaopen_lev_archive);
+    register_to(globals(L)["package"]["preload"], "lev.archive", luaopen_lev_archive);
     register_to(globals(L)["package"]["preload"], "lev.base", luaopen_lev_base);
 //    register_to(globals(L)["package"]["preload"], "lev.db", luaopen_lev_db);
     register_to(globals(L)["package"]["preload"], "lev.draw", luaopen_lev_draw);

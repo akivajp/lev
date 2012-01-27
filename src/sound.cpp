@@ -8,19 +8,26 @@
 // Licence:     MIT License
 /////////////////////////////////////////////////////////////////////////////
 
+// pre-compiled header
 #include "prec.h"
 
+// declarations
 #include "lev/sound.hpp"
+
+// dependencies
 #include "lev/system.hpp"
 #include "register.hpp"
 
+// libraries
 #include <boost/shared_array.hpp>
 #include <boost/shared_ptr.hpp>
 #include <luabind/adopt_policy.hpp>
 #include <luabind/luabind.hpp>
 #include <map>
-
 #include <vorbis/vorbisfile.h>
+
+// singleton initialization
+boost::shared_ptr<lev::mixer> lev::mixer::singleton;
 
 int luaopen_lev_sound(lua_State *L)
 {
@@ -28,14 +35,16 @@ int luaopen_lev_sound(lua_State *L)
   using namespace lev;
 
   open(L);
+  globals(L)["package"]["loaded"]["lev.sound"] = true;
   globals(L)["require"]("lev");
+  globals(L)["require"]("lev.system");
 
   module(L, "lev")
   [
     namespace_("sound"),
     namespace_("classes")
     [
-      class_<sound, base>("sound")
+      class_<sound, base, boost::shared_ptr<base> >("sound")
         .def("clear", &sound::clear)
         .property("is_playing", &sound::is_playing, &sound::set_playing)
         .property("len", &sound::get_length)
@@ -54,7 +63,7 @@ int luaopen_lev_sound(lua_State *L)
         [
           def("create", &sound::create, adopt(result))
         ],
-      class_<mixer, base>("mixer")
+      class_<mixer, base, boost::shared_ptr<base> >("mixer")
         .def("activate", &mixer::activate)
         .def("activate", &mixer::activate0)
         .def("clear_slot", &mixer::clear_slot)
@@ -75,12 +84,12 @@ int luaopen_lev_sound(lua_State *L)
         ]
     ]
   ];
-  object classes = globals(L)["lev"]["classes"];
-  object sound = globals(L)["lev"]["sound"];
-  sound["create"] = classes["sound"]["create"];
-  sound["mixer"] = classes["mixer"]["get"];
+//  object classes = globals(L)["lev"]["classes"];
+//  object sound = globals(L)["lev"]["sound"];
+//  sound["create"] = classes["sound"]["create"];
+//  sound["mixer"] = classes["mixer"]["get"];
 
-  globals(L)["package"]["loaded"]["lev.sound"] = sound;
+  globals(L)["package"]["loaded"]["lev.sound"] = true;
   return 0;
 }
 
@@ -615,7 +624,7 @@ namespace lev
           request.samples  = 512;
           request.callback = my_mix_audio;
           request.userdata = mx;
-          if (system::init() == NULL) { throw -1; }
+//          if (system::init() == NULL) { throw -1; }
           if (SDL_OpenAudio(&request, &mx->spec) < 0) { throw -2; }
 //test("REQUEST", request);
 //test("ACCEPT",  mx->spec);
@@ -754,9 +763,9 @@ namespace lev
   mixer::~mixer()
   {
     if (_obj) { delete (myMixer *)_obj; }
-printf("CLOSING AUDIO!\n");
-//    SDL_CloseAudio();
-printf("CLOSED AUDIO!\n");
+//printf("CLOSING AUDIO!\n");
+    SDL_CloseAudio();
+//printf("CLOSED AUDIO!\n");
   }
 
   bool mixer::activate(bool active)
@@ -784,12 +793,23 @@ printf("CLOSED AUDIO!\n");
     return ((myMixer *)_obj)->GetSlot(slot_num);
   }
 
-  mixer* mixer::init()
+//  mixer* mixer::init()
+  boost::shared_ptr<mixer> mixer::init(boost::shared_ptr<system> sys)
   {
-    static lev::mixer mx;
-    if (mx._obj) { return &mx; }
-    mx._obj = myMixer::Create();
-    return &mx;
+//    static lev::mixer mx;
+    if (! sys) { return boost::shared_ptr<mixer>(); }
+    if (singleton) { return singleton; }
+    try {
+      singleton.reset(new mixer);
+      if (! singleton) { throw -1; }
+      singleton->_obj = myMixer::Create();
+      if (! singleton->_obj) { throw -2; }
+    }
+    catch (...) {
+      singleton.reset();
+      fprintf(stderr, "error on mixer instance creation\n");
+    }
+    return singleton;
   }
 
   bool mixer::is_active()

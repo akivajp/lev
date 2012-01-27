@@ -4,7 +4,7 @@ window = system:window()
 screen = window:screen()
 
 tran = lev.image.transition('bbb.png')
-tran:set_next('test.png', 2000, 'cross_fade')
+tran:set_next('test.png', 3, 'cross_fade')
 tran:texturize()
 
 system.on_tick = function()
@@ -15,4 +15,6 @@ system.on_tick = function()
 end
 
 system:run()
+
+system:close()
 

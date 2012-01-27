@@ -22,6 +22,7 @@ namespace lev
   class util
   {
     public:
+      static luabind::object copy_function(luabind::object func);
       static bool execute(const std::string &target);
       static int execute_code_l(lua_State *L);
       static luabind::object get_merged(lua_State *L, int start, int end);
@@ -35,6 +36,7 @@ namespace lev
       static std::string serialize1(luabind::object var) { return serialize(var); }
       static int using_l(lua_State *L);
   };
+
 }
 
 #endif // _UTIL_HPP

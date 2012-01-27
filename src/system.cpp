@@ -16,46 +16,23 @@
 
 // dependencies
 #include "lev/draw.hpp"
+#include "lev/sound.hpp"
 #include "lev/timer.hpp"
+#include "lev/util.hpp"
 #include "lev/window.hpp"
 #include "register.hpp"
 
 // libraries
 #include <map>
+#include <luabind/adopt_policy.hpp>
+//#include <luabind/copy_policy.hpp>
+#include <luabind/dependency_policy.hpp>
 #include <luabind/luabind.hpp>
 #include <SDL/SDL.h>
 #include <vector>
 
-//namespace lev
-//{
-//  class finalizer : public base
-//  {
-//    protected:
-//      finalizer() : base() { }
-//    public:
-//      virtual ~finalizer()
-//      {
-//printf("FINALIZE!\n");
-//        system::get()->done();
-//      }
-//
-//      static finalizer* create()
-//      {
-//        finalizer *f = NULL;
-//        try {
-//          f = new finalizer;
-//          return f;
-//        }
-//        catch (...) {
-//          delete f;
-//          return NULL;
-//        }
-//      }
-//
-//      virtual type_id get_type_id() const { return LEV_TFINALIZER; }
-//      virtual const char *get_type_name() const { return "lev.system.finalizer"; }
-//  };
-//}
+// globals initialization
+boost::shared_ptr<lev::system> lev::system::singleton;
 
 int luaopen_lev_system(lua_State *L)
 {
@@ -75,7 +52,7 @@ int luaopen_lev_system(lua_State *L)
     namespace_("system"),
     namespace_("classes")
     [
-      class_<event, base>("event")
+      class_<event, base, boost::shared_ptr<base> >("event")
         .property("button", &event::get_button)
         .property("dx", &event::get_dx)
         .property("dy", &event::get_dy)
@@ -93,12 +70,13 @@ int luaopen_lev_system(lua_State *L)
         .property("scancode", &event::get_scan_code)
         .property("x", &event::get_x)
         .property("y", &event::get_y),
-      class_<lev::system, base>("system")
+      class_<lev::system, base, boost::shared_ptr<base> >("system")
         .def("clock", &system::create_clock, adopt(result))
         .def("clock", &system::create_clock0, adopt(result))
         .def("close", &system::done)
         .def("create_clock", &system::create_clock, adopt(result))
         .def("create_clock", &system::create_clock0, adopt(result))
+        .def("create_mixer", &mixer::init)
         .def("create_timer", &system::create_timer, adopt(result))
         .def("create_timer", &system::create_timer0, adopt(result))
         .def("delay", &system::delay)
@@ -106,6 +84,7 @@ int luaopen_lev_system(lua_State *L)
         .def("do_events", &system::do_events)
         .def("done", &system::done)
         .property("is_running", &system::is_running, &system::set_running)
+        .def("mixer", &mixer::init)
         .property("on_button_down", &system::get_on_button_down, &system::set_on_button_down)
         .property("on_button_up", &system::get_on_button_up, &system::set_on_button_up)
         .property("on_key_down", &system::get_on_key_down, &system::set_on_key_down)
@@ -122,18 +101,15 @@ int luaopen_lev_system(lua_State *L)
         .def("quit", &system::quit)
         .def("quit", &system::quit0)
         .def("run", &system::run)
-        .property("screen", &system::get_screen)
         .def("set_running", &system::set_running)
-        .def("set_video_mode", &system::set_video_mode)
-        .def("set_video_mode", &system::set_video_mode2)
         .property("ticks", &system::get_ticks)
         .def("timer", &system::create_timer, adopt(result))
         .def("timer", &system::create_timer0, adopt(result))
-        .def("toggle_full_screen", &system::toggle_full_screen)
         .scope
         [
-          def("create_window_c", &window::create, adopt(result)),
-          def("get_c", &system::get),
+          def("create_window_c", &window::create),
+//          def("get_c", &system::get),
+          def("get", &system::get),
           def("init", &system::init)
         ]
 //      class_<lev::finalizer, base>("finalizer")
@@ -145,10 +121,10 @@ int luaopen_lev_system(lua_State *L)
   ];
   object lev = globals(L)["lev"];
   object classes = lev["classes"];
-  register_to(classes["system"], "get", &system::get_l);
+//  register_to(classes["system"], "get", &system::get_l);
   register_to(classes["system"], "create_window", &window::create_l);
   register_to(classes["system"], "window", &window::create_l);
-  lev["system"] = classes["system"]["get"];
+  lev["system"] = classes["system"]["init"];
 //  lev["finalizer"] = classes["finalizer"]["create"];
 
   // post-requirement
@@ -620,6 +596,7 @@ namespace lev
           on_right_down(),  on_right_up(),
           timers()
       { }
+
     public:
       ~mySystem() { }
 
@@ -642,6 +619,7 @@ namespace lev
         return true;
       }
 
+//      lua_State *L;
       std::map<Uint32, luabind::object> funcs;
       luabind::object on_tick;
       luabind::object on_left_down,   on_left_up;
@@ -658,7 +636,9 @@ namespace lev
 
   system::~system()
   {
+//printf("BEGIN DELETING SYSTEM\n");
     done();
+//printf("END DELETING SYSTEM\n");
   }
 
   clock* system::create_clock(double freq)
@@ -697,16 +677,16 @@ namespace lev
 
   bool system::done()
   {
-printf("QUITING1\n");
+//printf("QUITING1\n");
     if (_obj)
     {
-printf("QUITING2\n");
+//printf("QUITING2\n");
       SDL_Quit();
       delete cast_sys(_obj);
       _obj = NULL;
       return true;
     }
-printf("QUITING3\n");
+//printf("QUITING3\n");
     return false;
   }
 
@@ -808,14 +788,15 @@ printf("DETACHING TIMER!\n");
     return true;
   }
 
-  int system::get_l(lua_State *L)
-  {
-    using namespace luabind;
-    object o = globals(L)["lev"]["classes"]["system"]["get_c"]();
-//    o["finalizer"] = globals(L)["lev"]["classes"]["finalizer"]["create"]();
-    o.push(L);
-    return 1;
-  }
+//  int system::get_l(lua_State *L)
+//  {
+//    using namespace luabind;
+//    system::init();
+//    object o = globals(L)["lev"]["classes"]["system"]["get_c"]();
+////    o["finalizer"] = globals(L)["lev"]["classes"]["finalizer"]["create"]();
+//    o.push(L);
+//    return 1;
+//  }
 
   luabind::object system::get_on_button_down()
   {
@@ -882,35 +863,38 @@ printf("DETACHING TIMER!\n");
     return cast_sys(_obj)->on_tick;
   }
 
-  screen* system::get_screen()
-  {
-    return screen::get();
-  }
-
   unsigned long system::get_ticks()
   {
     return SDL_GetTicks();
   }
 
-  system* system::init()
+//  system* system::init()
+  boost::shared_ptr<system> system::init()
   {
-    static system sys;
-    if (sys._obj) { return &sys; }
-printf("INITTING!\n");
-    if (SDL_Init(SDL_INIT_EVERYTHING) < 0) { return NULL; }
-printf("INITTED!\n");
+    if (system::singleton) { return system::singleton; }
+    try {
+      singleton.reset(new system);
+      if (! singleton) { throw -1; }
+//printf("INITTING!\n");
+      if (SDL_Init(SDL_INIT_EVERYTHING) < 0) { throw -2; }
+//printf("INITTED!\n");
 
-    SDL_EnableUNICODE(1);
-    SDL_GL_SetAttribute(SDL_GL_RED_SIZE,    8);
-    SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE,  8);
-    SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE,   8);
-    SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE,  8);
-    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
-    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+      SDL_EnableUNICODE(1);
+      SDL_GL_SetAttribute(SDL_GL_RED_SIZE,    8);
+      SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE,  8);
+      SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE,   8);
+      SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE,  8);
+      SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+      SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 
-    sys._obj = mySystem::Create();
-    if (! sys._obj) { return NULL; }
-    return &sys;
+      singleton->_obj = mySystem::Create();
+      if (! singleton->_obj) { throw -3; }
+    }
+    catch (...) {
+      singleton.reset();
+      fprintf(stderr, "error on system instance creation\n");
+    }
+    return singleton;
   }
 
   bool system::is_running()
@@ -954,97 +938,89 @@ printf("INITTED!\n");
 
   bool system::set_on_button_down(luabind::object func)
   {
-    cast_sys(_obj)->funcs[SDL_MOUSEBUTTONDOWN] = func;
+    cast_sys(_obj)->funcs[SDL_MOUSEBUTTONDOWN] = util::copy_function(func);
     return true;
   }
 
   bool system::set_on_button_up(luabind::object func)
   {
-    cast_sys(_obj)->funcs[SDL_MOUSEBUTTONUP] = func;
+    cast_sys(_obj)->funcs[SDL_MOUSEBUTTONUP] = util::copy_function(func);
     return true;
   }
 
   bool system::set_on_key_down(luabind::object func)
   {
-    cast_sys(_obj)->funcs[SDL_KEYDOWN] = func;
+    cast_sys(_obj)->funcs[SDL_KEYDOWN] = util::copy_function(func);
     return true;
   }
 
   bool system::set_on_key_up(luabind::object func)
   {
-    cast_sys(_obj)->funcs[SDL_KEYUP] = func;
+    cast_sys(_obj)->funcs[SDL_KEYUP] = util::copy_function(func);
     return true;
   }
 
   bool system::set_on_left_down(luabind::object func)
   {
-    cast_sys(_obj)->on_left_down = func;
+    cast_sys(_obj)->on_left_down = util::copy_function(func);
     return true;
   }
 
   bool system::set_on_left_up(luabind::object func)
   {
-    cast_sys(_obj)->on_left_up = func;
+    cast_sys(_obj)->on_left_up = util::copy_function(func);
     return true;
   }
 
   bool system::set_on_middle_down(luabind::object func)
   {
-    cast_sys(_obj)->on_middle_down = func;
+    cast_sys(_obj)->on_middle_down = util::copy_function(func);
     return true;
   }
 
   bool system::set_on_middle_up(luabind::object func)
   {
-    cast_sys(_obj)->on_middle_up = func;
+    cast_sys(_obj)->on_middle_up = util::copy_function(func);
     return true;
   }
 
   bool system::set_on_motion(luabind::object func)
   {
-    cast_sys(_obj)->funcs[SDL_MOUSEMOTION] = func;
+    cast_sys(_obj)->funcs[SDL_MOUSEMOTION] = util::copy_function(func);
     return true;
   }
 
   bool system::set_on_quit(luabind::object func)
   {
-    cast_sys(_obj)->funcs[SDL_QUIT] = func;
+    cast_sys(_obj)->funcs[SDL_QUIT] = util::copy_function(func);
     return true;
   }
 
   bool system::set_on_right_down(luabind::object func)
   {
-    cast_sys(_obj)->on_right_down = func;
+    cast_sys(_obj)->on_right_down = util::copy_function(func);
     return true;
   }
 
   bool system::set_on_right_up(luabind::object func)
   {
-    cast_sys(_obj)->on_right_up = func;
+    cast_sys(_obj)->on_right_up = util::copy_function(func);
     return true;
   }
 
   bool system::set_on_tick(luabind::object func)
   {
-    cast_sys(_obj)->on_tick = func;
+//    using namespace luabind;
+//    if (! func) { cast_sys(_obj)->on_tick = func; }
+//    cast_sys(_obj)->on_tick = object(func.interpreter(), func, luabind::adopt(luabind::result));
+//    cast_sys(_obj)->on_tick = object(func, luabind::adopt(luabind::result), luabind::detail::null_type());
+    cast_sys(_obj)->on_tick = util::copy_function(func);
     return true;
   }
 
   bool system::set_running(bool run)
   {
     return cast_sys(_obj)->SetRunning(run);
-  }
-
-  screen* system::set_video_mode(int width, int height, int depth)
-  {
-    return screen::set_mode(width, height, depth);
-  }
-
-  bool system::toggle_full_screen()
-  {
-    screen* s = system::get_screen();
-    if (! s) { return false; }
-    return SDL_WM_ToggleFullScreen((SDL_Surface *)s->get_rawobj());
   }
 
 }

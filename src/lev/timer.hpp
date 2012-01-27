@@ -31,14 +31,18 @@ namespace lev
       stop_watch();
     public:
       virtual ~stop_watch();
-      static stop_watch* create();
+      static boost::shared_ptr<stop_watch> create();
       virtual type_id get_type_id() const { return LEV_TSTOP_WATCH; }
       virtual const char *get_type_name() const { return "lev.stop_watch"; }
-      long get_time();
+      double get_time();
+      bool is_running();
+      double microseconds();
+      double milliseconds();
       bool pause();
       bool resume();
-      bool set_time(long ticks);
-      bool start(long initial_msec = 0);
+      double seconds() { return get_time(); }
+      bool set_time(double seconds);
+      bool start(double initial_msec = 0);
       bool start0() { return start(0); }
     protected:
       void *_obj;

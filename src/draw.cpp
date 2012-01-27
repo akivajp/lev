@@ -23,7 +23,7 @@
 
 // libraries
 #include <boost/shared_ptr.hpp>
-#include <boost/shared_array.hpp>
+#include <boost/weak_ptr.hpp>
 
 int luaopen_lev_draw(lua_State *L)
 {
@@ -37,7 +37,7 @@ int luaopen_lev_draw(lua_State *L)
   [
     namespace_("classes")
     [
-      class_<drawable, base>("drawable")
+      class_<drawable, base, boost::shared_ptr<base> >("drawable")
         .def("compile", &drawable::compile)
         .def("compile", &drawable::compile0)
         .def("draw_on", &drawable::draw_on_image)
@@ -54,7 +54,7 @@ int luaopen_lev_draw(lua_State *L)
         .def("texturize", &drawable::texturize0)
         .property("w", &drawable::get_w)
         .property("width", &drawable::get_w),
-      class_<screen, base>("screen")
+      class_<screen, base, boost::shared_ptr<base> >("screen")
         .def("blit", &screen::blit)
         .def("blit", &screen::blit1)
         .def("blit", &screen::blit2)
@@ -73,10 +73,6 @@ int luaopen_lev_draw(lua_State *L)
         .def("map2d", &screen::map2d_auto)
         .def("set_current", &screen::set_current)
         .def("swap", &screen::swap)
-        .scope
-        [
-          def("get", &screen::get)
-        ]
 //      class_<canvas, control>("canvas")
 //        .def("clear", &canvas::clear)
 //        .def("clear", &canvas::clear_color)
@@ -182,15 +178,18 @@ namespace lev
     return clear_color(c.get_r(), c.get_g(), c.get_b(), c.get_a());
   }
 
-  screen* screen::create(window *holder)
+//  screen* screen::create(window *holder)
+  boost::shared_ptr<screen> screen::create(boost::shared_ptr<window> holder)
   {
-    if (! holder) { return NULL; }
-    screen* scr = NULL;
+    boost::shared_ptr<screen> screen;
+
+    if (! holder) { return screen; }
     try {
-      scr = new screen;
-      scr->_obj = SDL_GL_CreateContext((SDL_Window *)holder->get_rawobj());
-      if (! scr->_obj) { throw -1; }
-      scr->holder = holder;
+      screen.reset(new lev::screen);
+      if (! screen) { throw -1; }
+      screen->_obj = SDL_GL_CreateContext((SDL_Window *)holder->get_rawobj());
+      if (! screen->_obj) { throw -2; }
+      screen->holder = holder;
 
       SDL_GL_SetSwapInterval(0);
 //      glMatrixMode(GL_PROJECTION);
@@ -201,13 +200,12 @@ namespace lev
       glOrtho(0, holder->get_w(), holder->get_h(), 0, -1, 1);
       glEnable(GL_BLEND);
       glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-      return scr;
     }
     catch (...) {
-      delete scr;
-      return NULL;
+      screen.reset();
+      fprintf(stderr, "error on screen instance creation\n");
     }
+    return screen;
   }
 
   bool screen::draw(drawable *src, int x, int y, unsigned char alpha)
@@ -239,26 +237,22 @@ namespace lev
 
       if (t["lev.image1"])
       {
-        image *src = object_cast<image *>(t["lev.image1"]);
-
+        drawable *src = object_cast<drawable *>(t["lev.image1"]);
         s->draw(src, x, y, a);
       }
       else if (t["lev.texture1"])
       {
-        texture *src = object_cast<texture *>(t["lev.texture1"]);
-
+        drawable *src = object_cast<drawable *>(t["lev.texture1"]);
         s->draw(src, x, y, a);
       }
       else if (t["lev.transition1"])
       {
-        transition *src = object_cast<transition *>(t["lev.transition1"]);
-
+        drawable *src = object_cast<drawable *>(t["lev.transition1"]);
         s->draw(src, x, y, a);
       }
       else if (t["lev.layout1"])
       {
-        layout *src = object_cast<layout *>(t["lev.layout1"]);
-
+        drawable *src = object_cast<drawable *>(t["lev.layout1"]);
         s->draw(src, x, y, a);
       }
       else if (t["lev.raster1"])
@@ -309,6 +303,7 @@ namespace lev
       return 1;
     }
     catch (...) {
+      fprintf(stderr, "error on drawing\n");
       lua_pushboolean(L, false);
       return 1;
     }
@@ -370,23 +365,18 @@ namespace lev
 //    else { return false; }
   }
 
-  screen* screen::get()
-  {
-    static screen scr;
-    if (scr._obj) { return &scr; }
-    scr._obj = SDL_GetVideoSurface();
-    if (! scr._obj) { return NULL; }
-    return &scr;
-  }
-
   bool screen::map2d_auto()
   {
-    int w = holder->get_w();
-    int h = holder->get_h();
-    set_current();
-    glLoadIdentity();
-    glOrtho(0, w, h, 0, -1, 1);
-    return true;
+    if (boost::shared_ptr<window> win = holder.lock())
+    {
+      int w = win->get_w();
+      int h = win->get_h();
+      set_current();
+      glLoadIdentity();
+      glOrtho(0, w, h, 0, -1, 1);
+      return true;
+    }
+    return false;
   }
 
   bool screen::map2d(int left, int right, int top, int bottom)
@@ -399,34 +389,22 @@ namespace lev
 
   bool screen::set_current()
   {
-    SDL_GL_MakeCurrent((SDL_Window *)holder->get_rawobj(), (SDL_GLContext)_obj);
-    return true;
-  }
-
-  screen* screen::set_mode(int width, int height, int depth)
-  {
-    SDL_GL_SetAttribute(SDL_GL_RED_SIZE,    8);
-    SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE,  8);
-    SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE,   8);
-    SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE,  8);
-    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
-    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-//    SDL_GL_SetSwapInterval(0);
-//    SDL_GL_SetAttribute(SDL_GL_SWAP_CONTROL, 0);
-//    SDL_GL_SetAttribute(SDL_GL_BUFFER_SIZE, 24);
-//    SDL_GL_SetAttribute(SDL_GL_ACCELERATED_VISUAL, 1);
-    if (SDL_SetVideoMode(width, height, depth, SDL_OPENGL) == NULL) { return NULL; }
-    glOrtho(0, width, height, 0, -1, 1);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    SDL_GL_SwapBuffers();
-    return get();
+    if (boost::shared_ptr<window> win = holder.lock())
+    {
+      SDL_GL_MakeCurrent((SDL_Window *)win->get_rawobj(), (SDL_GLContext)_obj);
+      return true;
+    }
+    return false;
   }
 
   bool screen::swap()
   {
-    SDL_GL_SwapWindow((SDL_Window *)holder->get_rawobj());
-    return true;
+    if (boost::shared_ptr<window> win = holder.lock())
+    {
+      SDL_GL_SwapWindow((SDL_Window *)win->get_rawobj());
+      return true;
+    }
+    return false;
   }
 
 //  bool canvas::call_compiled(drawable *img)

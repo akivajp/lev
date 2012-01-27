@@ -18,7 +18,9 @@
 #include "lev/system.hpp"
 
 // libraries
-#include <SDL/SDL.h>
+#include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/shared_ptr.hpp>
+//#include <SDL/SDL.h>
 
 int luaopen_lev_timer(lua_State *L)
 {
@@ -36,17 +38,24 @@ int luaopen_lev_timer(lua_State *L)
   [
     namespace_("classes")
     [
-      class_<stop_watch, base>("stop_watch")
+      class_<stop_watch, base, boost::shared_ptr<base> >("stop_watch")
+        .property("elapsed", &stop_watch::get_time, &stop_watch::set_time)
+        .property("is_running", &stop_watch::is_running)
+        .property("micro", &stop_watch::microseconds)
+        .property("microseconds", &stop_watch::microseconds)
+        .property("milli", &stop_watch::milliseconds)
+        .property("milliseconds", &stop_watch::milliseconds)
         .def("pause", &stop_watch::pause)
         .def("resume", &stop_watch::resume)
+        .property("seconds", &stop_watch::seconds)
         .def("start", &stop_watch::start)
         .def("start", &stop_watch::start0)
         .property("time", &stop_watch::get_time, &stop_watch::set_time)
         .scope
         [
-          def("create", &stop_watch::create, adopt(result))
+          def("create", &stop_watch::create)
         ],
-      class_<timer, base>("timer")
+      class_<timer, base, boost::shared_ptr<base> >("timer")
         .property("is_one_shot", &timer::is_one_shot)
         .property("is_running", &timer::is_running)
         .property("interval", &timer::get_interval, &timer::set_interval)
@@ -58,7 +67,7 @@ int luaopen_lev_timer(lua_State *L)
         .def("start", &timer::start0)
         .def("start", &timer::start1)
         .def("stop", &timer::stop),
-      class_<lev::clock, timer>("clock")
+      class_<lev::clock, timer, boost::shared_ptr<base> >("clock")
         .property("fps", &clock::get_freq, &clock::set_freq)
         .property("freq", &clock::get_freq, &clock::set_freq)
         .property("frequency", &clock::get_freq, &clock::set_freq)
@@ -80,49 +89,72 @@ namespace lev
   class myStopWatch
   {
     public:
-      myStopWatch(long initial_msec = 0) :
-        last_time(SDL_GetTicks()), running(true), ticks(initial_msec)
+      myStopWatch(long initial_sec = 0) :
+        last_time(boost::posix_time::microsec_clock::local_time()),
+        running(true), ticks(initial_sec * 1000000)
       { }
+
+      double Microseconds()
+      {
+        Update();
+        return double(ticks);
+      }
+
+      double Milliseconds()
+      {
+        Update();
+        return double(ticks) / 1000;
+      }
 
       bool Pause()
       {
+        Update();
         running = false;
         return true;
       }
 
       bool Resume()
       {
+        last_time = boost::posix_time::microsec_clock::local_time();
         running = true;
-        last_time = SDL_GetTicks();
         return true;
       }
 
-      bool SetTime(long ticks)
+      bool SetTime(double seconds)
       {
-        this->ticks = ticks;
+        this->ticks = seconds * 1000000;
         return true;
       }
 
-      bool Start(long initial_msec)
+      bool Start(double initial_sec)
       {
         running = true;
-        ticks = initial_msec;
-        last_time = SDL_GetTicks();
+        ticks = initial_sec * 1000000;
+        last_time = boost::posix_time::microsec_clock::local_time();
         return true;
       }
 
-      long Time()
+      double Time()
+      {
+        Update();
+        return double(ticks) / 1000000;
+      }
+
+      bool Update()
       {
         if (running)
         {
-          long new_time = SDL_GetTicks();
-          ticks += (new_time - last_time);
+          boost::posix_time::ptime new_time = boost::posix_time::microsec_clock::local_time();
+          boost::posix_time::time_duration d = new_time - last_time;
+          ticks += d.total_microseconds();
           last_time = new_time;
+          return true;
         }
-        return ticks;
+        return false;
       }
 
-      long last_time;
+//      long last_time;
+      boost::posix_time::ptime last_time;
       bool running;
       long ticks;
   };
@@ -135,23 +167,40 @@ namespace lev
     if (_obj) { delete cast_watch(_obj); }
   }
 
-  stop_watch* stop_watch::create()
+  boost::shared_ptr<stop_watch> stop_watch::create()
   {
-    stop_watch *sw = NULL;
+    boost::shared_ptr<stop_watch> sw;
     try {
-      sw = new stop_watch;
+      sw.reset(new stop_watch);
+      if (! sw) { throw -1; }
       sw->_obj = new myStopWatch;
-      return sw;
+      if (! sw->_obj) { throw -2; }
     }
     catch(...) {
-      delete sw;
-      return NULL;
+      sw.reset();
+      fprintf(stderr, "error on stop watch instance creation\n");
     }
+    return sw;
   }
 
-  long stop_watch::get_time()
+  double stop_watch::get_time()
   {
     return cast_watch(_obj)->Time();
+  }
+
+  bool stop_watch::is_running()
+  {
+    return cast_watch(_obj)->running;
+  }
+
+  double stop_watch::microseconds()
+  {
+    return cast_watch(_obj)->Microseconds();
+  }
+
+  double stop_watch::milliseconds()
+  {
+    return cast_watch(_obj)->Milliseconds();
   }
 
   bool stop_watch::pause()
@@ -164,14 +213,14 @@ namespace lev
     return cast_watch(_obj)->Resume();
   }
 
-  bool stop_watch::set_time(long ticks)
+  bool stop_watch::set_time(double seconds)
   {
-    return cast_watch(_obj)->SetTime(ticks);
+    return cast_watch(_obj)->SetTime(seconds);
   }
 
-  bool stop_watch::start(long initial_msec)
+  bool stop_watch::start(double initial_sec)
   {
-    return cast_watch(_obj)->Start(initial_msec);
+    return cast_watch(_obj)->Start(initial_sec);
   }
 
 

@@ -21,6 +21,7 @@
 #include "register.hpp"
 
 // libraries
+#include <boost/shared_ptr.hpp>
 #include <luabind/luabind.hpp>
 #include <SDL.h>
 
@@ -39,15 +40,15 @@ int luaopen_lev_window(lua_State *L)
   [
     namespace_("classes")
     [
-      class_<window, base>("window")
+      class_<window, base, boost::shared_ptr<base> >("window")
         .def("close", &window::close)
-        .def("create_context", &window::create_context, adopt(result))
-        .def("create_screen", &window::create_context, adopt(result))
+        .def("create_context", &screen::create)
+        .def("create_screen", &screen::create)
         .property("h", &window::get_h, &window::set_h)
         .property("height", &window::get_h, &window::set_h)
         .property("id", &window::get_id)
         .def("hide", &window::hide)
-        .def("screen", &window::create_context, adopt(result))
+        .def("screen", &screen::create)
         .def("show", &window::show)
         .def("show", &window::show0)
         .property("w", &window::get_w, &window::set_w)
@@ -71,7 +72,9 @@ namespace lev
   {
     if (_obj)
     {
+//printf("BEGIN DELETING WINDOW\n");
       SDL_DestroyWindow(cast_win(_obj));
+//printf("END DELETING WINDOW\n");
     }
   }
 
@@ -86,19 +89,22 @@ namespace lev
     return false;
   }
 
-  window* window::create(const char *title, int x, int y, int w, int h, unsigned long flags)
+//  window* window::create(const char *title, int x, int y, int w, int h, unsigned long flags)
+  boost::shared_ptr<window> window::create(const char *title, int x, int y, int w, int h, unsigned long flags)
   {
-    window* win = NULL;
+//    window* win = NULL;
+    boost::shared_ptr<window> win;
     try {
-      win = new window;
+      win.reset(new window);
+      if (! win) { throw -1; }
       win->_obj = SDL_CreateWindow(title, x, y, w, h, flags);
-      if (! win->_obj) { throw -1; }
-      return win;
+      if (! win->_obj) { throw -2; }
     }
     catch (...) {
-      delete win;
-      return NULL;
+      win.reset();
+      fprintf(stderr, "error on window instance creation\n");
     }
+    return win;
   }
 
   int window::create_l(lua_State *L)
@@ -156,10 +162,11 @@ namespace lev
     return 1;
   }
 
-  screen* window::create_context()
-  {
-    return screen::create(this);
-  }
+//  screen* window::create_context()
+//  boost::shared_ptr<screen> window::create_context()
+//  {
+//    return screen::create(this);
+//  }
 
   int window::get_h()
   {
