@@ -21,7 +21,7 @@
 // libraries
 #include <boost/shared_array.hpp>
 #include <boost/shared_ptr.hpp>
-#include <luabind/adopt_policy.hpp>
+#include <boost/weak_ptr.hpp>
 #include <luabind/luabind.hpp>
 #include <map>
 #include <vorbis/vorbisfile.h>
@@ -58,11 +58,11 @@ int luaopen_lev_sound(lua_State *L)
         .def("play", &sound::play)
         .def("play", &sound::play0)
         .property("pos", &sound::get_position, &sound::set_position)
-        .property("position", &sound::get_position, &sound::set_position)
-        .scope
-        [
-          def("create", &sound::create, adopt(result))
-        ],
+        .property("position", &sound::get_position, &sound::set_position),
+//        .scope
+//        [
+//          def("create", &sound::create)
+//        ],
       class_<mixer, base, boost::shared_ptr<base> >("mixer")
         .def("activate", &mixer::activate)
         .def("activate", &mixer::activate0)
@@ -273,13 +273,10 @@ namespace lev
   {
     private:
 
-      mySound() : buf(NULL), pos(0),
-                  len(0),
-                  loader(NULL),
-                  loop(false),
-                  spec(), mx(NULL), playing(false)
-      {
-      }
+      mySound()
+        : buf(NULL), pos(0), len(0), loader(NULL), loop(false),
+          spec(), mx(NULL), playing(false)
+      { }
 
     public:
 
@@ -312,7 +309,8 @@ namespace lev
       {
         mySound *snd = NULL;
         try {
-          snd = new mySound;
+          snd = new mySound();
+          if (! snd) { throw -1; }
           return snd;
         }
         catch (...) {
@@ -529,18 +527,20 @@ namespace lev
     if (_obj) { delete (mySound *)_obj; }
   }
 
-  sound* sound::create()
+  boost::shared_ptr<sound> sound::create()
   {
-    sound *snd = NULL;
+    boost::shared_ptr<sound> snd;
     try {
-      snd = new sound;
+      snd.reset(new sound);
+      if (! snd) { throw -1; }
       snd->_obj = mySound::Create();
-      return snd;
+      if (! snd->_obj) { throw -2; }
     }
     catch (...) {
-      delete snd;
-      return NULL;
+      snd.reset();
+      fprintf(stderr, "error on sound instance creation\n");
     }
+    return snd;
   }
 
   bool sound::clear() { return ((mySound *)_obj)->Clear(); }
@@ -580,7 +580,7 @@ namespace lev
 
       ~myMixer()
       {
-        std::map<int, sound *>::iterator i;
+        std::map<int, boost::shared_ptr<sound> >::iterator i;
         for (i = slots.begin(); i != slots.end(); i++)
         {
           if (i->second != NULL) { i->second->clear(); }
@@ -638,24 +638,30 @@ namespace lev
         }
       }
 
-      sound *CreateSlot(int slot_num)
+      boost::shared_ptr<sound> CreateSlot(int slot_num)
       {
-        sound *slot = sound::create();
-        if (slot == NULL) { return NULL; }
-        audio_locker lock(this);
-        slots[slot_num] = slot;
-        cast_snd(slot->get_rawobj())->mx = this;
+        boost::shared_ptr<sound> slot;
+        try {
+          slot = sound::create();
+          if (! slot) { throw -1; }
+          audio_locker lock(this);
+          slots[slot_num] = slot;
+          cast_snd(slot->get_rawobj())->mx = this;
+        }
+        catch (...) {
+          slot.reset();
+        }
         return slot;
       }
 
-      sound *GetSlot(int slot_num)
+      boost::shared_ptr<sound> GetSlot(int slot_num)
       {
         if (slot_num == 0)
         {
           int i;
           for (i = -1; ; i--)
           {
-            std::map<int, sound *>::iterator found;
+            std::map<int, boost::shared_ptr<sound> >::iterator found;
             found = slots.find(i);
             if (found == slots.end())
             {
@@ -698,7 +704,8 @@ namespace lev
     public:
       bool active;
       SDL_AudioSpec spec;
-      std::map<int, sound *> slots;
+//      std::map<int, sound *> slots;
+      std::map<int, boost::shared_ptr<sound> > slots;
   };
 
   static myMixer *cast_mx(void *obj) { return (myMixer *)obj; }
@@ -712,7 +719,7 @@ namespace lev
   {
     myMixer *mx = cast_mx(udata);
 
-    std::map<int, sound *>::iterator i;
+    std::map<int, boost::shared_ptr<sound> >::iterator i;
     memset(stream, 0, len);
     for (i = mx->slots.begin(); i != mx->slots.end(); i++)
     {
@@ -788,15 +795,13 @@ namespace lev
     return cast_mx(_obj)->spec.freq;
   }
 
-  sound* mixer::get_slot(int slot_num)
+  boost::shared_ptr<sound> mixer::get_slot(int slot_num)
   {
-    return ((myMixer *)_obj)->GetSlot(slot_num);
+    return cast_mx(_obj)->GetSlot(slot_num);
   }
 
-//  mixer* mixer::init()
   boost::shared_ptr<mixer> mixer::init(boost::shared_ptr<system> sys)
   {
-//    static lev::mixer mx;
     if (! sys) { return boost::shared_ptr<mixer>(); }
     if (singleton) { return singleton; }
     try {

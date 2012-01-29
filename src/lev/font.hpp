@@ -62,8 +62,8 @@ namespace lev
       raster *rasterize1(unsigned long code) { return rasterize(code); }
       raster *rasterize_utf8(const std::string &str, int spacing = 1);
       raster *rasterize_utf8_1(const std::string &str) { return rasterize_utf8(str); }
-      raster *rasterize_utf16(const unistr &str, int spacing = 1);
-      raster *rasterize_utf16_1(const unistr &str) { return rasterize_utf16(str); }
+      raster *rasterize_utf16(const unicode_string &str, int spacing = 1);
+      raster *rasterize_utf16_1(const unicode_string &str) { return rasterize_utf16(str); }
       bool set_encoding(const std::string &encode);
       bool set_index(int index);
       bool set_pixel_size(int size);

@@ -23,6 +23,7 @@ extern "C" {
   #include <unzip.h>
   #include <zip.h>
 }
+#include <boost/filesystem.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/weak_ptr.hpp>
 #include <luabind/luabind.hpp>
@@ -48,8 +49,8 @@ int luaopen_lev_archive(lua_State *L)
   //        .def("add_file_to", &lev::archive::add_file_to)
           .def("flush", &lev::archive::flush)
           .def("entry_exists", &lev::archive::entry_exists)
-  //        .def("extract", &lev::archive::extract)
-  //        .def("extract_to", &lev::archive::extract_to)
+          .def("extract", &lev::archive::extract)
+          .def("extract_to", &lev::archive::extract_to)
           .def("get_size", &lev::archive::get_uncompressed_size)
           .def("get_size", &lev::archive::get_uncompressed_size_current)
           .def("get_uncompressed_size", &lev::archive::get_uncompressed_size)
@@ -57,8 +58,8 @@ int luaopen_lev_archive(lua_State *L)
           .scope
           [
             def("entry_exists_direct", &lev::archive::entry_exists_direct),
-  //          def("extract_direct", &lev::archive::extract_direct),
-  //          def("extract_direct_to", &lev::archive::extract_direct_to),
+            def("extract_direct", &lev::archive::extract_direct),
+            def("extract_direct_to", &lev::archive::extract_direct_to),
             def("get_uncompressed_size_direct", &lev::archive::get_uncompressed_size_direct),
             def("is_archive", &lev::archive::is_archive),
             def("open", &lev::archive::open)
@@ -77,8 +78,8 @@ int luaopen_lev_archive(lua_State *L)
     register_to(classes["archive"], "read_direct", &lev::archive::read_direct_l);
 
     arch["entry_exists"] = classes["archive"]["entry_exists_direct"];
-  //  arch["extract"] = classes["archive"]["extract_direct"];
-  //  arch["extract_to"] = classes["archive"]["extract_direct_to"];
+    arch["extract"] = classes["archive"]["extract_direct"];
+    arch["extract_to"] = classes["archive"]["extract_direct_to"];
     arch["find"] = classes["archive"]["find_direct"];
     arch["get_size"] = classes["archive"]["get_uncompressed_size_direct"];
     arch["get_uncompressed_size"] = classes["archive"]["get_uncompressed_size_direct"];
@@ -219,48 +220,6 @@ namespace lev
         }
         return FindNext(entry_name);
       }
-//
-//      bool Extract(const std::string &entry_name)
-//      {
-//        if (!StartReading()) { return false; }
-//
-//        archive_entry *entry = Find(entry_name);
-//        if (entry == NULL) { return false; }
-//
-//        if (archive_read_extract(r, entry, 0) == ARCHIVE_OK) { return true; }
-//        else { return false; }
-//      }
-//
-//      bool ExtractTo(const std::string &entry_name, const std::string &target)
-//      {
-//        int fd = 0;
-//        file_path *path = NULL;
-//
-//        if (!StartReading()) { return false; }
-//        if (Find(entry_name) == NULL) { return false; }
-//        try {
-//          path = file_path::create(target);
-//          if (path == NULL) { throw -1; }
-//
-//          std::string dir = path->get_dir_path();
-//          file_system::mkdir(dir.c_str(), true);
-//
-//          int fd = ::open(target.c_str(), O_WRONLY | O_CREAT, S_IREAD | S_IWRITE);
-//          if (fd == -1) { throw -2; }
-//
-//          int size = archive_read_data_into_fd(r, fd);
-//          ::close(fd);
-//          delete path;
-//
-//          if (size >= 0) { return true; }
-//          else { return false; }
-//        }
-//        catch (...) {
-//          if (fd > 0) { ::close(fd); }
-//          delete path;
-//          return false;
-//        }
-//      }
 
       bool StartReading()
       {
@@ -466,7 +425,6 @@ namespace lev
                                     const std::string &entry_name)
   {
     try {
-//      boost::scoped_ptr<lev::archive> arc(lev::archive::open(archive_file));
       boost::shared_ptr<archive> arc(lev::archive::open(archive_file));
       return arc->entry_exists(entry_name);
     }
@@ -475,41 +433,65 @@ namespace lev
     }
   }
 
-//  bool archive::extract(const std::string &entry_name)
-//  {
-//    return cast_arc(_obj)->Extract(entry_name);
-//  }
-//
-//  bool archive::extract_direct(const std::string &archive_file,
-//                               const std::string &entry_name)
-//  {
-//    try {
-//      boost::shared_ptr<lev::archive> arc(lev::archive::open(archive_file));
-//      return arc->extract(entry_name);
-//    }
-//    catch (...) {
-//      return false;
-//    }
-//  }
-//
-//  bool archive::extract_direct_to(const std::string &archive_file,
-//                                  const std::string &entry_name,
-//                                  const std::string &target)
-//  {
-//    try {
-//      boost::shared_ptr<lev::archive> arc(lev::archive::open(archive_file));
-//      return arc->extract_to(entry_name, target);
-//    }
-//    catch (...) {
-//      return false;
-//    }
-//  }
-//
-//  bool archive::extract_to(const std::string &entry_name, const std::string &target)
-//  {
-//    return cast_arc(_obj)->ExtractTo(entry_name, target);
-//  }
-//
+  bool archive::extract(const std::string &entry_name, const char *password)
+  {
+    std::string real_name;
+    if (! find(entry_name, real_name)) { return false; }
+    return extract_to(entry_name, real_name, password);
+  }
+
+  bool archive::extract_direct(const std::string &archive_file,
+                               const std::string &entry_name,
+                               const char *password)
+  {
+    try {
+      boost::shared_ptr<lev::archive> arc(lev::archive::open(archive_file));
+      return arc->extract(entry_name);
+    }
+    catch (...) {
+      return false;
+    }
+  }
+
+  bool archive::extract_direct_to(const std::string &archive_file,
+                                  const std::string &entry_name,
+                                  const std::string &target,
+                                  const char *password)
+  {
+    try {
+      boost::shared_ptr<lev::archive> arc(lev::archive::open(archive_file));
+      return arc->extract_to(entry_name, target);
+    }
+    catch (...) {
+      return false;
+    }
+  }
+
+  bool archive::extract_to(const std::string &entry_name, const std::string &target_path,
+                           const char *password)
+  {
+    try {
+      std::string data;
+      if (! read(entry_name, data, 0, password)) { return false; }
+
+      boost::filesystem::path target = target_path;
+      boost::filesystem::create_directories(target.parent_path());
+      FILE *w = fopen(target_path.c_str(), "wb");
+      if (! w) { return false; }
+
+      if (fwrite(data.c_str(), 1, data.length(), w) == data.length())
+      {
+        fclose(w);
+        return true;
+      }
+      fclose(w);
+    }
+    catch (...) {
+      fprintf(stderr, "error on data extracting from archive\n");
+    }
+    return false;
+  }
+
   bool archive::find(const std::string &pattern, std::string &entry_name)
   {
     return cast_arc(_obj)->FindNew(pattern, entry_name);
@@ -673,27 +655,42 @@ namespace lev
 
   bool archive::read_current(std::string &data, int block_size, const char *password)
   {
-    char buffer[block_size];
+    boost::scoped_array<unsigned char> buffer;
+    try {
+      if (block_size < 0) { throw -1; }
+      else if (block_size == 0)
+      {
+        block_size = get_uncompressed_size_current();
+        if (block_size < 0) { throw -2; }
+      }
+      buffer.reset(new unsigned char[block_size]);
+      if (! buffer) { throw -3; }
 
-    if (unzOpenCurrentFile(cast_arc(_obj)->r) == UNZ_OK)
-    {
-      int readed = unzReadCurrentFile(cast_arc(_obj)->r, buffer, block_size);
-      if (readed >= 0)
+      if (unzOpenCurrentFile(cast_arc(_obj)->r) == UNZ_OK)
       {
-        data.assign(buffer, readed);
-        return true;
+        int readed = unzReadCurrentFile(cast_arc(_obj)->r, buffer.get(), block_size);
+        if (readed >= 0)
+        {
+          data.assign(reinterpret_cast<char *>(buffer.get()), readed);
+          return true;
+        }
       }
-    }
-    if (unzOpenCurrentFilePassword(cast_arc(_obj)->r, password) == UNZ_OK)
-    {
-      int readed = unzReadCurrentFile(cast_arc(_obj)->r, buffer, block_size);
-      if (readed >= 0)
+      if (unzOpenCurrentFilePassword(cast_arc(_obj)->r, password) == UNZ_OK)
       {
-        data.assign(buffer, readed);
-        return true;
+        int readed = unzReadCurrentFile(cast_arc(_obj)->r, buffer.get(), block_size);
+        if (readed >= 0)
+        {
+          data.assign(reinterpret_cast<char *>(buffer.get()), readed);
+          return true;
+        }
       }
+      data = "";
     }
-    data = "";
+    catch (...) {
+      fprintf(stderr, "error on read data from archive\n");
+      return false;
+    }
+
     return false;
   }
 
@@ -702,7 +699,7 @@ namespace lev
     using namespace luabind;
     const char *entry = NULL;
     const char *pass = NULL;
-    int bs = 4096;
+    int bs = 0;
 
     luaL_checktype(L, 1, LUA_TUSERDATA);
     lev::archive *arc = object_cast<lev::archive *>(object(from_stack(L, 1)));
@@ -770,7 +767,7 @@ namespace lev
     const char *archive = NULL;
     const char *entry = NULL;
     const char *pass = NULL;
-    int bs = 4096;
+    int bs = 0;
 
     object t = util::get_merged(L, 1, -1);
 

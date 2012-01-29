@@ -12,7 +12,7 @@
 #include "prec.h"
 
 // dependencies
-//#include "lev/archive.hpp"
+#include "lev/archive.hpp"
 #include "lev/entry.hpp"
 #include "lev/fs.hpp"
 #include "lev/package.hpp"
@@ -26,12 +26,16 @@
 using namespace lev;
 using namespace luabind;
 
-static bool do_file(lua_State *L, const char *filename)
+const char *entry_dir[] = {"entry"};
+const char *entry_files[] = {"entry.lc", "entry.lua", "entry.txt"};
+const int entry_files_len = 3;
+
+static bool do_file(lua_State *L, const std::string &filename)
 {
-  if (luaL_dofile(L, filename))
+  if (luaL_dofile(L, filename.c_str()))
   {
     fprintf(stderr, "%s\n", lua_tostring(L, -1));
-    return -1;
+    return false;
   }
   return true;
 }
@@ -83,10 +87,52 @@ static bool set_libs(lua_State *L)
 }
 
 
+static bool execute_path(lua_State *L, const std::string &path)
+{
+  if (file_system::dir_exists(path))
+  {
+    // given path is directory
+    // run entry program in path directory
+    package::add_path(L, path);
+    for (int i = 0; i < entry_files_len; i++)
+    {
+      std::string filename = path + "/" + entry_files[i];
+      if (! file_system::file_exists(filename)) { continue; }
+      do_file(L, filename);
+      return true;
+    }
+  }
+  else if (lev::archive::is_archive(path))
+  {
+    // given path is a archive file
+    // run entry program in path archive
+    std::string entry_name;
+    for (int i = 0; i < entry_files_len; i++)
+    {
+      if (lev::archive::find_direct(path, entry_files[i], entry_name)
+          || lev::archive::find_direct(path, path + "/" + entry_files[i], entry_name))
+      {
+        std::string code;
+        package::add_path(L, path);
+        if (! lev::archive::read_direct(path, entry_name, code)) { continue; }
+        do_string(L, code);
+        return true;
+      }
+    }
+  }
+  else
+  {
+    // given path is a regular file
+    if (! file_system::file_exists(path)) { return false; }
+    do_file(L, path);
+    return true;
+  }
+  return false;
+}
+
+
 int main(int argc, char **argv)
 {
-  const int len = 3;
-  const char *entry[] = {"entry.lc", "entry.lua", "entry.txt"};
   bool done_something = false;
 
   // initializing lua statement
@@ -124,68 +170,17 @@ int main(int argc, char **argv)
         break;
       default:
         set_args(L, argc, argv, i);
-        if (file_system::dir_exists(argv[i]))
-        {
-          // argv[i] is directory
-          // run entry program in argv[i] directory
-//          package::add_path(L, file_system::to_full_path(argv[i]));
-          package::add_path(L, argv[i]);
-          for (int j = 0; j < len; j++)
-          {
-            std::string filename = argv[i];
-            filename = filename + "/" + entry[j];
-            if (! file_system::file_exists(filename)) { continue; }
-            if (! do_file(L, filename.c_str())) { return -1; }
-            done_something = true;
-            break;
-          }
-          if (! done_something)
-          {
-            fprintf(stderr, "%s\n", lua_tostring(L, -1));
-            return -1;
-          }
-        }
-        else
-        {
-//          // argv[i] is archive or script file
-//          if (lev::archive::is_archive(argv[i]))
-//          {
-//            // argv[i] is archive
-//            boost::shared_ptr<file_path> path(file_path::create(argv[i]));
-//            std::string entry_name;
-//            for (int j = 0; j < len; j++)
-//            {
-//              if (lev::archive::find_direct(argv[i], entry[j], entry_name)
-//                  || lev::archive::find_direct(argv[i], path->get_name() + "/" + entry[j], entry_name))
-//              {
-//                std::string code;
-//                package::add_path(L, file_system::to_full_path(argv[i]));
-//                if (! lev::archive::read_direct(argv[i], entry_name, code)) { continue; }
-//                if (! do_string(L, code)) { return -1; }
-//                done_something = true;
-//                break;
-//              }
-//              else { continue; }
-//            }
-//          }
-//          else
-          {
-            if (! do_file(L, argv[i])) { return -1; }
-          }
-        }
-        done_something = true;
-        i = argc; // escaping
-        break;
+        done_something = execute_path(L, argv[i]);
     }
   }
 
   // nothing was done
   // run entry program
-  for (int i = 0; i < len; i++)
+  for (int i = 0; i < entry_files_len; i++)
   {
     if (done_something) { break; }
-    if (! file_system::file_exists(entry[i])) { continue; }
-    if (! do_file(L, entry[i])) { return -1; }
+    if (! file_system::file_exists(entry_files[i])) { continue; }
+    if (! do_file(L, entry_files[i])) { return -1; }
     done_something = true;
   }
   if (! done_something)

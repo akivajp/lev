@@ -24,8 +24,6 @@
 
 // libraries
 #include <map>
-#include <luabind/adopt_policy.hpp>
-//#include <luabind/copy_policy.hpp>
 #include <luabind/dependency_policy.hpp>
 #include <luabind/luabind.hpp>
 #include <SDL/SDL.h>
@@ -71,20 +69,21 @@ int luaopen_lev_system(lua_State *L)
         .property("x", &event::get_x)
         .property("y", &event::get_y),
       class_<lev::system, base, boost::shared_ptr<base> >("system")
-        .def("clock", &system::create_clock, adopt(result))
-        .def("clock", &system::create_clock0, adopt(result))
+        .def("clock", &system::create_clock)
+        .def("clock", &system::create_clock1)
         .def("close", &system::done)
-        .def("create_clock", &system::create_clock, adopt(result))
-        .def("create_clock", &system::create_clock0, adopt(result))
+        .def("create_clock", &system::create_clock)
+        .def("create_clock", &system::create_clock1)
         .def("create_mixer", &mixer::init)
-        .def("create_timer", &system::create_timer, adopt(result))
-        .def("create_timer", &system::create_timer0, adopt(result))
+        .def("create_timer", &system::create_timer)
+        .def("create_timer", &system::create_timer1)
         .def("delay", &system::delay)
         .def("do_event", &system::do_event)
         .def("do_events", &system::do_events)
         .def("done", &system::done)
         .property("is_running", &system::is_running, &system::set_running)
         .def("mixer", &mixer::init)
+        .property("name", &system::get_name, &system::set_name)
         .property("on_button_down", &system::get_on_button_down, &system::set_on_button_down)
         .property("on_button_up", &system::get_on_button_up, &system::set_on_button_up)
         .property("on_key_down", &system::get_on_key_down, &system::set_on_key_down)
@@ -103,8 +102,8 @@ int luaopen_lev_system(lua_State *L)
         .def("run", &system::run)
         .def("set_running", &system::set_running)
         .property("ticks", &system::get_ticks)
-        .def("timer", &system::create_timer, adopt(result))
-        .def("timer", &system::create_timer0, adopt(result))
+        .def("timer", &system::create_timer)
+        .def("timer", &system::create_timer1)
         .scope
         [
           def("create_window_c", &window::create),
@@ -112,11 +111,6 @@ int luaopen_lev_system(lua_State *L)
           def("get", &system::get),
           def("init", &system::init)
         ]
-//      class_<lev::finalizer, base>("finalizer")
-//        .scope
-//        [
-//          def("create", &finalizer::create, adopt(result))
-//        ]
     ]
   ];
   object lev = globals(L)["lev"];
@@ -125,7 +119,6 @@ int luaopen_lev_system(lua_State *L)
   register_to(classes["system"], "create_window", &window::create_l);
   register_to(classes["system"], "window", &window::create_l);
   lev["system"] = classes["system"]["init"];
-//  lev["finalizer"] = classes["finalizer"]["create"];
 
   // post-requirement
   globals(L)["require"]("lev.window");
@@ -589,7 +582,7 @@ namespace lev
   {
     private:
       mySystem()
-        : funcs(), running(true),
+        : funcs(), name("lev"), running(true),
           on_tick(),
           on_left_down(),   on_left_up(),
           on_middle_down(), on_middle_up(),
@@ -621,12 +614,14 @@ namespace lev
 
 //      lua_State *L;
       std::map<Uint32, luabind::object> funcs;
+      std::string name;
       luabind::object on_tick;
       luabind::object on_left_down,   on_left_up;
       luabind::object on_middle_down, on_middle_up;
       luabind::object on_right_down,  on_right_up;
       bool running;
-      std::vector<timer *> timers;
+//      std::vector<timer *> timers;
+      std::vector<boost::shared_ptr<timer> > timers;
   };
   static mySystem *cast_sys(void *obj) { return (mySystem *)obj; }
 
@@ -641,32 +636,38 @@ namespace lev
 //printf("END DELETING SYSTEM\n");
   }
 
-  clock* system::create_clock(double freq)
+  boost::shared_ptr<clock> system::create_clock(boost::shared_ptr<system> sys,
+                                                double freq)
   {
-    clock *c = clock::create(this, freq);
-    if (! c) { return NULL; }
+    boost::shared_ptr<clock> c;
+    if (! sys) { return c; }
     try {
-      cast_sys(_obj)->timers.push_back(c);
-      return c;
+      c = clock::create(sys, freq);
+      if (! c) { throw -1; }
+      cast_sys(sys->_obj)->timers.push_back(c);
     }
     catch (...) {
-      delete c;
-      return NULL;
+      c.reset();
+      fprintf(stderr, "error on clock instance creation within system instance\n");
     }
+    return c;
   }
 
-  timer* system::create_timer(double interval)
+  boost::shared_ptr<timer> system::create_timer(boost::shared_ptr<system> sys,
+                                                double interval)
   {
-    timer *t = timer::create(this, interval);
-    if (! t) { return NULL; }
+    boost::shared_ptr<timer> t;
+    if (! sys) { return t; }
     try {
-      cast_sys(_obj)->timers.push_back(t);
-      return t;
+      t = timer::create(sys, interval);
+      if (! t) { throw -1; }
+      cast_sys(sys->_obj)->timers.push_back(t);
     }
     catch (...) {
-      delete t;
-      return NULL;
+      t.reset();
+      fprintf(stderr, "error on timer instance creation within system instance\n");
     }
+    return t;
   }
 
   bool system::delay(unsigned long msec)
@@ -693,12 +694,12 @@ namespace lev
   bool system::detach_timer(timer *t)
   {
     if (! _obj) { return NULL; }
-    std::vector<timer *> &timers = cast_sys(_obj)->timers;
-    std::vector<timer *>::iterator i = timers.begin();
+    std::vector<boost::shared_ptr<timer> > &timers = cast_sys(_obj)->timers;
+    std::vector<boost::shared_ptr<timer> >::iterator i = timers.begin();
 
     for ( ; i != timers.end(); i++)
     {
-      if (*i == t)
+      if (i->get() == t)
       {
 printf("DETACHING TIMER!\n");
         timers.erase(i);
@@ -712,8 +713,8 @@ printf("DETACHING TIMER!\n");
   {
     SDL_Event sdl_evt;
     event e;
-    std::vector<timer *> &timers = cast_sys(_obj)->timers;
-    std::vector<timer *>::iterator i = timers.begin();
+    std::vector<boost::shared_ptr<timer> > &timers = cast_sys(_obj)->timers;
+    std::vector<boost::shared_ptr<timer> >::iterator i = timers.begin();
 
     for ( ; i != timers.end(); i++)
     {
@@ -788,15 +789,10 @@ printf("DETACHING TIMER!\n");
     return true;
   }
 
-//  int system::get_l(lua_State *L)
-//  {
-//    using namespace luabind;
-//    system::init();
-//    object o = globals(L)["lev"]["classes"]["system"]["get_c"]();
-////    o["finalizer"] = globals(L)["lev"]["classes"]["finalizer"]["create"]();
-//    o.push(L);
-//    return 1;
-//  }
+  std::string system::get_name()
+  {
+    return cast_sys(_obj)->name;
+  }
 
   luabind::object system::get_on_button_down()
   {
@@ -936,6 +932,12 @@ printf("DETACHING TIMER!\n");
     return true;
   }
 
+  bool system::set_name(const std::string &name)
+  {
+    cast_sys(_obj)->name = name;
+    return true;
+  }
+
   bool system::set_on_button_down(luabind::object func)
   {
     cast_sys(_obj)->funcs[SDL_MOUSEBUTTONDOWN] = util::copy_function(func);
@@ -1010,10 +1012,6 @@ printf("DETACHING TIMER!\n");
 
   bool system::set_on_tick(luabind::object func)
   {
-//    using namespace luabind;
-//    if (! func) { cast_sys(_obj)->on_tick = func; }
-//    cast_sys(_obj)->on_tick = object(func.interpreter(), func, luabind::adopt(luabind::result));
-//    cast_sys(_obj)->on_tick = object(func, luabind::adopt(luabind::result), luabind::detail::null_type());
     cast_sys(_obj)->on_tick = util::copy_function(func);
     return true;
   }

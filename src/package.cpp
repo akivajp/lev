@@ -15,14 +15,14 @@
 #include "lev/package.hpp"
 
 // dependencies
-//#include "lev/archive.hpp"
+#include "lev/archive.hpp"
 #include "lev/fs.hpp"
 #include "lev/util.hpp"
-//#include "lev/system.hpp"
+#include "lev/system.hpp"
 #include "register.hpp"
 
 // libraries
-#include <luabind/adopt_policy.hpp>
+#include <luabind/raw_policy.hpp>
 #include <luabind/luabind.hpp>
 
 int luaopen_lev_package(lua_State *L)
@@ -37,6 +37,9 @@ int luaopen_lev_package(lua_State *L)
   module(L, "lev")
   [
     namespace_("package")
+    [
+      def("resolve", &package::resolve, raw(_1))
+    ]
   ];
   object lev = globals(L)["lev"];
   object package = lev["package"];
@@ -45,8 +48,8 @@ int luaopen_lev_package(lua_State *L)
   register_to(package, "add_path", &package::add_path_l);
   register_to(package, "add_search", &package::add_search_l);
   register_to(package, "clear_search", &package::clear_search_l);
+  register_to(package, "dofile", &package::dofile_l);
   register_to(package, "require", &package::require_l);
-  register_to(package, "resolve", &package::resolve_l);
   register_to(package, "search_font", &package::search_font_l);
 
   lev["require"] = package["require"];
@@ -173,6 +176,30 @@ namespace lev
     return 1;
   }
 
+  int package::dofile_l(lua_State *L)
+  {
+    using namespace luabind;
+
+    luaL_checkstring(L, 1);
+    std::string filename = object_cast<const char *>(object(from_stack(L, 1)));
+
+    object path_list = package::get_path_list(L);
+    boost::shared_ptr<file_path> fpath = package::resolve(L, filename);
+    if (fpath)
+    {
+      if (luaL_dofile(L, fpath->get_full_path().c_str()) != 0)
+      {
+        fprintf(stderr, "%s\n", lua_tostring(L, -1));
+        lua_pushnil(L);
+        return 1;
+      }
+      lua_pushboolean(L, true);
+      return 1;
+    }
+
+    luaL_error(L, ("cannnot open " + filename + ": No such file or directory").c_str());
+    return 0;
+  }
 
   const char *package::get_archive_dir(lua_State *L)
   {
@@ -252,14 +279,13 @@ namespace lev
     }
 
     object path_list = package::get_path_list(L);
-    std::string path = package::resolve(L, module);
-    if (path.empty()) { path = resolve(L, module + ".lua"); }
-    if (path.length() > 0)
+    boost::shared_ptr<file_path> fpath = package::resolve(L, module);
+    if (! fpath) { fpath = package::resolve(L, module + ".lua"); }
+    if (fpath)
     {
-      if (luaL_dofile(L, path.c_str()))
+      if (luaL_dofile(L, fpath->get_full_path().c_str()))
       {
         fprintf(stderr, "%s\n", lua_tostring(L, -1));
-//        wxMessageBox(wxString(lua_tostring(L, -1), wxConvUTF8), _("Lua runtime error"));
         lua_pushnil(L);
         return 1;
       }
@@ -282,7 +308,8 @@ namespace lev
     }
   }
 
-  std::string package::resolve(lua_State *L, const std::string &file)
+  boost::shared_ptr<file_path> package::resolve(lua_State *L,
+                                                const std::string &file)
   {
     using namespace luabind;
 
@@ -303,56 +330,55 @@ namespace lev
 
           if (file_system::file_exists(real_path))
           {
-            return real_path;
+            return file_path::create(real_path);
           }
         }
 
-//        if (lev::archive::is_archive(path))
-//        {
-//          for (iterator s(search_list); s != end; s++)
-//          {
-//            std::string entry = object_cast<const char *>(*s);
-//            if (entry.empty()) { entry = file; }
-//            else { entry = entry + "/" + file; }
-//            if (archive::entry_exists_direct(path, entry))
-//            {
-//              std::string app_name = application::get_app()->get_name();
-//              std::string ext = file_system::get_ext(file);
-//              if (! ext.empty()) { ext = "." + ext; }
-//
-//              file_path *fpath = file_path::create_temp(app_name + "/", ext);
-//              if (fpath == NULL) { return NULL; }
-//              lev::archive::extract_direct_to(full, entry, fpath->get_full_path());
-//              return fpath;
-//            }
-//          }
+        if (lev::archive::is_archive(path))
+        {
+          for (iterator s(search_list); s != end; s++)
+          {
+            std::string entry = object_cast<const char *>(*s);
+            if (entry.empty()) { entry = file; }
+            else { entry = entry + "/" + file; }
+            if (archive::entry_exists_direct(path, entry))
+            {
+              std::string sys_name = ".";
+              if (system::get()) { sys_name = system::get()->get_name(); }
+              std::string ext = file_system::get_ext(file);
 
-//          std::string arc_name = file_system::to_name(path);
-//          for (iterator s(search_list); s != end; s++)
-//          {
-//            std::string entry = object_cast<const char *>(*s);
-//            if (entry.empty()) { entry = arc_name + "/" + file; }
-//            else { entry = arc_name + "/" + entry + "/" + file; }
-//            if (archive::entry_exists_direct(full, entry))
-//            {
-//              std::string app_name = application::get_app()->get_name();
-//              std::string ext = file_system::get_ext(file);
-//              if (! ext.empty()) { ext = "." + ext; }
-//
-//              file_path *fpath = file_path::create_temp(app_name + "/", ext);
-//              if (fpath == NULL) { return NULL; }
-//              lev::archive::extract_direct_to(full, entry, fpath->get_full_path());
-//              return fpath;
-//            }
-//          }
-//        }
+              boost::shared_ptr<file_path> fpath(file_path::create_temp(sys_name + "/", ext));
+              if (! fpath) { return fpath; }
+              lev::archive::extract_direct_to(path, entry, fpath->get_full_path());
+              return fpath;
+            }
+          }
+
+          std::string arc_name = file_system::to_stem(path);
+          for (iterator s(search_list); s != end; s++)
+          {
+            std::string entry = object_cast<const char *>(*s);
+            if (entry.empty()) { entry = arc_name + "/" + file; }
+            else { entry = arc_name + "/" + entry + "/" + file; }
+            if (archive::entry_exists_direct(path, entry))
+            {
+              std::string sys_name = ".";
+              if (system::get()) { sys_name = system::get()->get_name(); }
+              std::string ext = file_system::get_ext(file);
+
+              boost::shared_ptr<file_path> fpath(file_path::create_temp(sys_name + "/", ext));
+              if (! fpath) { return fpath; }
+              lev::archive::extract_direct_to(path, entry, fpath->get_full_path());
+              return fpath;
+            }
+          }
+        }
       }
     }
     catch (...) {
-      return "";
+      fprintf(stderr, "error on file path resolving\n");
     }
-
-    return "";
+    return boost::shared_ptr<file_path>();
   }
 
 //  file_path *package::resolve(lua_State *L, const std::string &file)
@@ -430,30 +456,6 @@ namespace lev
 //
 //    return NULL;
 //  }
-
-  int package::resolve_l(lua_State *L)
-  {
-    using namespace luabind;
-    const char *file = NULL;
-
-    object t = util::get_merged(L, 1, -1);
-
-    if (t["file"]) { file = object_cast<const char *>(t["file"]); }
-    else if (t["f"]) { file = object_cast<const char *>(t["f"]); }
-    else if (t["lua.string1"]) { file = object_cast<const char *>(t["lua.string1"]); }
-    if (file == NULL) { luaL_error(L, "file (string) was not given."); }
-
-    std::string path = resolve(L, file);
-    if (path.length() > 0)
-    {
-      lua_pushstring(L, path.c_str());
-    }
-    else
-    {
-      lua_pushnil(L);
-    }
-    return 1;
-  }
 
   luabind::object package::search_font(lua_State *L, const std::string &filename)
   {

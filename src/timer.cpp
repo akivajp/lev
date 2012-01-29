@@ -232,7 +232,7 @@ namespace lev
 
     public:
 
-      myTimer(system *sys) :
+      myTimer(boost::shared_ptr<system> sys) :
         base_time(0), interval(1000), notify(), one_shot(false),
         running(false), sys(sys) { }
 
@@ -269,12 +269,15 @@ namespace lev
       {
         if (running)
         {
-          if (sys->get_ticks() - base_time > interval)
+          if (boost::shared_ptr<system> s = sys.lock())
           {
-            Notify();
-            base_time = sys->get_ticks();
-            if (one_shot) { running = false; }
-            return true;
+            if (s->get_ticks() - base_time > interval)
+            {
+              Notify();
+              base_time = s->get_ticks();
+              if (one_shot) { running = false; }
+              return true;
+            }
           }
         }
         return false;
@@ -290,10 +293,14 @@ namespace lev
       {
         if (new_interval >= 0) { interval = new_interval; }
 
-        base_time = sys->get_ticks();
-        this->one_shot = one_shot;
-        running = true;
-        return true;
+        if (boost::shared_ptr<system> s = sys.lock())
+        {
+          base_time = s->get_ticks();
+          this->one_shot = one_shot;
+          running = true;
+          return true;
+        }
+        return false;
       }
 
       bool Stop()
@@ -306,7 +313,7 @@ namespace lev
       bool one_shot;
       bool running;
       luabind::object notify;
-      system *sys;
+      boost::weak_ptr<system> sys;
   };
 
 //  static Uint32 timer_callback(Uint32 interval, void *param)
@@ -345,24 +352,30 @@ namespace lev
   {
     if (_obj)
     {
-      cast_timer(_obj)->sys->detach_timer(this);
+      if (boost::shared_ptr<system> s = cast_timer(_obj)->sys.lock())
+      {
+        s->detach_timer(this);
+      }
       delete cast_timer(_obj);
     }
   }
 
-  timer* timer::create(system *sys, double interval)
+  boost::shared_ptr<timer> timer::create(boost::shared_ptr<system> sys, double interval)
   {
-    timer* t = NULL;
+    boost::shared_ptr<timer> t;
+    if (! sys) { return t; }
     try {
-      t = new timer;
+      t.reset(new timer);
+      if (! t) { throw -1; }
       t->_obj = new myTimer(sys);
+      if (! t->_obj) { throw -2; }
       t->start(interval, false);
-      return t;
     }
     catch (...) {
-      delete t;
-      return NULL;
+      t.reset();
+      fprintf(stderr, "error on timer class creation\n");
     }
+    return t;
   }
 
   double timer::get_interval() const
@@ -418,7 +431,7 @@ namespace lev
   {
     public:
 
-      myClock(system *sys) : myTimer(sys) { }
+      myClock(boost::shared_ptr<system> sys) : myTimer(sys) { }
 
       virtual ~myClock() { }
 
@@ -426,12 +439,15 @@ namespace lev
       {
         if (running)
         {
-          if (sys->get_ticks() - base_time > interval)
+          if (boost::shared_ptr<system> s = sys.lock())
           {
-            base_time = base_time + interval;
-            Notify();
-            if (one_shot) { running = false; }
-            return true;
+            if (s->get_ticks() - base_time > interval)
+            {
+              base_time = base_time + interval;
+              Notify();
+              if (one_shot) { running = false; }
+              return true;
+            }
           }
         }
         return false;
@@ -445,25 +461,31 @@ namespace lev
   {
     if (_obj)
     {
-      cast_clk(_obj)->sys->detach_timer(this);
+      if (boost::shared_ptr<system> s = cast_clk(_obj)->sys.lock())
+      {
+        s->detach_timer(this);
+      }
       delete cast_clk(_obj);
       _obj = NULL;
     }
   }
 
-  clock* clock::create(system *sys, double freq)
+  boost::shared_ptr<clock> clock::create(boost::shared_ptr<system> sys, double freq)
   {
-    clock *c = NULL;
+    boost::shared_ptr<clock> c;
+    if (! sys) { return c; }
     try {
-      c = new clock;
+      c.reset(new clock);
+      if (! c) { throw -1; }
       c->_obj = new myClock(sys);
+      if (! c->_obj) { throw -2; }
       c->start(freq);
-      return c;
     }
     catch (...) {
-      delete c;
-      return NULL;
+      c.reset();
+      fprintf(stderr, "error on clock instance creation\n");
     }
+    return c;
   }
 
   double clock::get_freq() const

@@ -25,6 +25,7 @@ namespace lev
 {
 
   class system;
+  class mixer;
 
   class sound : public base
   {
@@ -33,7 +34,7 @@ namespace lev
     public:
       ~sound();
       bool clear();
-      static sound *create();
+      static boost::shared_ptr<sound> create();
       double get_length();
       float get_pan();
       double get_position();
@@ -70,8 +71,8 @@ namespace lev
       int get_channels();
       int get_freq();
       void *get_rawobj() { return _obj; }
-      sound *get_slot(int slot_num = 0);
-      sound *get_slot0() { return get_slot(); }
+      boost::shared_ptr<sound> get_slot(int slot_num = 0);
+      boost::shared_ptr<sound> get_slot0() { return get_slot(); }
 //      static int get_field(lua_State *L);
       bool get_playing();
       virtual type_id get_type_id() const { return LEV_TMIXER; }

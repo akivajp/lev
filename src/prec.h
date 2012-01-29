@@ -27,13 +27,17 @@ extern "C" {
 #include <vector>
 
 #include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/filesystem.hpp>
 #include <boost/format.hpp>
+#include <boost/scoped_array.hpp>
+#include <boost/scoped_ptr.hpp>
 #include <boost/shared_array.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/weak_ptr.hpp>
 
-#include <luabind/adopt_policy.hpp>
+//#include <luabind/adopt_policy.hpp>
 //#include <luabind/copy_policy.hpp>
+#include <luabind/raw_policy.hpp>
 #include <luabind/luabind.hpp>
 
 #include <GL/glu.h>

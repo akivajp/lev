@@ -381,10 +381,10 @@ namespace lev
 
   raster *font::rasterize_utf8(const std::string &str, int spacing)
   {
-    return font::rasterize_utf16(unistr(str), spacing);
+    return font::rasterize_utf16(unicode_string(str), spacing);
   }
 
-  raster *font::rasterize_utf16(const unistr &str, int spacing)
+  raster *font::rasterize_utf16(const unicode_string &str, int spacing)
   {
     if (str.empty()) { return NULL; }
     try {

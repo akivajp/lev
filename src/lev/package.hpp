@@ -12,7 +12,6 @@
 /////////////////////////////////////////////////////////////////////////////
 
 #include "base.hpp"
-//#include "fs.hpp"
 #include <luabind/luabind.hpp>
 #include <string>
 
@@ -22,6 +21,8 @@ extern "C" {
 
 namespace lev
 {
+
+  class file_path;
 
   class package
   {
@@ -33,14 +34,13 @@ namespace lev
       static bool add_search(lua_State *L, const std::string &search);
       static int add_search_l(lua_State *L);
       static int clear_search_l(lua_State *L);
+      static int dofile_l(lua_State *L);
       static const char *get_archive_dir(lua_State *L);
       static luabind::object get_font_list(lua_State *L);
       static luabind::object get_path_list(lua_State *L);
       static luabind::object get_search_list(lua_State *L);
       static int require_l(lua_State *L);
-      static std::string resolve(lua_State *L, const std::string &file);
-//      static file_path* resolve(lua_State *L, const std::string &file);
-      static int resolve_l(lua_State *L);
+      static boost::shared_ptr<file_path> resolve(lua_State *L, const std::string &file);
       static luabind::object search_font(lua_State *L, const std::string &filename);
       static int search_font_l(lua_State *L);
       static bool set_archive_dir(lua_State *L, const std::string &archive_dir);

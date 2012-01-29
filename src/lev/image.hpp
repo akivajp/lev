@@ -25,6 +25,7 @@ namespace lev
 {
 
   // class dependencies
+  class file_path;
   class font;
   class raster;
 
@@ -61,7 +62,7 @@ namespace lev
       bool fill_circle(int x, int y, int radius, color *filling);
       bool fill_rect(int x, int y, int w, int h, color *filling);
       virtual int get_h() const;
-      color* get_pixel(int x, int y);
+      boost::shared_ptr<color> get_pixel(int x, int y);
       void* get_rawobj() const { return _obj; }
       const rect get_rect() const;
       const size get_size() const;
@@ -71,8 +72,8 @@ namespace lev
       virtual bool is_compiled();
       virtual bool is_texturized();
       static image* levana_icon();
-//      static image* load(const std::string &filename);
       static boost::shared_ptr<image> load(const std::string &filename);
+      static boost::shared_ptr<image> load_path(boost::shared_ptr<file_path> path);
       bool reload(const std::string &filename);
       bool save(const std::string &filename) const;
       bool set_pixel(int x, int y, const color &c);
@@ -144,14 +145,20 @@ namespace lev
       virtual bool draw_on_screen(screen *cv, int x = 0, int y = 0, unsigned char alpha = 255);
       virtual bool draw_on_screen1(screen *cv) { return draw_on_screen(cv); }
       virtual bool draw_on_screen3(screen *cv, int x = 0, int y = 0) { return draw_on_screen(cv, x, y); }
-      static transition* create(luabind::object img);
-      static transition* create0() { return create(luabind::object()); }
+      static boost::shared_ptr<transition> create(boost::shared_ptr<drawable> img);
+      static boost::shared_ptr<transition> create_with_path(boost::shared_ptr<file_path> path);
+      static boost::shared_ptr<transition> create_with_string(const std::string &image_path);
+      static boost::shared_ptr<transition> create0() { return create(boost::shared_ptr<drawable>()); }
       virtual type_id get_type_id() const { return LEV_TTRANSITION; }
       virtual const char *get_type_name() const { return "lev.transition"; }
       bool is_running();
       bool rewind();
-      bool set_current(luabind::object current);
-      bool set_next(luabind::object next, int duration = 1000, const std::string &type = "");
+      bool set_current(boost::shared_ptr<drawable> current);
+      bool set_current_with_path(boost::shared_ptr<file_path> path);
+      bool set_current_with_string(const std::string &image_path);
+      bool set_next(boost::shared_ptr<drawable> next, int duration = 1000, const std::string &type = "");
+      bool set_next_with_path(boost::shared_ptr<file_path> path, int duration = 1000, const std::string &type = "");
+      bool set_next_with_string(const std::string &image_path, int duration = 1000, const std::string &type = "");
       virtual bool texturize(bool force = false);
     protected:
       void *_obj;

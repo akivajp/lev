@@ -63,10 +63,16 @@ namespace lev
       system();
     public:
       virtual ~system();
-      clock* create_clock(double freq = 50);
-      clock* create_clock0() { return create_clock(); }
-      timer* create_timer(double interval = 1000);
-      timer* create_timer0() { return create_timer(); }
+      static boost::shared_ptr<clock> create_clock(boost::shared_ptr<system> sys,
+                                                   double freq = 50);
+      static boost::shared_ptr<clock> create_clock1(boost::shared_ptr<system> sys)
+      { return create_clock(sys); }
+
+      static boost::shared_ptr<timer> create_timer(boost::shared_ptr<system> sys,
+                                                   double interval = 1000);
+      static boost::shared_ptr<timer> create_timer1(boost::shared_ptr<system> sys)
+      { return create_timer(sys); }
+
       bool delay(unsigned long msec = 1000);
       bool detach_timer(timer *t);
       bool do_event();
@@ -74,6 +80,7 @@ namespace lev
       bool done();
 //      static system* get() { return singleton; }
       static boost::shared_ptr<system> get() { return singleton; }
+      std::string get_name();
 //      static int get_l(lua_State *L);
       luabind::object get_on_button_down();
       luabind::object get_on_button_up();
@@ -97,6 +104,7 @@ namespace lev
       bool quit(bool force = false);
       bool quit0() { return quit(); }
       bool run();
+      bool set_name(const std::string &name);
       bool set_on_button_down(luabind::object func);
       bool set_on_button_up(luabind::object func);
       bool set_on_key_down(luabind::object func);

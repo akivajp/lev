@@ -16,6 +16,7 @@
 
 // dependencies
 #include "lev/font.hpp"
+#include "lev/fs.hpp"
 #include "lev/util.hpp"
 #include "lev/system.hpp"
 #include "lev/timer.hpp"
@@ -65,8 +66,8 @@ int luaopen_lev_image(lua_State *L)
 //        .def("fill_circle", &image::fill_circle)
         .def("fill_rect", &image::fill_rect)
         .def("fill_rectangle", &image::fill_rect)
-        .def("get_color", &image::get_pixel, adopt(result))
-        .def("get_pixel", &image::get_pixel, adopt(result))
+        .def("get_color", &image::get_pixel)
+        .def("get_pixel", &image::get_pixel)
         .def("load", &image::reload)
         .property("rect",  &image::get_rect)
         .def("reload", &image::reload)
@@ -86,6 +87,7 @@ int luaopen_lev_image(lua_State *L)
 //          def("draw_text_c", &image::draw_text),
 //          def("levana_icon", &image::levana_icon),
           def("load",    &image::load),
+          def("load",    &image::load_path),
           def("string_c",  &image::string),
           def("sub_image_c", &image::sub_image)
         ],
@@ -107,11 +109,17 @@ int luaopen_lev_image(lua_State *L)
         .property("is_running", &transition::is_running)
         .def("rewind", &transition::rewind)
         .def("set_current", &transition::set_current)
+        .def("set_current", &transition::set_current_with_path)
+        .def("set_current", &transition::set_current_with_string)
         .def("set_next", &transition::set_next)
+        .def("set_next", &transition::set_next_with_path)
+        .def("set_next", &transition::set_next_with_string)
         .scope
         [
-          def("create", &transition::create, adopt(result)),
-          def("create", &transition::create0, adopt(result))
+          def("create", &transition::create),
+          def("create", &transition::create0),
+          def("create", &transition::create_with_path),
+          def("create", &transition::create_with_string)
         ],
       class_<layout, drawable, boost::shared_ptr<base> >("layout")
         .def("clear", &layout::clear)
@@ -635,12 +643,20 @@ namespace lev
     return true;
   }
 
-  color* image::get_pixel(int x, int y)
+  boost::shared_ptr<color> image::get_pixel(int x, int y)
   {
-    if (x < 0 || x >= get_w() || y < 0 || y >= get_h()) { return NULL; }
-    unsigned char *buf = cast_image(_obj)->buf;
-    unsigned char *pixel = &buf[4 * (y * get_w() + x)];
-    return color::create(pixel[0], pixel[1], pixel[2], pixel[3]);
+    boost::shared_ptr<color> c;
+    try {
+      if (x < 0 || x >= get_w() || y < 0 || y >= get_h()) { throw -1; }
+      unsigned char *buf = cast_image(_obj)->buf;
+      unsigned char *pixel = &buf[4 * (y * get_w() + x)];
+      c = color::create(pixel[0], pixel[1], pixel[2], pixel[3]);
+      if (! c) { throw -2; }
+    }
+    catch (...) {
+      c.reset();
+    }
+    return c;
   }
 
   const rect image::get_rect() const
@@ -684,20 +700,16 @@ namespace lev
 //    }
 //  }
 
-//  image* image::load(const std::string &filename)
   boost::shared_ptr<image> image::load(const std::string &filename)
   {
     boost::shared_ptr<image> img;
-//    unsigned char *buf = NULL;
     try {
       int w, h;
-//      buf = stbi_load(filename.c_str(), &w, &h, NULL, 4);
       boost::shared_ptr<unsigned char> buf(stbi_load(filename.c_str(), &w, &h, NULL, 4), stbi_image_free);
       if (! buf) { throw -1; }
       img = image::create(w, h);
       if (! img) { throw -2; }
 
-//      unsigned char *pixel = buf.get();
       for (int y = 0; y < h; y++)
       {
         for (int x = 0; x < w; x++)
@@ -711,13 +723,17 @@ namespace lev
           img->set_pixel(x, y, color(r, g, b, a));
         }
       }
-//      stbi_image_free(buf);
     }
     catch (...) {
       img.reset();
       fprintf(stderr, "error on image data loading\n");
     }
     return img;
+  }
+
+  boost::shared_ptr<image> image::load_path(boost::shared_ptr<file_path> path)
+  {
+    return load(path->get_full_path());
   }
 
   bool image::reload(const std::string &filename)
@@ -1222,18 +1238,13 @@ namespace lev
 
     protected:
 
-      myTransition() : imgs(), sw(), texturized(false) { }
+      myTransition() : imgs(), sw() { }
 
     public:
 
-      ~myTransition()
-      {
-        if (sw)
-        {
-        }
-      }
+      ~myTransition() { }
 
-      static myTransition *Create(luabind::object img)
+      static myTransition *Create(boost::shared_ptr<drawable> img)
       {
         myTransition *tran = NULL;
         try {
@@ -1242,23 +1253,7 @@ namespace lev
           if (! tran->sw) { throw -1; }
 
           tran->sw->start();
-          if (! img) { tran->imgs.push_back(luabind::object()); }
-          else if (luabind::type(img) == LUA_TSTRING)
-          {
-            luabind::object data = globals(img.interpreter())["lev"]["image"]["load"](img);
-            tran->imgs.push_back(data);
-          }
-  //        else if (base::is_type_of(img, base::LEV_TFILE_PATH))
-  //        {
-  //          luabind::object data = globals(img.interpreter())["lev"]["image"]["load"](img["full"]);
-  //          imgs.push_back(data);
-  //        }
-          else if (base::is_type_of(img, base::LEV_TDRAWABLE, base::LEV_TDRAWABLE_END))
-          {
-            tran->imgs.push_back(img);
-          }
-          else { tran->imgs.push_back(luabind::object()); }
-
+          tran->imgs.push_back(img);
           return tran;
         }
         catch (...) {
@@ -1282,10 +1277,9 @@ namespace lev
         {
           if (types.size() >= 1 && types[0] == LEV_TRAN_FADE_OUT)
           {
-//            imgs[0]["draw_on"](imgs[0], cv, x, y, 255 - (int)(alpha * grad));
-            imgs[0]["draw_on"](imgs[0], cv, x, y, alpha);
+            imgs[0]->draw_on_screen(cv, x, y, alpha);
           }
-          else { imgs[0]["draw_on"](imgs[0], cv, x, y, alpha); }
+          else { imgs[0]->draw_on_screen(cv, x, y, alpha); }
         }
 
         if (imgs.size() == 1) { return true; }
@@ -1293,7 +1287,7 @@ namespace lev
         {
           if (types[0] == LEV_TRAN_CROSS_FADE)
           {
-            imgs[1]["draw_on"](imgs[1], cv, x, y, alpha * grad);
+            imgs[1]->draw_on_screen(cv, x, y, alpha * grad);
           }
         }
 
@@ -1307,84 +1301,51 @@ namespace lev
         return true;
       }
 
-      bool OnChange()
-      {
-        texturized = false;
-        return true;
-      }
-
       bool Rewind()
       {
         return sw->start(0);
       }
 
-      bool SetCurrent(luabind::object img)
+      bool SetCurrent(boost::shared_ptr<drawable> img)
       {
-        OnChange();
         imgs.resize(0);
         durations.resize(0);
-        if (! img) { imgs.push_back(luabind::object()); }
-        else if (luabind::type(img) == LUA_TSTRING)
-        {
-          luabind::object data = globals(img.interpreter())["lev"]["image"]["load"](img);
-          imgs.push_back(data);
-        }
-//        else if (base::is_type_of(img, base::LEV_TFILE_PATH))
-//        {
-//          luabind::object data = globals(img.interpreter())["lev"]["image"]["load"](img["full"]);
-//          imgs.push_back(data);
-//        }
-        else if (base::is_type_of(img, base::LEV_TDRAWABLE, base::LEV_TDRAWABLE_END)) { imgs.push_back(img); }
-        else { imgs.push_back(luabind::object()); }
+        imgs.push_back(img);
+        return true;
       }
 
-      bool SetNext(luabind::object img, int duration, const std::string &type)
+      bool SetNext(boost::shared_ptr<drawable> img, int duration, const std::string &type)
       {
-        OnChange();
         if (duration < 0) { return false; }
-        if (! img) { imgs.push_back(luabind::object()); }
-        else if (luabind::type(img) == LUA_TSTRING)
-        {
-          luabind::object data = globals(img.interpreter())["lev"]["image"]["load"](img);
-          imgs.push_back(data);
+
+        try {
+          imgs.push_back(img);
+          durations.push_back(duration);
+
+          if (type == "cross_fade") { types.push_back(LEV_TRAN_CROSS_FADE); }
+          else if (type == "fade") { types.push_back(LEV_TRAN_CROSS_FADE); }
+          else if (type == "fade_out") { types.push_back(LEV_TRAN_FADE_OUT); }
+          else { types.push_back(LEV_TRAN_CROSS_FADE); }
         }
-//        else if (base::is_type_of(img, base::LEV_TFILE_PATH))
-//        {
-//          luabind::object data = globals(img.interpreter())["lev"]["image"]["load"](img["full"]);
-//          imgs.push_back(data);
-//        }
-        else if (base::is_type_of(img, base::LEV_TDRAWABLE, base::LEV_TDRAWABLE_END)) { imgs.push_back(img); }
-        else { imgs.push_back(luabind::object()); }
-
-        durations.push_back(duration);
-
-        if (type == "cross_fade") { types.push_back(LEV_TRAN_CROSS_FADE); }
-        else if (type == "fade") { types.push_back(LEV_TRAN_CROSS_FADE); }
-        else if (type == "fade_out") { types.push_back(LEV_TRAN_FADE_OUT); }
-        else { types.push_back(LEV_TRAN_CROSS_FADE); }
-
+        catch (...) {
+          return false;
+        }
         return true;
       }
 
       bool TexturizeAll(bool force)
       {
-        if (! texturized)
+        bool at_least_one = false;
+        for (int i = 0; i < imgs.size(); i++)
         {
-          for (int i = 0; i < imgs.size(); i++)
-          {
-            if (base::is_type_of(imgs[i], base::LEV_TDRAWABLE, base::LEV_TDRAWABLE_END))
-            {
-              imgs[i]["texturize"](imgs[i]);
-            }
-          }
-          texturized = true;
-          return true;
+          if (! imgs[i]) { continue; }
+          if (imgs[i]->texturize(force)) { at_least_one = true; }
         }
-        return false;
+        return at_least_one;
       }
 
-      bool texturized;
-      std::vector<luabind::object> imgs;
+//      std::vector<luabind::object> imgs;
+      std::vector<boost::shared_ptr<drawable> > imgs;
       std::vector<long> durations;
       std::vector<transition_type> types;
       boost::shared_ptr<stop_watch> sw;
@@ -1400,19 +1361,31 @@ namespace lev
 //printf("END DELETE!\n");
   }
 
-  transition* transition::create(luabind::object img)
+  boost::shared_ptr<transition> transition::create(boost::shared_ptr<drawable> img)
   {
-    transition* tran = NULL;
+    boost::shared_ptr<transition> tran;
     try {
-      tran = new transition;
+      tran.reset(new transition);
+      if (! tran) { throw -1; }
       tran->_obj = myTransition::Create(img);
-      if (! tran->_obj) { throw -1; }
-      return tran;
+      if (! tran->_obj) { throw -2; }
     }
     catch (...) {
-      delete tran;
-      return NULL;
+      tran.reset();
+      fprintf(stderr, "error on transition instance creation\n");
     }
+    return tran;
+  }
+
+  boost::shared_ptr<transition>
+    transition::create_with_path(boost::shared_ptr<file_path> path)
+  {
+    return transition::create_with_string(path->get_full_path());
+  }
+
+  boost::shared_ptr<transition> transition::create_with_string(const std::string &image_path)
+  {
+    return transition::create(image::load(image_path));
   }
 
   bool transition::draw_on_screen(screen *cv, int x, int y, unsigned char alpha)
@@ -1431,14 +1404,36 @@ namespace lev
     return cast_tran(_obj)->Rewind();
   }
 
-  bool transition::set_current(luabind::object current)
+  bool transition::set_current(boost::shared_ptr<drawable> current)
   {
     return cast_tran(_obj)->SetCurrent(current);
   }
 
-  bool transition::set_next(luabind::object next, int duration, const std::string &type)
+  bool transition::set_current_with_path(boost::shared_ptr<file_path> path)
+  {
+    return cast_tran(_obj)->SetCurrent(image::load(path->get_full_path()));
+  }
+
+  bool transition::set_current_with_string(const std::string &image_path)
+  {
+    return cast_tran(_obj)->SetCurrent(image::load(image_path));
+  }
+
+  bool transition::set_next(boost::shared_ptr<drawable> next, int duration, const std::string &type)
   {
     return cast_tran(_obj)->SetNext(next, duration, type);
+  }
+
+  bool transition::set_next_with_path(boost::shared_ptr<file_path> path, int duration,
+                                      const std::string &type)
+  {
+    return cast_tran(_obj)->SetNext(image::load(path->get_full_path()), duration, type);
+  }
+
+  bool transition::set_next_with_string(const std::string &image_path, int duration,
+                                        const std::string &type)
+  {
+    return cast_tran(_obj)->SetNext(image::load(image_path), duration, type);
   }
 
   bool transition::texturize(bool force)

@@ -41,13 +41,21 @@ namespace lev
       bool entry_exists(const std::string &pattern);
       static bool entry_exists_direct(const std::string &archive_file,
                                       const std::string &entry_name);
-      bool extract(const std::string &entry_name);
+
+      bool extract(const std::string &entry_name, const char *password = NULL);
+
       static bool extract_direct(const std::string &archive_file,
-                                 const std::string &entry_name);
+                                 const std::string &entry_name,
+                                 const char *password = NULL);
+
       static bool extract_direct_to(const std::string &archive_file,
                                     const std::string &entry_name,
-                                    const std::string &target_path);
-      bool extract_to(const std::string &entry_name, const std::string &target_path);
+                                    const std::string &target_path,
+                                    const char *password = NULL);
+
+      bool extract_to(const std::string &entry_name, const std::string &target_path,
+                      const char *password = NULL);
+
       bool find(const std::string &pattern, std::string &entry_name);
       static int find_l(lua_State *L);
 
@@ -69,13 +77,13 @@ namespace lev
 //      static archive* open(const std::string &archive_path);
       static boost::shared_ptr<archive> open(const std::string &archive_path);
       bool read(const std::string &entry_name, std::string &data,
-                int block_size = 4096, const char *password = NULL);
-      bool read_current(std::string &data, int block_size = 4096, const char *password = NULL);
+                int read_len = 0, const char *password = NULL);
+      bool read_current(std::string &data, int read_len = 0, const char *password = NULL);
       static int read_l(lua_State *L);
       static bool read_direct(const std::string &archive_file,
                               const std::string &entry_name,
                               std::string &data,
-                              int block_size = 4096,
+                              int block_size = 0,
                               const char *password = NULL);
       static int read_direct_l(lua_State *L);
     protected:

@@ -37,7 +37,7 @@ namespace lev
           LEV_TDRAWABLE_END,
 
           LEV_TEVENT,
-//          LEV_TFINALIZER,
+          LEV_TFILE_PATH,
           LEV_TFONT,
           LEV_TMIXER,
           LEV_TPOINT,
@@ -48,12 +48,13 @@ namespace lev
           LEV_TSOUND,
           LEV_TSTOP_WATCH,
           LEV_TSYSTEM,
+          LEV_TTEMP_NAME,
 
           LEV_TTIMER,
             LEV_TCLOCK,
           LEV_TTIMER_END,
 
-          LEV_TUNISTR,
+          LEV_TUNICODE_STRING,
           LEV_TVECTOR,
           LEV_TWINDOW,
         LEV_TBASE_END,

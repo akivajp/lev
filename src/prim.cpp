@@ -29,7 +29,7 @@ int luaopen_lev_prim(lua_State *L)
     namespace_("prim"),
     namespace_("classes")
     [
-      class_<color, base>("color")
+      class_<color, base, boost::shared_ptr<base> >("color")
         .property("a", &color::get_a, &color::set_a)
         .property("alpha", &color::get_a, &color::set_a)
         .property("b", &color::get_b, &color::set_b)
@@ -45,9 +45,9 @@ int luaopen_lev_prim(lua_State *L)
         .property("string", &color::get_codestr)
         .scope
         [
-          def("create_c", &color::create, adopt(result))
+          def("create_c", &color::create)
         ],
-      class_<size, base>("size")
+      class_<size, base, boost::shared_ptr<base> >("size")
         .def("assign", &size::assign)
         .def("assign", &size::assign_size)
         .property("d", &size::get_d, &size::set_d)
@@ -58,9 +58,9 @@ int luaopen_lev_prim(lua_State *L)
         .property("width", &size::get_w, &size::set_w)
         .scope
         [
-          def("create_c", &size::create, adopt(result))
+          def("create_c", &size::create)
         ],
-      class_<vector, base>("vector")
+      class_<vector, base, boost::shared_ptr<base> >("vector")
         .def("assign", &vector::assign)
         .def("assign", &vector::assign_vector)
 //        .def(self + vector())
@@ -69,9 +69,9 @@ int luaopen_lev_prim(lua_State *L)
         .property("z", &vector::get_z, &vector::set_z)
         .scope
         [
-          def("create_c", &vector::create, adopt(result))
+          def("create_c", &vector::create)
         ],
-      class_<point, base>("point")
+      class_<point, base, boost::shared_ptr<base> >("point")
         .property("c", &point::get_color, &point::set_color)
         .property("col", &point::get_color, &point::set_color)
         .property("color", &point::get_color, &point::set_color)
@@ -85,9 +85,9 @@ int luaopen_lev_prim(lua_State *L)
         .property("vertex", &point::get_vertex, &point::set_vertex)
         .scope
         [
-          def("create_c", &point::create, adopt(result))
+          def("create_c", &point::create)
         ],
-      class_<rect, base>("rect")
+      class_<rect, base, boost::shared_ptr<base> >("rect")
         .def("assign", &rect::assign)
         .def("assign", &rect::assign_position_size)
         .def("assign", &rect::assign_rect)
@@ -138,6 +138,7 @@ int luaopen_lev_prim(lua_State *L)
   prim["position"] = classes["vector"]["create"];
   prim["rect"]     = classes["rect"]["create"];
   prim["size"]     = classes["size"]["create"];
+  prim["vertex"]   = classes["vector"]["create"];
   prim["vector"]   = classes["vector"]["create"];
 
   prim["black"] = classes["color"]["create"](  0,   0,   0);
@@ -169,16 +170,19 @@ namespace lev
     b = (argb_code & 0x000000FF) >>  0;
   }
 
-  color* color::create(unsigned char r, unsigned char g, unsigned char b, unsigned char a)
+  boost::shared_ptr<color> color::create(unsigned char r, unsigned char g,
+                                         unsigned char b, unsigned char a)
   {
-    color *c = NULL;
+    boost::shared_ptr<color> c;
     try {
-      c = new color(r, g, b, a);
-      return c;
+      c.reset(new color(r, g, b, a));
+      if (! c) { throw -1; }
     }
     catch (...) {
-      return NULL;
+      c.reset();
+      fprintf(stderr, "error on color instance creation\n");
     }
+    return c;
   }
 
   int color::create_l(lua_State *L)
@@ -253,16 +257,18 @@ namespace lev
     return true;
   }
 
-  size* size::create(int w, int h, int d)
+  boost::shared_ptr<size> size::create(int w, int h, int d)
   {
-    size* s = NULL;
+    boost::shared_ptr<size> s;
     try {
-      s = new size(w, h, d);
-      return s;
+      s.reset(new size(w, h, d));
+      if (! s) { throw -1; }
     }
     catch (...) {
-      return NULL;
+      s.reset();
+      fprintf(stderr, "error on size instance creation\n");
     }
+    return s;
   }
 
 
@@ -302,18 +308,19 @@ namespace lev
     return true;
   }
 
-  vector* vector::create(int x, int y, int z)
+  boost::shared_ptr<vector> vector::create(int x, int y, int z)
   {
-    vector* vec = NULL;
+    boost::shared_ptr<vector> vec;
     try {
-      vec = new vector(x, y, z);
-      return vec;
+      vec.reset(new vector(x, y, z));
+      if (! vec) { throw -1; }
     }
     catch (...) {
-      return NULL;
+      vec.reset();
+      fprintf(stderr, "error on vector instance creation\n");
     }
+    return vec;
   }
-
 
   int vector::create_l(lua_State *L)
   {
@@ -336,45 +343,34 @@ namespace lev
     return 1;
   }
 
+  point::point() : vertex(), col() { }
 
   point::~point()
-  {
-    if (vertex)
-    {
-      delete vertex;
-      vertex = NULL;
-    }
-    if (col)
-    {
-      delete col;
-      col = NULL;
-    }
-  }
-
+  { }
 
   bool point::clear_color()
   {
-    if (col)
-    {
-      delete col;
-      col = NULL;
-    }
+    col.reset();
     return true;
   }
 
-  point* point::create(vector *vec, color *col)
+  boost::shared_ptr<point> point::create(vector *vec, color *col)
   {
-    point *pt = NULL;
+    boost::shared_ptr<point> pt;
     try {
-      if (vec == NULL) { throw -1; }
-      pt = new point;
-      pt->vertex = new vector(*vec);
-      if (col) { pt->col = new color(*col); }
-      return pt;
+      pt.reset(new point);
+
+      if (vec) { pt->vertex.reset(new vector(*vec)); }
+      else { pt->vertex.reset(new vector); }
+
+      if (col) { pt->col.reset(new color(*col)); }
+//      else { pt->col.reset(new color); }
     }
     catch (...) {
-      return NULL;
+      pt.reset();
+      fprintf(stderr, "error on point instance creation\n");
     }
+    return pt;
   }
 
   int point::create_l(lua_State *L)
@@ -383,73 +379,85 @@ namespace lev
     object ver, col;
     unsigned char r = 0, g = 0, b = 0, a = 255;
 
-    object t = util::get_merged(L, 1, -1);
+    try {
+      object t = util::get_merged(L, 1, -1);
 
-    if (t["lua.userdata1"])
-    {
-      switch ( object_cast<int>(t["lua.userdata1"]["type_id"]) )
+      if (t["lua.userdata1"])
       {
-        case LEV_TCOLOR:
-          col = t["lua.userdata1"];
-          break;
-        case LEV_TVECTOR:
-          ver = t["lua.userdata1"];
-          break;
+        switch ( object_cast<int>(t["lua.userdata1"]["type_id"]) )
+        {
+          case LEV_TCOLOR:
+            col = t["lua.userdata1"];
+            break;
+          case LEV_TVECTOR:
+            ver = t["lua.userdata1"];
+            break;
+        }
       }
-    }
-    if (t["lua.userdata2"])
-    {
-      switch ( object_cast<int>(t["lua.userdata2"]["type_id"]) )
+      if (t["lua.userdata2"])
       {
-        case LEV_TCOLOR:
-          col = t["lua.userdata2"];
-          break;
-        case LEV_TVECTOR:
-          ver = t["lua.userdata2"];
-          break;
+        switch ( object_cast<int>(t["lua.userdata2"]["type_id"]) )
+        {
+          case LEV_TCOLOR:
+            col = t["lua.userdata2"];
+            break;
+          case LEV_TVECTOR:
+            ver = t["lua.userdata2"];
+            break;
+        }
       }
-    }
 
-    if (t["vertex"]) { ver = t["vertex"]; }
-    else if (t["ver"]) { ver = t["ver"]; }
-    else if (t["v"]) { ver = t["v"]; }
+      if (t["vertex"]) { ver = t["vertex"]; }
+      else if (t["ver"]) { ver = t["ver"]; }
+      else if (t["v"]) { ver = t["v"]; }
 
-    if (not ver) { ver = globals(L)["lev"]["classes"]["vector"]["create"](t); }
+      if (! ver) { ver = globals(L)["lev"]["prim"]["vector"](t); }
 
-    if (t["color"]) { col = t["color"]; }
-    else if (t["col"]) { col = t["col"]; }
-    else if (t["c"]) { col = t["c"]; }
+      if (t["color"]) { col = t["color"]; }
+      else if (t["col"]) { col = t["col"]; }
+      else if (t["c"]) { col = t["c"]; }
 
-    if (not col)
-    {
-      if (t["red"] || t["r"] || t["green"] || t["g"] || t["blue"] || t["b"])
+      if (! col)
       {
-        col = globals(L)["lev"]["classes"]["color"]["create"](t);
+        if (t["red"] || t["r"] || t["green"] || t["g"] || t["blue"] || t["b"])
+        {
+          col = globals(L)["lev"]["prim"]["color"](t);
+        }
       }
-    }
 
-    object o = globals(L)["lev"]["classes"]["point"]["create_c"](ver, col);
-    o.push(L);
-    return 1;
+      object o = globals(L)["lev"]["classes"]["point"]["create_c"](ver, col);
+      o.push(L);
+      return 1;
+    }
+    catch (...) {
+      fprintf(stderr, "error on point instance creation\n");
+      fprintf(stderr, "error message: %s\n", lua_tostring(L, -1));
+    }
   }
 
   bool point::set_color(color *c)
   {
-    clear_color();
-    if (c == NULL) { return true; }
     try {
-      col = new color(*c);
-      return true;
+      if (c) { col.reset(new color(*c)); }
+      else { col.reset(); }
     }
     catch (...) {
+      fprintf(stderr, "error on point color setting\n");
       return false;
     }
+    return true;
   }
 
   bool point::set_vertex(vector *v)
   {
-    if (v == NULL) { return false; }
-    *vertex = *v;
+    if (! v) { return false; }
+    try {
+      vertex.reset(new vector(*v));
+    }
+    catch (...) {
+      fprintf(stderr, "error on point vertex setting\n");
+      return false;
+    }
     return true;
   }
 

@@ -14,7 +14,7 @@ OBJS = $(SRC:%.cpp=%.o)
 DLIB = lev.so
 #LIBS = -llua -lluabind -lSDL -lvorbisfile -lfreetype -lGL
 LIBS = -llua -lluabind -lvorbisfile -lfreetype -lGL `/usr/local/bin/sdl-config --libs` \
-       -L./minizip -lminizip
+       -L./minizip -lminizip -lboost_filesystem
 
 MINIZIP_CFLAGS = -fPIC
 

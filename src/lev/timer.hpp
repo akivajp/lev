@@ -54,7 +54,8 @@ namespace lev
       timer();
     public:
       virtual ~timer();
-      static timer* create(system *sys, double interval = 1000);
+      static boost::shared_ptr<timer> create(boost::shared_ptr<system> sys,
+                                             double interval = 1000);
       double get_interval() const;
       luabind::object get_notify();
       virtual type_id get_type_id() const { return LEV_TTIMER; }
@@ -78,7 +79,8 @@ namespace lev
       clock();
     public:
       virtual ~clock();
-      static clock* create(system *sys, double freq = 50);
+      static boost::shared_ptr<clock> create(boost::shared_ptr<system> sys,
+                                             double freq = 50);
       double get_freq() const;
       virtual type_id get_type_id() const { return LEV_TCLOCK; }
       virtual const char *get_type_name() const { return "lev.clock"; }

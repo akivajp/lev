@@ -20,12 +20,8 @@
 
 // libraries
 #include <boost/format.hpp>
+#include <boost/filesystem.hpp>
 #include <string>
-#include <sys/stat.h>
-
-#if defined(__WIN32__)
-  #include <io.h>
-#endif // __WIN32__
 
 int luaopen_lev_fs(lua_State *L)
 {
@@ -39,23 +35,25 @@ int luaopen_lev_fs(lua_State *L)
   [
     namespace_("classes")
     [
-//      class_<temp_name, base>("temp_name")
-//        .def("__tostring", &temp_name::get_name)
-//        .property("name", &temp_name::get_name)
-//        .property("path", &temp_name::get_name)
-//        .scope
-//        [
-//          def("create_c", &temp_name::create, adopt(result))
-//        ],
-//      class_<file_path, base>("file_path")
-//        .def("clear", &file_path::clear)
+      class_<temp_name, base, boost::shared_ptr<base> >("temp_name")
+        .def("__tostring", &temp_name::get_name)
+        .property("name", &temp_name::get_name)
+        .property("path", &temp_name::get_name)
+        .scope
+        [
+          def("create_c", &temp_name::create)
+        ],
+      class_<file_path, base, boost::shared_ptr<base> >("file_path")
+        .def("__tostring", &file_path::get_full_path)
+        .def("clear", &file_path::clear)
+        .property("absolute", &file_path::get_full_path)
 //        .property("dir_exists", &file_path::dir_exists)
 //        .property("dir", &file_path::get_dir_path)
 //        .property("dir_path", &file_path::get_dir_path)
 //        .property("file_exists", &file_path::file_exists)
 //        .property("file_name", &file_path::get_name)
-//        .property("full_path", &file_path::get_full_path)
-//        .property("full", &file_path::get_full_path)
+        .property("full_path", &file_path::get_full_path)
+        .property("full", &file_path::get_full_path)
 //        .property("ext", &file_path::get_ext)
 //        .property("is_dir", &file_path::is_dir)
 //        .property("is_dir_readable", &file_path::is_dir_readable)
@@ -70,11 +68,11 @@ int luaopen_lev_fs(lua_State *L)
 //        .property("size", &file_path::get_size)
 //        .property("url", &file_path::get_url)
 //        .def("touch", &file_path::touch)
-//        .scope
-//        [
-//          def("create_c", &file_path::create, adopt(result)),
-//          def("create_temp_c", &file_path::create_temp, adopt(result))
-//        ],
+        .scope
+        [
+          def("create_c", &file_path::create),
+          def("create_temp_c", &file_path::create_temp)
+        ],
       class_<file_system, base>("file_system")
 //        .property("path", &file_system::get_path, &file_system::set_path)
         .scope
@@ -84,20 +82,21 @@ int luaopen_lev_fs(lua_State *L)
           def("file_exists", &file_system::file_exists),
 //          def("get_cwd", &file_system::get_cwd),
 //          def("get_executable_path", &file_system::get_executable_path),
-//          def("get_ext", &file_system::get_ext),
+          def("get_ext", &file_system::get_ext),
 //          def("get_resource_dir", &file_system::get_resource_dir),
           def("get_size", &file_system::get_size),
-//          def("get_temp_dir", &file_system::get_temp_dir),
+          def("get_temp_dir", &file_system::get_temp_dir),
           def("mkdir", &file_system::mkdir),
-          def("mkdir", &file_system::mkdir1)
+          def("mkdir", &file_system::mkdir1),
 //          def("open_c", &file_system::open, adopt(result)),
-//          def("remove", &file_system::remove),
-//          def("remove", &file_system::remove1),
+          def("remove", &file_system::remove),
+          def("remove", &file_system::remove1),
 //          def("to_file_path", &file_system::to_file_path),
 //          def("to_full_path", &file_system::to_full_path),
 //          def("to_name", &file_system::to_name),
+          def("to_stem", &file_system::to_stem),
 //          def("to_url", &file_system::to_url),
-//          def("touch", &file_system::touch)
+          def("touch", &file_system::touch)
         ]
     ],
     namespace_("fs") // stub
@@ -106,41 +105,42 @@ int luaopen_lev_fs(lua_State *L)
   object lev = globals(L)["lev"];
   object classes = lev["classes"];
   object fs = lev["fs"];
-//  register_to(classes["file_path"], "create", &file_path::create_l);
-//  register_to(classes["file_path"], "create_temp", &file_path::create_temp_l);
+  register_to(classes["file_path"], "create", &file_path::create_l);
+  register_to(classes["file_path"], "create_temp", &file_path::create_temp_l);
 //  register_to(classes["file_system"], "open", &file_system::open_l);
 //  register_to(classes["file_system"], "find", &file_system::find_l);
 //  register_to(classes["file_system"], "find_next", &file_system::find_next_l);
-//  register_to(classes["temp_name"], "create", &temp_name::create_l);
-//  fs["create_temp"] = classes["file_path"]["create_temp"];
+  register_to(classes["temp_name"], "create", &temp_name::create_l);
+  fs["create_temp"] = classes["file_path"]["create_temp"];
 //  fs["cwd"] = classes["file_system"]["get_cwd"];
   fs["dir_exists"] = classes["file_system"]["dir_exists"];
 //  fs["exe_path"] = classes["file_system"]["get_executable_path"];
   fs["exists"] = classes["file_system"]["exists"];
-//  fs["file_path"] = classes["file_path"]["create"];
+  fs["file_path"] = classes["file_path"]["create"];
   fs["file_exists"] = classes["file_system"]["file_exists"];
 //  fs["get_cwd"] = classes["file_system"]["get_cwd"];
 //  fs["get_executable_path"] = classes["file_system"]["get_executable_path"];
-//  fs["get_ext"] = classes["file_system"]["get_ext"];
+  fs["get_ext"] = classes["file_system"]["get_ext"];
 //  fs["get_resurce_dir"] = classes["file_system"]["get_resource_dir"];
   fs["get_size"] = classes["file_system"]["get_size"];
-//  fs["get_temp_dir"] = classes["file_system"]["get_temp_dir"];
+  fs["get_temp_dir"] = classes["file_system"]["get_temp_dir"];
   fs["is_dir"] = classes["file_system"]["dir_exists"];
   fs["is_file"] = classes["file_system"]["file_exists"];
   fs["mkdir"] = classes["file_system"]["mkdir"];
 //  fs["open"] = classes["file_system"]["open"];
-//  fs["path"] = classes["file_path"]["create"];
-//  fs["remove"] = classes["file_system"]["remove"];
+  fs["path"] = classes["file_path"]["create"];
+  fs["remove"] = classes["file_system"]["remove"];
 //  fs["res_dir"] = classes["file_system"]["get_resource_dir"];
 //  fs["resorce_dir"] = classes["file_system"]["get_resource_dir"];
-//  fs["temp_name"] = classes["temp_name"]["create"];
-//  fs["temp_dir"] = classes["file_system"]["get_temp_dir"];
-//  fs["tmp_dir"] = classes["file_system"]["get_temp_dir"];
-//  fs["tmpname"] = classes["temp_name"]["create"];
+  fs["temp_name"] = classes["temp_name"]["create"];
+  fs["temp_dir"] = classes["file_system"]["get_temp_dir"];
+  fs["tmp_dir"] = classes["file_system"]["get_temp_dir"];
+  fs["tmpname"] = classes["temp_name"]["create"];
 //  fs["to_file_path"] = classes["file_system"]["to_file_path"];
 //  fs["to_path"] = classes["file_system"]["to_file_path"];
+  fs["to_stem"] = classes["file_system"]["to_stem"];
 //  fs["to_url"] = classes["file_system"]["to_url"];
-//  fs["touch"] = classes["file_system"]["touch"];
+  fs["touch"] = classes["file_system"]["touch"];
 
   globals(L)["package"]["loaded"]["lev.fs"] = fs;
   return 0;
@@ -148,54 +148,47 @@ int luaopen_lev_fs(lua_State *L)
 
 namespace lev
 {
-/*
-  temp_name::temp_name() : path() { }
+
+  temp_name::temp_name() : path_str() { }
 
   temp_name::~temp_name()
   {
-    if (! path.empty())
+    if (! path_str.empty())
     {
-      file_system::remove(path.c_str(), false);
+      file_system::remove(path_str.c_str(), false);
     }
   }
 
-  temp_name* temp_name::create(const std::string &prefix, const std::string &suffix)
+  boost::shared_ptr<temp_name> temp_name::create(const std::string &prefix,
+                                                 const std::string &suffix)
   {
-    temp_name *tmp = NULL;
+    boost::shared_ptr<temp_name> tmp;
     try {
-      tmp = new temp_name;
+      tmp.reset(new temp_name);
+      if (! tmp) { throw -1; }
 
       for (int i = 0 ; ; i++)
       {
-        std::string new_path = file_system::get_temp_dir() + "/"
-                             + (boost::format("%s%d%s") % prefix % i % suffix).str();
-        new_path = file_system::to_full_path(new_path);
+        std::string format = (boost::format("%s%d%s") % prefix % i % suffix).str();
+        boost::filesystem::path new_path = file_system::get_temp_dir() + "/" + format;
+        new_path = boost::filesystem::absolute(new_path);
 
-        boost::shared_ptr<file_path> path(file_path::create(new_path));
-        if (! file_system::dir_exists(path->get_dir_path()))
+        if (! file_system::dir_exists(new_path.parent_path().generic_string()))
         {
-          file_system::mkdir(path->get_dir_path(), true);
+          file_system::mkdir(new_path.parent_path().generic_string(), true);
         }
 
-        if (file_system::file_exists(new_path)) { continue; }
-        else if (file_system::dir_exists(new_path)) { continue; }
-        else
-        {
-          FILE *out = fopen(new_path.c_str(), "a+");
-          if (out == NULL) { continue; }
-          else
-          {
-            fclose(out);
-            tmp->path = new_path;
-            break;
-          }
-        }
+        if (file_system::exists(new_path.generic_string())) { continue; }
+        if (! file_system::touch(new_path.generic_string())) { continue; }
+        tmp->path_str = new_path.generic_string();
+        break;
       }
-      return tmp;
     }
     catch (...) {
-      delete tmp;
+      tmp.reset();
+      fprintf(stderr, "error on temp name instance creation\n");
     }
+    return tmp;
   }
 
   int temp_name::create_l(lua_State *L)
@@ -221,25 +214,22 @@ namespace lev
   }
 
 
-  class myFileName : public wxFileName
+  class myFilePath
   {
     public:
-      myFileName(const wxFileName &path)
-        : wxFileName(path), tmp(NULL)
+      myFilePath(const std::string &path,
+                 boost::shared_ptr<temp_name> tmp = boost::shared_ptr<temp_name>())
+        : p(path), tmp(tmp)
       { }
 
-      virtual ~myFileName()
+      virtual ~myFilePath()
       {
-        if (tmp)
-        {
-          delete tmp;
-          tmp = NULL;
-        }
       }
 
-      temp_name *tmp;
+      boost::filesystem::path p;
+      boost::shared_ptr<temp_name> tmp;
   };
-  static myFileName* cast_path(void *obj) { return (myFileName *)obj; }
+  static myFilePath* cast_path(void *obj) { return (myFilePath *)obj; }
 
   file_path::file_path() : _obj(NULL) { }
 
@@ -254,24 +244,24 @@ namespace lev
 
   bool file_path::clear()
   {
-    cast_path(_obj)->Clear();
+    cast_path(_obj)->p.clear();
     return true;
   }
 
-  file_path* file_path::create(const std::string &path)
+  boost::shared_ptr<file_path> file_path::create(const std::string &path)
   {
-    file_path* fpath = NULL;
-    myFileName *obj = NULL;
-    wxString url = wxFileSystem::FileNameToURL(wxString(path.c_str(), wxConvUTF8));
+    boost::shared_ptr<file_path> fpath;
     try {
-      fpath = new file_path;
-      fpath->_obj = obj = new myFileName(wxFileSystem::URLToFileName(url));
-      return fpath;
+      fpath.reset(new file_path);
+      if (! fpath) { throw -1; }
+      fpath->_obj = new myFilePath(path);
+      if (! fpath->_obj) { throw -2; }
     }
     catch (...) {
-      delete fpath;
-      return NULL;
+      fpath.reset();
+      fprintf(stderr, "error on file path instance creation\n");
     }
+    return fpath;
   }
 
   int file_path::create_l(lua_State *L)
@@ -303,22 +293,23 @@ namespace lev
     return 1;
   }
 
-  file_path* file_path::create_temp(const std::string &prefix, const std::string &suffix)
+  boost::shared_ptr<file_path> file_path::create_temp(const std::string &prefix,
+                                                      const std::string &suffix)
   {
-    file_path *fpath = NULL;
-    temp_name *tmp = NULL;
+    boost::shared_ptr<file_path> fpath;
     try {
-      tmp = temp_name::create(prefix, suffix);
-      if (tmp == NULL) { throw -1; }
-      fpath = file_path::create(tmp->get_name());
-      cast_path(fpath->_obj)->tmp = tmp;
-      return fpath;
+      boost::shared_ptr<temp_name> tmp(temp_name::create(prefix, suffix));
+      if (! tmp) { throw -1; }
+      fpath.reset(new file_path);
+      if (! fpath) { throw -2; }
+      fpath->_obj = new myFilePath(tmp->get_name(), tmp);
+      if (! fpath->_obj) { throw -3; }
     }
     catch (...) {
-      delete tmp;
-      delete fpath;
-      return NULL;
+      fpath.reset();
+      fprintf(stderr, "error on temp file path instance creation\n");
     }
+    return fpath;
   }
 
   int file_path::create_temp_l(lua_State *L)
@@ -352,6 +343,7 @@ namespace lev
     return 1;
   }
 
+  /*
   bool file_path::dir_exists()
   {
     return cast_path(_obj)->DirExists();
@@ -367,11 +359,13 @@ namespace lev
     return (const char *)cast_path(_obj)->GetPath().mb_str();
   }
 
+  */
   std::string file_path::get_full_path()
   {
-    return (const char *)cast_path(_obj)->GetFullPath().mb_str();
+    return boost::filesystem::absolute(cast_path(_obj)->p).generic_string();
   }
 
+  /*
   std::string file_path::get_ext()
   {
     return (const char *)cast_path(_obj)->GetExt().mb_str();
@@ -436,7 +430,6 @@ namespace lev
     return cast_path(_obj)->Touch();
   }
 
-
   class myFileSystem : public wxFileSystem
   {
     public:
@@ -462,37 +455,32 @@ namespace lev
 
   bool file_system::dir_exists(const std::string &dir_path)
   {
-    struct stat buf;
-
-    if (stat(dir_path.c_str(), &buf) == 0)
-    {
-      return S_ISDIR(buf.st_mode);
+    try {
+      return boost::filesystem::is_directory(dir_path);
     }
-    else { return false; }
+    catch (...) {
+      return false;
+    }
   }
 
   bool file_system::exists(const std::string &path)
   {
-    struct stat buf;
-
-    if (stat(path.c_str(), &buf) == 0)
-    {
-      if (S_ISREG(buf.st_mode)) { return true; }
-      else if (S_ISDIR(buf.st_mode)) { return true; }
-      else { return false; }
+    try {
+      return boost::filesystem::exists(path);
     }
-    else { return false; }
+    catch (...) {
+      return false;
+    }
   }
 
   bool file_system::file_exists(const std::string &file_path)
   {
-    struct stat buf;
-
-    if (stat(file_path.c_str(), &buf) == 0)
-    {
-      return S_ISREG(buf.st_mode);
+    try {
+      return boost::filesystem::is_regular_file(file_path);
     }
-    else { return false; }
+    catch (...) {
+      return false;
+    }
   }
 
   /*
@@ -566,12 +554,13 @@ namespace lev
     return (const char *)wxStandardPaths::Get().GetExecutablePath().mb_str();
   }
 
+  */
   std::string file_system::get_ext(const std::string &path)
   {
-    boost::shared_ptr<file_path> p(file_path::create(path));
-    return p->get_ext();
+    return boost::filesystem::path(path).extension().c_str();
   }
 
+  /*
   std::string file_system::get_resource_dir()
   {
     return (const char *)wxStandardPaths::Get().GetResourcesDir().mb_str();
@@ -581,22 +570,26 @@ namespace lev
 
   long file_system::get_size(const std::string &file_path)
   {
-    struct stat buf;
-
-    if (stat(file_path.c_str(), &buf) == 0)
-    {
-      return buf.st_size;
+    try {
+      return boost::filesystem::file_size(file_path);
     }
-    else { return -1; }
+    catch (...) {
+      return -1;
+    }
   }
 
-  /*
 
   std::string file_system::get_temp_dir()
   {
-    return (const char *)wxFileName::GetTempDir().mb_str();
+    try {
+      return boost::filesystem::temp_directory_path().generic_string();
+    }
+    catch (...) {
+      return "";
+    }
   }
 
+  /*
   std::string file_system::get_path()
   {
     return (const char *)cast_fs(_obj)->GetPath().mb_str();
@@ -605,15 +598,15 @@ namespace lev
 */
   bool file_system::mkdir(const std::string &path, bool force)
   {
-    // it's not completed yet...
-#if defined(__WIN32__) || defined(__WIN64__)
-    if (::mkdir(path.c_str()) != 0) { return true; }
-#else
-    if (::mkdir(path.c_str(), 0755) != 0) { return true; }
-#endif
-    return false;
-//    if (force) { flags = wxPATH_MKDIR_FULL; }
- //   return wxFileName::Mkdir(wxString(path.c_str(), wxConvUTF8), 0755, flags);
+    try {
+      if (force)
+      {
+        boost::filesystem::create_directories(path);
+        return true;
+      }
+      else { return boost::filesystem::create_directory(path); }
+    }
+    catch (...) { return false; }
   }
 
 /*
@@ -647,15 +640,19 @@ namespace lev
     return 1;
   }
 
-  bool file_system::remove(const char *path, bool force)
+  */
+  bool file_system::remove(const std::string &path, bool force)
   {
-    bool result;
-    result = wxRemoveFile(wxString(path, wxConvUTF8));
-    if (result) { return true; }
-    if (force) { result = wxRmdir(wxString(path, wxConvUTF8)); }
-    return result;
+    try {
+      if (force) { return boost::filesystem::remove_all(path); }
+      else { return boost::filesystem::remove(path); }
+    }
+    catch (...) {
+      return false;
+    }
   }
 
+  /*
   bool file_system::set_path(const std::string &path)
   {
     std::string full = file_system::to_full_path(path);
@@ -683,22 +680,33 @@ namespace lev
     return (const char *)wxFileSystem::URLToFileName(u).GetName().mb_str();
   }
 
+  */
+  std::string file_system::to_stem(const std::string &file_path)
+  {
+    try {
+      return boost::filesystem::path(file_path).stem().generic_string();
+    }
+    catch (...) {
+      return "";
+    }
+  }
+
+  /*
   std::string file_system::to_url(const std::string &filename)
   {
     wxString file(filename.c_str(), wxConvUTF8);
     return (const char *)wxFileSystem::FileNameToURL(file).mb_str();
   }
 
-  bool file_system::touch(const char *path)
+  */
+  bool file_system::touch(const std::string &path)
   {
-    file_path *p = file_path::create(path);
-    if (p == NULL) { return false; }
-    bool res = p->touch();
-    delete p;
-    return res;
+    FILE *w = fopen(path.c_str(), "a+");
+    if (! w) { return false; }
+    fclose(w);
+    return true;
   }
 
-*/
 }
 
 

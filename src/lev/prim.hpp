@@ -12,6 +12,7 @@
 
 #include "base.hpp"
 
+#include <boost/shared_ptr.hpp>
 #include <luabind/luabind.hpp>
 #include <string>
 
@@ -28,7 +29,8 @@ namespace lev
       color(const color &orig);
       color(unsigned char r = 0, unsigned char g = 0, unsigned char b = 0, unsigned char a = 255);
       color(unsigned long argb_code);
-      static color* create(unsigned char r, unsigned char g, unsigned char b, unsigned char a);
+      static boost::shared_ptr<color> create(unsigned char r, unsigned char g,
+                                             unsigned char b, unsigned char a);
       static int create_l(lua_State *L);
       unsigned char get_a() const { return a; }
       unsigned char get_b() const { return b; }
@@ -61,7 +63,7 @@ namespace lev
       size(int w, int h, int d = 0) : w(w), h(h), d(d), base() {}
       bool assign(int w, int h, int d = 0);
       bool assign_size(const size &sz) { return assign(sz.w, sz.h, sz.d); }
-      static size* create(int w, int h, int d = 0);
+      static boost::shared_ptr<size> create(int w, int h, int d = 0);
       static int create_l(lua_State *L);
       int get_d() const { return d; }
       int get_h() const { return h; }
@@ -85,7 +87,7 @@ namespace lev
       vector(int x = 0, int y = 0, int z = 0) : x(x), y(y), z(z) { }
       bool assign(int x = 0, int y = 0, int z = 0);
       bool assign_vector(const vector &vec) { return assign(vec.x, vec.y, vec.z); }
-      static vector* create(int x = 0, int y = 0, int z = 0);
+      static boost::shared_ptr<vector> create(int x = 0, int y = 0, int z = 0);
       static int create_l(lua_State *L);
       int get_x() const { return x; }
       int get_y() const { return y; }
@@ -107,21 +109,21 @@ namespace lev
   class point : public base
   {
     protected:
-      point() : vertex(NULL), col(NULL) { }
+      point();
     public:
       virtual ~point();
       bool clear_color();
-      static point* create(vector *vec, color *col = NULL);
+      static boost::shared_ptr<point> create(vector *vec, color *col);
       static int create_l(lua_State *L);
-      color*  get_color()  { return col; }
-      vector* get_vertex() { return vertex; }
+      boost::shared_ptr<color> get_color()  { return col; }
+      boost::shared_ptr<vector> get_vertex() { return vertex; }
       virtual type_id get_type_id() const { return LEV_TPOINT; }
       virtual const char *get_type_name() const { return "lev.prim.point"; }
       bool set_color(color *c);
       bool set_vertex(vector *v);
     protected:
-      vector *vertex;
-      color *col;
+      boost::shared_ptr<vector> vertex;
+      boost::shared_ptr<color> col;
   };
 
   class rect : public base

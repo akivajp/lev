@@ -8,9 +8,14 @@
 // Licence:     MIT License
 /////////////////////////////////////////////////////////////////////////////
 
+// pre-compiled header
 #include "prec.h"
+
+// declarations
 #include "lev/string.hpp"
 
+// libraries
+#include <luabind/raw_policy.hpp>
 
 int luaopen_lev_string(lua_State *L)
 {
@@ -25,31 +30,31 @@ int luaopen_lev_string(lua_State *L)
     namespace_("string"),
     namespace_("classes")
     [
-      class_<unistr, base>("unistr")
-        .def("append", &unistr::append)
-        .def("append", &unistr::append_utf8)
-        .def("cmp", &unistr::compare_with)
-        .def("compare", &unistr::compare_with)
-        .def("empty", &unistr::empty)
-        .def("find", &unistr::find)
-        .def("find", &unistr::find_utf8)
-        .def("index_code", &unistr::index)
-        .def("index", &unistr::index_str, adopt(result))
-        .property("len", &unistr::len)
-        .property("length", &unistr::len)
-        .property("str", &unistr::to_utf8, &unistr::assign_utf8)
-        .property("string", &unistr::to_utf8, &unistr::assign_utf8)
-        .def("sub", &unistr::sub_string, adopt(result))
-        .def("sub", &unistr::sub_string1, adopt(result))
-        .def("__eq", &unistr::compare)
-        .def("__concat", &unistr::concat, adopt(result))
-        .def("__len", &unistr::len)
-        .def("__tostring", &unistr::to_utf8)
+      class_<unicode_string, base>("unicode_string")
+        .def("append", &unicode_string::append)
+        .def("append", &unicode_string::append_utf8)
+        .def("cmp", &unicode_string::compare_with)
+        .def("compare", &unicode_string::compare_with)
+        .def("empty", &unicode_string::empty)
+        .def("find", &unicode_string::find)
+        .def("find", &unicode_string::find_utf8)
+        .def("index_code", &unicode_string::index)
+        .def("index", &unicode_string::index_str)
+        .property("len", &unicode_string::len)
+        .property("length", &unicode_string::len)
+        .property("str", &unicode_string::to_utf8, &unicode_string::assign_utf8)
+        .property("string", &unicode_string::to_utf8, &unicode_string::assign_utf8)
+        .def("sub", &unicode_string::sub_string)
+        .def("sub", &unicode_string::sub_string1)
+        .def("__eq", &unicode_string::compare)
+        .def("__concat", &unicode_string::concat, raw(_1))
+        .def("__len", &unicode_string::len)
+        .def("__tostring", &unicode_string::to_utf8)
         .scope
         [
-          def("concat", &unistr::concat, adopt(result)),
-          def("create", &unistr::create, adopt(result)),
-          def("create", &unistr::from_utf8, adopt(result))
+          def("concat", &unicode_string::concat, raw(_1)),
+          def("create", &unicode_string::create),
+          def("create", &unicode_string::from_utf8)
         ]
     ]
   ];
@@ -57,10 +62,11 @@ int luaopen_lev_string(lua_State *L)
   object classes = lev["classes"];
   object string = lev["string"];
 
-  string["concat"] = classes["unistr"]["concat"];
-  string["create"] = classes["unistr"]["create"];
-  string["unicode"] = classes["unistr"]["create"];
-  string["unistr"] = classes["unistr"]["create"];
+  string["concat"] = classes["unicode_string"]["concat"];
+  string["create"] = classes["unicode_string"]["create"];
+  string["unicode"] = classes["unicode_string"]["create"];
+  string["unistr"] = classes["unicode_string"]["create"];
+  string["utf16"] = classes["unicode_string"]["create"];
 
   globals(L)["package"]["loaded"]["lev.string"] = string;
   return 0;
@@ -226,21 +232,21 @@ namespace lev
 
   static myString* cast_str(void *obj) { return (myString *)obj; }
 
-  unistr::unistr() : base(), _obj(NULL) { }
+  unicode_string::unicode_string() : base(), _obj(NULL) { }
 
-  unistr::unistr(const std::string &src) : base(), _obj(NULL)
+  unicode_string::unicode_string(const std::string &src) : base(), _obj(NULL)
   {
     _obj = myString::FromUTF8(src);
     if (! _obj) { _obj = myString::FromUTF8(""); }
   }
 
-  unistr::unistr(const unistr &src) : base(), _obj(NULL)
+  unicode_string::unicode_string(const unicode_string &src) : base(), _obj(NULL)
   {
     _obj = myString::Clone(*cast_str(src._obj));
     if (! _obj) { _obj = myString::FromUTF8(""); }
   }
 
-  unistr::~unistr()
+  unicode_string::~unicode_string()
   {
     if (_obj)
     {
@@ -249,13 +255,13 @@ namespace lev
     }
   }
 
-  unistr &unistr::append(const unistr &str)
+  unicode_string &unicode_string::append(const unicode_string &str)
   {
     cast_str(_obj)->str.append(cast_str(str._obj)->str);
     return *this;
   }
 
-  bool unistr::assign_utf8(const std::string &src)
+  bool unicode_string::assign_utf8(const std::string &src)
   {
     myString *str = myString::FromUTF8(src);
     if (! str) { return false; }
@@ -264,7 +270,7 @@ namespace lev
     return true;
   }
 
-  bool unistr::compare(luabind::object op1, luabind::object op2)
+  bool unicode_string::compare(luabind::object op1, luabind::object op2)
   {
     using namespace luabind;
 
@@ -280,7 +286,7 @@ namespace lev
     }
   }
 
-  bool unistr::compare_with(luabind::object rhs)
+  bool unicode_string::compare_with(luabind::object rhs)
   {
     using namespace luabind;
 
@@ -295,78 +301,84 @@ namespace lev
     }
   }
 
-  unistr* unistr::concat(luabind::object op1, luabind::object op2)
+  boost::shared_ptr<unicode_string> unicode_string::concat(lua_State *L,
+                                                           luabind::object op1,
+                                                           luabind::object op2)
   {
     using namespace luabind;
 
-    unistr *uni = NULL;
-    lua_State *L = op1.interpreter();
+    boost::shared_ptr<unicode_string> uni;
+    if (! L) { return uni; }
     try {
-      uni = new unistr;
+      uni.reset(new unicode_string);
+      if (! uni) { throw -1; }
       const char *str1 = object_cast<const char *>(globals(L)["tostring"](op1));
       const char *str2 = object_cast<const char *>(globals(L)["tostring"](op2));
       uni->_obj = myString::FromUTF8(std::string(str1) + str2);
-      if (! uni->_obj) { throw -1; }
-      return uni;
+      if (! uni->_obj) { throw -2; }
     }
     catch (...) {
-      delete uni;
-      return NULL;
+      uni.reset();
+      fprintf(stderr, "error on unicode string concatination of two strings\n");
     }
+    return uni;
   }
 
-  bool unistr::empty() const
+  bool unicode_string::empty() const
   {
     return cast_str(_obj)->str.empty();
   }
 
-  int unistr::find(const unistr &str)
+  int unicode_string::find(const unicode_string &str)
   {
     return cast_str(_obj)->str.find(cast_str(str._obj)->str);
   }
 
-  unistr* unistr::from_utf8(const std::string &src)
+  boost::shared_ptr<unicode_string> unicode_string::from_utf8(const std::string &src)
   {
-    unistr *u = NULL;
+    boost::shared_ptr<unicode_string> u;
     try {
-      u = new unistr;
+      u.reset(new unicode_string);
+      if (! u) { throw -1; }
       u->_obj = myString::FromUTF8(src);
-      if (! u->_obj) { throw -1; }
-      return u;
+      if (! u->_obj) { throw -2; }
     }
     catch (...) {
-      delete u;
-      return NULL;
+      u.reset();
+      fprintf(stderr, "error on unicode string instance creation from utf8 string\n");
     }
+    return u;
   }
 
-  long unistr::index(size_t pos) const
+  long unicode_string::index(size_t pos) const
   {
     if (pos < cast_str(_obj)->str.length()) { return cast_str(_obj)->str[pos]; }
     else { return -1; }
   }
 
-  size_t unistr::len() const
+  size_t unicode_string::len() const
   {
     return cast_str(_obj)->str.length();
   }
 
-  unistr* unistr::sub_string(size_t from, size_t to) const
+  boost::shared_ptr<unicode_string> unicode_string::sub_string(size_t from,
+                                                               size_t to) const
   {
-    unistr *uni = NULL;
+    boost::shared_ptr<unicode_string> uni;
     try {
-      uni = new unistr;
+      uni.reset(new unicode_string);
+      if (! uni) { throw -1; }
       uni->_obj = myString::FromUTF16(cast_str(_obj)->str.substr(from, to));
-      if (! uni->_obj) { throw -1; }
-      return uni;
+      if (! uni->_obj) { throw -2; }
     }
     catch (...) {
-      delete uni;
-      return NULL;
+      uni.reset();
+      fprintf(stderr, "error on unicode sub string creation\n");
     }
+    return uni;
   }
 
-  std::string unistr::to_utf8() const
+  std::string unicode_string::to_utf8() const
   {
     std::string buf;
     cast_str(_obj)->ToUTF8(buf);
