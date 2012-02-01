@@ -496,17 +496,18 @@ namespace lev
     return assign_position_size(r.pos, r.sz);
   }
 
-  rect* rect::create(int x, int y, int w, int h)
+  boost::shared_ptr<rect> rect::create(int x, int y, int w, int h)
   {
-    rect *r = NULL;
+    boost::shared_ptr<rect> r;
     try {
-      r = new rect(x, y, w, h);
-      return r;
+      r.reset(new rect(x, y, w, h));
+      if (! r) { throw -1; }
     }
     catch (...) {
-      delete r;
-      return NULL;
+      r.reset();
+      fprintf(stderr, "error on rect instance creation\n");
     }
+    return r;
   }
 
   int rect::create_l(lua_State *L)

@@ -136,7 +136,7 @@ namespace lev
       bool assign(int x, int y, int w, int h);
       bool assign_position_size(const vector &v, const size &sz);
       bool assign_rect(const rect &r);
-      static rect* create(int x, int y, int w, int h);
+      static boost::shared_ptr<rect> create(int x, int y, int w, int h);
       static int create_l(lua_State *L);
       int get_bottom() const { return get_y() + sz.get_h(); }
       int get_h() const { return sz.get_h(); }

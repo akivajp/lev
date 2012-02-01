@@ -32,6 +32,7 @@ namespace lev
           LEV_TDRAWABLE,
             LEV_TIMAGE,
             LEV_TLAYOUT,
+            LEV_TMAP,
             LEV_TTEXTURE,
             LEV_TTRANSITION,
           LEV_TDRAWABLE_END,

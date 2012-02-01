@@ -64,8 +64,8 @@ namespace lev
       virtual int get_h() const;
       boost::shared_ptr<color> get_pixel(int x, int y);
       void* get_rawobj() const { return _obj; }
-      const rect get_rect() const;
-      const size get_size() const;
+      boost::shared_ptr<rect> get_rect() const;
+      boost::shared_ptr<size> get_size() const;
       virtual type_id get_type_id() const { return LEV_TIMAGE; }
       virtual const char *get_type_name() const { return "lev.image"; }
       virtual int get_w() const;
@@ -77,12 +77,11 @@ namespace lev
       bool reload(const std::string &filename);
       bool save(const std::string &filename) const;
       bool set_pixel(int x, int y, const color &c);
-//      static image* string(font *f, const std::string &str, const color *fore = NULL, const color *back = NULL, int spacing = 1);
       static boost::shared_ptr<image> string(font *f, const std::string &str,
                                              const color *fore = NULL,
+                                             const color *shade = NULL,
                                              const color *back = NULL,
                                              int spacing = 1);
-//      static image* string2(font *f, const std::string &str) { return string(f, str); }
       static int string_l(lua_State *L);
       bool stroke_circle(int x, int y, int radius, color *border, int width);
       bool stroke_line(int x1, int y1, int x2, int y2, color *border, int width,
@@ -111,7 +110,7 @@ namespace lev
       virtual type_id get_type_id() const { return LEV_TTEXTURE; }
       virtual int get_h() const;
       virtual int get_w() const;
-      virtual const char *get_type_name() const { return "lev.texture"; }
+      virtual const char *get_type_name() const { return "lev.image.texture"; }
       virtual bool is_texturized() { return true; }
       static boost::shared_ptr<texture> load(const std::string &file);
     protected:
@@ -149,16 +148,18 @@ namespace lev
       static boost::shared_ptr<transition> create_with_path(boost::shared_ptr<file_path> path);
       static boost::shared_ptr<transition> create_with_string(const std::string &image_path);
       static boost::shared_ptr<transition> create0() { return create(boost::shared_ptr<drawable>()); }
+      virtual int get_h() const;
       virtual type_id get_type_id() const { return LEV_TTRANSITION; }
-      virtual const char *get_type_name() const { return "lev.transition"; }
+      virtual const char *get_type_name() const { return "lev.image.transition"; }
+      virtual int get_w() const;
       bool is_running();
       bool rewind();
       bool set_current(boost::shared_ptr<drawable> current);
-      bool set_current_with_path(boost::shared_ptr<file_path> path);
-      bool set_current_with_string(const std::string &image_path);
-      bool set_next(boost::shared_ptr<drawable> next, int duration = 1000, const std::string &type = "");
-      bool set_next_with_path(boost::shared_ptr<file_path> path, int duration = 1000, const std::string &type = "");
-      bool set_next_with_string(const std::string &image_path, int duration = 1000, const std::string &type = "");
+      bool set_current(const std::string &image_path);
+      static int set_current_l(lua_State *L);
+      bool set_next(boost::shared_ptr<drawable> next, double duration = 1000, const std::string &mode = "");
+      bool set_next(const std::string &image_path, double duration = 1000, const std::string &mode = "");
+      static int set_next_l(lua_State *L);
       virtual bool texturize(bool force = false);
     protected:
       void *_obj;
@@ -173,7 +174,7 @@ namespace lev
       virtual bool clear(const color &c);
       virtual bool clear0() { return clear(color::transparent()); }
       bool complete();
-      static layout* create(int width_stop = -1);
+      static boost::shared_ptr<layout> create(int width_stop = -1);
       virtual bool draw_on_image(image *dst, int x = 0, int y = 0, unsigned char alpha = 255);
       virtual bool draw_on_screen(screen *dst, int x = 0, int y = 0, unsigned char alpha = 255);
       color &get_fg_color();
@@ -181,8 +182,9 @@ namespace lev
       virtual int get_h() const;
       font *get_ruby_font();
       int get_spacing();
+      boost::shared_ptr<color> get_shade_color();
       virtual type_id get_type_id() const { return LEV_TLAYOUT; }
-      virtual const char *get_type_name() const { return "lev.layout"; }
+      virtual const char *get_type_name() const { return "lev.image.layout"; }
       virtual int get_w() const;
       bool is_done();
       bool on_hover(int x, int y);
@@ -198,6 +200,7 @@ namespace lev
       bool set_fg_color(const color &fg);
       bool set_font(font *f);
       bool set_on_hover(const std::string &name, luabind::object hover_func);
+      bool set_shade_color(const color *c);
       bool set_ruby_font(font *f);
       bool set_spacing(int space = 1);
       bool show_next();

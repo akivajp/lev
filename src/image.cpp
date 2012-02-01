@@ -17,6 +17,7 @@
 // dependencies
 #include "lev/font.hpp"
 #include "lev/fs.hpp"
+#include "lev/map.hpp"
 #include "lev/util.hpp"
 #include "lev/system.hpp"
 #include "lev/timer.hpp"
@@ -108,12 +109,6 @@ int luaopen_lev_image(lua_State *L)
       class_<transition, drawable, boost::shared_ptr<base> >("transition")
         .property("is_running", &transition::is_running)
         .def("rewind", &transition::rewind)
-        .def("set_current", &transition::set_current)
-        .def("set_current", &transition::set_current_with_path)
-        .def("set_current", &transition::set_current_with_string)
-        .def("set_next", &transition::set_next)
-        .def("set_next", &transition::set_next_with_path)
-        .def("set_next", &transition::set_next_with_string)
         .scope
         [
           def("create", &transition::create),
@@ -132,6 +127,7 @@ int luaopen_lev_image(lua_State *L)
         .property("fore",  &layout::get_fg_color, &layout::set_fg_color)
         .property("is_done", &layout::is_done)
         .def("on_hover", &layout::on_hover)
+        .def("on_lclick", &layout::on_left_click)
         .def("on_left_click", &layout::on_left_click)
         .def("reserve_clickable", &layout::reserve_clickable)
         .def("reserve_clickable", &layout::reserve_clickable_text)
@@ -141,6 +137,8 @@ int luaopen_lev_image(lua_State *L)
         .def("reserve_word", &layout::reserve_word1)
         .property("ruby",  &layout::get_ruby_font, &layout::set_ruby_font)
         .property("ruby_font",  &layout::get_ruby_font, &layout::set_ruby_font)
+        .property("shade", &layout::get_shade_color, &layout::set_shade_color)
+        .property("shade_color", &layout::get_shade_color, &layout::set_shade_color)
         .property("space",  &layout::get_spacing, &layout::set_spacing)
         .property("spacing",  &layout::get_spacing, &layout::set_spacing)
         .def("set_on_hover", &layout::set_on_hover)
@@ -148,7 +146,17 @@ int luaopen_lev_image(lua_State *L)
         .property("text_font",  &layout::get_font, &layout::set_font)
         .scope
         [
-          def("create", &layout::create, adopt(result))
+          def("create", &layout::create)
+        ],
+      class_<map, drawable, boost::shared_ptr<base> >("map")
+        .def("clear", &map::clear)
+        .def("on_hover", &map::on_hover)
+        .def("on_lclick", &map::on_left_click)
+        .def("on_left_click", &map::on_left_click)
+        .def("pop_back", &map::pop_back)
+        .scope
+        [
+          def("create", &map::create)
         ]
     ]
   ];
@@ -162,15 +170,20 @@ int luaopen_lev_image(lua_State *L)
   register_to(classes["image"], "string", &image::string_l);
   register_to(classes["image"], "sub", &image::sub_image_l);
   register_to(classes["image"], "sub_image", &image::sub_image_l);
+  register_to(classes["map"], "map_image", &map::map_image_l);
+  register_to(classes["map"], "map_link", &map::map_link_l);
+  register_to(classes["transition"], "set_current", &transition::set_current_l);
+  register_to(classes["transition"], "set_next", &transition::set_next_l);
 
 //  image["animation"]   = classes["animation"]["create"];
   image["create"]      = classes["image"]["create"];
   image["layout"]      = classes["layout"]["create"];
 //  image["levana_icon"] = classes["image"]["levana_icon"];
   image["load"]        = classes["image"]["load"];
+  image["map"]         = classes["map"]["create"];
   image["string"]      = classes["image"]["string"];
   image["tex2d"]       = classes["texture"]["create"];
-  image["texture"]       = classes["texture"]["create"];
+  image["texture"]     = classes["texture"]["create"];
   image["transition"]  = classes["transition"]["create"];
 
   globals(L)["package"]["loaded"]["lev.image"] = image;
@@ -553,9 +566,9 @@ namespace lev
 
         img->draw(src, x, y, a);
       }
-      else if (t["lev.layout1"])
+      else if (t["lev.image.layout1"])
       {
-        layout *src = object_cast<layout *>(t["lev.layout1"]);
+        layout *src = object_cast<layout *>(t["lev.image.layout1"]);
 
         img->draw(src, x, y, a);
       }
@@ -590,7 +603,7 @@ namespace lev
 
         if (! str) { throw -1; }
 
-        boost::scoped_ptr<raster> r(f->rasterize_utf8(str, spacing));
+        boost::shared_ptr<raster> r = f->rasterize_utf8(str, spacing);
         if (! r) { throw -2; }
         img->draw_raster(r.get(), x, y, c);
       }
@@ -659,14 +672,14 @@ namespace lev
     return c;
   }
 
-  const rect image::get_rect() const
+  boost::shared_ptr<rect> image::get_rect() const
   {
-    return rect(0, 0, get_w(), get_h());
+    return rect::create(0, 0, get_w(), get_h());
   }
 
-  const size image::get_size() const
+  boost::shared_ptr<size> image::get_size() const
   {
-    return size(get_w(), get_h());
+    return size::create(get_w(), get_h());
   }
 
   int image::get_w() const
@@ -704,11 +717,12 @@ namespace lev
   {
     boost::shared_ptr<image> img;
     try {
+      if (! file_system::file_exists(filename)) { throw -1; }
       int w, h;
       boost::shared_ptr<unsigned char> buf(stbi_load(filename.c_str(), &w, &h, NULL, 4), stbi_image_free);
-      if (! buf) { throw -1; }
+      if (! buf) { throw -2; }
       img = image::create(w, h);
-      if (! img) { throw -2; }
+      if (! img) { throw -3; }
 
       for (int y = 0; y < h; y++)
       {
@@ -768,9 +782,10 @@ namespace lev
   }
 
 
-//  image* image::string(font *f, const std::string &str, const color *fore, const color *back, int spacing)
   boost::shared_ptr<image> image::string(font *f, const std::string &str,
-                                         const color *fore, const color *back,
+                                         const color *fore,
+                                         const color *shade,
+                                         const color *back,
                                          int spacing)
   {
     boost::shared_ptr<image> img;
@@ -782,13 +797,24 @@ namespace lev
     if (back) { bg = *back; }
 
     try {
-      boost::scoped_ptr<raster> r(f->rasterize_utf8(str, spacing));
+      boost::shared_ptr<raster> r = f->rasterize_utf8(str, spacing);
       if (! r) { throw -1; }
-      img = image::create(r->get_w(), r->get_h());
-      if (! img) { throw -2; }
-      img->clear(bg);
-      img->draw_raster(r.get(), 0, 0, &fg);
-      return img;
+
+      if (shade)
+      {
+        img = image::create(r->get_w() + 1, r->get_h() + 1);
+        if (! img) { throw -2; }
+        img->clear(bg);
+        img->draw_raster(r.get(), 1, 1, shade);
+        img->draw_raster(r.get(), 0, 0, &fg);
+      }
+      else
+      {
+        img = image::create(r->get_w(), r->get_h());
+        if (! img) { throw -2; }
+        img->clear(bg);
+        img->draw_raster(r.get(), 0, 0, &fg);
+      }
     }
     catch (...) {
       img.reset();
@@ -800,54 +826,65 @@ namespace lev
   int image::string_l(lua_State *L)
   {
     using namespace luabind;
-    const char *str = NULL;
-    object font, fore, back;
-    int spacing = 1;
 
-    object t = util::get_merged(L, 1, -1);
+    try {
+      const char *str = NULL;
+      object font, fore, back, shade;
+      int spacing = 1;
 
-    if (t["lua.string1"]) { str = object_cast<const char *>(t["lua.string1"]); }
-    else if (t["lev.unistr1"]) { str = object_cast<const char *>(t["lev.unistr1"]["str"]); }
-    else if (t["text"]) { str = object_cast<const char *>(t["text"]); }
-    else if (t["t"]) { str = object_cast<const char *>(t["t"]); }
-    else if (t["string"]) { str = object_cast<const char *>(t["string"]); }
-    else if (t["str"]) { str = object_cast<const char *>(t["str"]); }
+      object t = util::get_merged(L, 1, -1);
+      if (t["lua.string1"]) { str = object_cast<const char *>(t["lua.string1"]); }
+      else if (t["lev.unistr1"]) { str = object_cast<const char *>(t["lev.unistr1"]["str"]); }
+      else if (t["text"]) { str = object_cast<const char *>(t["text"]); }
+      else if (t["t"]) { str = object_cast<const char *>(t["t"]); }
+      else if (t["string"]) { str = object_cast<const char *>(t["string"]); }
+      else if (t["str"]) { str = object_cast<const char *>(t["str"]); }
+      if (not str)
+      {
+        luaL_error(L, "text (string) is not specified!\n");
+        return 0;
+      }
 
-    if (not str)
-    {
-      luaL_error(L, "text (string) is not specified!\n");
-      return 0;
+      if (t["lev.font"]) { font = t["lev.font"]; }
+      else if (t["font"]) { font = t["font"]; }
+      else if (t["f"]) { font = t["f"]; }
+      else
+      {
+        font = globals(L)["lev"]["font"]["load"]();
+      }
+
+      if (t["lev.prim.color1"]) { fore = t["lev.prim.color1"]; }
+      else if (t["fg_color"]) { fore = t["fg_color"]; }
+      else if (t["fg"]) { fore = t["fg"]; }
+      else if (t["fore"]) { fore = t["fore"]; }
+      else if (t["f"]) { fore = t["f"]; }
+      else if (t["color"]) { fore = t["color"]; }
+      else if (t["c"]) { fore = t["c"]; }
+
+      if (t["lev.prim.color2"]) { shade = t["lev.prim.color2"]; }
+      else if (t["shade_color"]) { shade = t["shade_color"]; }
+      else if (t["shade"]) { shade = t["shade"]; }
+      else if (t["sh"]) { shade = t["sh"]; }
+      else if (t["s"]) { shade = t["s"]; }
+
+      if (t["lev.prim.color3"]) { back = t["lev.prim.color3"]; }
+      else if (t["bg_color"]) { back = t["bg_color"]; }
+      else if (t["bg"]) { back = t["bg"]; }
+      else if (t["back"]) { back = t["back"]; }
+      else if (t["b"]) { back = t["b"]; }
+
+      if (t["lua.number1"]) { spacing = object_cast<int>(t["lua.number1"]); }
+      else if (t["spacing"]) { spacing = object_cast<int>(t["spacing"]); }
+      else if (t["space"]) { spacing = object_cast<int>(t["space"]); }
+
+      object o = globals(L)["lev"]["classes"]["image"]["string_c"](font, str, fore, shade, back, spacing);
+      o.push(L);
+      return 1;
     }
-
-    if (t["lev.font"]) { font = t["lev.font"]; }
-    else if (t["font"]) { font = t["font"]; }
-    else if (t["f"]) { font = t["f"]; }
-    else
-    {
-      font = globals(L)["lev"]["font"]["load"]();
+    catch (...) {
+      lua_pushnil(L);
+      return 1;
     }
-
-    if (t["lev.prim.color1"]) { fore = t["lev.prim.color1"]; }
-    else if (t["fg_color"]) { fore = t["fg_color"]; }
-    else if (t["fg"]) { fore = t["fg"]; }
-    else if (t["fore"]) { fore = t["fore"]; }
-    else if (t["f"]) { fore = t["f"]; }
-    else if (t["color"]) { fore = t["color"]; }
-    else if (t["c"]) { fore = t["c"]; }
-
-    if (t["lev.prim.color2"]) { back = t["lev.prim.color2"]; }
-    else if (t["bg_color"]) { back = t["bg_color"]; }
-    else if (t["bg"]) { back = t["bg"]; }
-    else if (t["back"]) { back = t["back"]; }
-    else if (t["b"]) { back = t["b"]; }
-
-    if (t["lua.number1"]) { spacing = object_cast<int>(t["lua.number1"]); }
-    else if (t["spacing"]) { spacing = object_cast<int>(t["spacing"]); }
-    else if (t["space"]) { spacing = object_cast<int>(t["space"]); }
-
-    object o = globals(L)["lev"]["classes"]["image"]["string_c"](font, str, fore, back, spacing);
-    o.push(L);
-    return 1;
   }
 //
 //  bool image::stroke_circle(int x, int y, int radius, color *border, int width)
@@ -1229,7 +1266,7 @@ namespace lev
   {
     public:
 
-      enum transition_type
+      enum transition_mode
       {
         LEV_TRAN_NONE = 0,
         LEV_TRAN_CROSS_FADE,
@@ -1249,8 +1286,9 @@ namespace lev
         myTransition *tran = NULL;
         try {
           tran = new myTransition;
+          if (! tran) { throw -1; }
           tran->sw = stop_watch::create();
-          if (! tran->sw) { throw -1; }
+          if (! tran->sw) { throw -2; }
 
           tran->sw->start();
           tran->imgs.push_back(img);
@@ -1275,9 +1313,10 @@ namespace lev
         if (imgs.size() == 0) { return false; }
         if (imgs[0])
         {
-          if (types.size() >= 1 && types[0] == LEV_TRAN_FADE_OUT)
+          if (modes.size() >= 1 && modes[0] == LEV_TRAN_FADE_OUT)
           {
-            imgs[0]->draw_on_screen(cv, x, y, alpha);
+//printf("FADE: alpha: %d, glad: %lf\n", (int)alpha, grad);
+            imgs[0]->draw_on_screen(cv, x, y, (1 - grad) * alpha);
           }
           else { imgs[0]->draw_on_screen(cv, x, y, alpha); }
         }
@@ -1285,7 +1324,7 @@ namespace lev
         if (imgs.size() == 1) { return true; }
         if (imgs[1])
         {
-          if (types[0] == LEV_TRAN_CROSS_FADE)
+          if (modes[0] == LEV_TRAN_CROSS_FADE)
           {
             imgs[1]->draw_on_screen(cv, x, y, alpha * grad);
           }
@@ -1296,7 +1335,7 @@ namespace lev
           sw->start(sw->get_time() - durations[0]);
           imgs.erase(imgs.begin());
           durations.erase(durations.begin());
-          types.erase(types.begin());
+          modes.erase(modes.begin());
         }
         return true;
       }
@@ -1308,8 +1347,9 @@ namespace lev
 
       bool SetCurrent(boost::shared_ptr<drawable> img)
       {
-        imgs.resize(0);
-        durations.resize(0);
+        imgs.clear();
+        durations.clear();
+        modes.clear();
         imgs.push_back(img);
         return true;
       }
@@ -1322,10 +1362,10 @@ namespace lev
           imgs.push_back(img);
           durations.push_back(duration);
 
-          if (type == "cross_fade") { types.push_back(LEV_TRAN_CROSS_FADE); }
-          else if (type == "fade") { types.push_back(LEV_TRAN_CROSS_FADE); }
-          else if (type == "fade_out") { types.push_back(LEV_TRAN_FADE_OUT); }
-          else { types.push_back(LEV_TRAN_CROSS_FADE); }
+          if (type == "cross_fade") { modes.push_back(LEV_TRAN_CROSS_FADE); }
+          else if (type == "fade") { modes.push_back(LEV_TRAN_CROSS_FADE); }
+          else if (type == "fade_out") { modes.push_back(LEV_TRAN_FADE_OUT); }
+          else { modes.push_back(LEV_TRAN_CROSS_FADE); }
         }
         catch (...) {
           return false;
@@ -1344,10 +1384,9 @@ namespace lev
         return at_least_one;
       }
 
-//      std::vector<luabind::object> imgs;
       std::vector<boost::shared_ptr<drawable> > imgs;
-      std::vector<long> durations;
-      std::vector<transition_type> types;
+      std::vector<double> durations;
+      std::vector<transition_mode> modes;
       boost::shared_ptr<stop_watch> sw;
   };
   static myTransition* cast_tran(void *obj) { return (myTransition *)obj; }
@@ -1356,9 +1395,7 @@ namespace lev
 
   transition::~transition()
   {
-//printf("DELETING TRANSITION!\n");
     if (_obj) { delete cast_tran(_obj); }
-//printf("END DELETE!\n");
   }
 
   boost::shared_ptr<transition> transition::create(boost::shared_ptr<drawable> img)
@@ -1393,6 +1430,18 @@ namespace lev
     return cast_tran(_obj)->DrawOn(cv, x, y, alpha);
   }
 
+  int transition::get_h() const
+  {
+    if (cast_tran(_obj)->imgs[0]) { return cast_tran(_obj)->imgs[0]->get_h(); }
+    else { return 0; }
+  }
+
+  int transition::get_w() const
+  {
+    if (cast_tran(_obj)->imgs[0]) { return cast_tran(_obj)->imgs[0]->get_w(); }
+    else { return 0; }
+  }
+
   bool transition::is_running()
   {
     if (cast_tran(_obj)->imgs.size() <= 1) { return false; }
@@ -1409,31 +1458,113 @@ namespace lev
     return cast_tran(_obj)->SetCurrent(current);
   }
 
-  bool transition::set_current_with_path(boost::shared_ptr<file_path> path)
-  {
-    return cast_tran(_obj)->SetCurrent(image::load(path->get_full_path()));
-  }
-
-  bool transition::set_current_with_string(const std::string &image_path)
+  bool transition::set_current(const std::string &image_path)
   {
     return cast_tran(_obj)->SetCurrent(image::load(image_path));
   }
 
-  bool transition::set_next(boost::shared_ptr<drawable> next, int duration, const std::string &type)
+  int transition::set_current_l(lua_State *L)
   {
-    return cast_tran(_obj)->SetNext(next, duration, type);
+    using namespace luabind;
+
+    try {
+      bool result = false;
+
+      luaL_checktype(L, 1, LUA_TUSERDATA);
+      transition *tran = object_cast<transition *>(object(from_stack(L, 1)));
+      object t = util::get_merged(L, 2, -1);
+
+      if (t["lev.image1"])
+      {
+        boost::shared_ptr<image> img = object_cast<boost::shared_ptr<image> >(t["lev.image1"]);
+        result = tran->set_current(img);
+      }
+      else if (t["lev.fs.file_path1"])
+      {
+        file_path* path = object_cast<file_path *>(t["lev.fs.file_path1"]);
+        result = tran->set_current(path->get_full_path());
+      }
+      else if (t["lua.string1"])
+      {
+        std::string path = object_cast<const char *>(t["lua.string1"]);
+        result = tran->set_current(path);
+      }
+      else
+      {
+        result = tran->set_current(boost::shared_ptr<drawable>());
+      }
+
+      lua_pushboolean(L, result);
+    }
+    catch (...) {
+      fprintf(stderr, "error on transition current image setting\n");
+      fprintf(stderr, "error message: %s\n", lua_tostring(L, -1));
+      lua_pushnil(L);
+    }
+    return 1;
   }
 
-  bool transition::set_next_with_path(boost::shared_ptr<file_path> path, int duration,
-                                      const std::string &type)
+  bool transition::set_next(boost::shared_ptr<drawable> next, double duration, const std::string &mode)
   {
-    return cast_tran(_obj)->SetNext(image::load(path->get_full_path()), duration, type);
+    return cast_tran(_obj)->SetNext(next, duration, mode);
   }
 
-  bool transition::set_next_with_string(const std::string &image_path, int duration,
-                                        const std::string &type)
+  bool transition::set_next(const std::string &image_path, double duration,
+                                        const std::string &mode)
   {
-    return cast_tran(_obj)->SetNext(image::load(image_path), duration, type);
+    return cast_tran(_obj)->SetNext(image::load(image_path), duration, mode);
+  }
+
+  int transition::set_next_l(lua_State *L)
+  {
+    using namespace luabind;
+
+    try {
+      double duration = 1;
+      std::string mode = "";
+      bool result = false;
+
+      luaL_checktype(L, 1, LUA_TUSERDATA);
+      transition *tran = object_cast<transition *>(object(from_stack(L, 1)));
+      object t = util::get_merged(L, 2, -1);
+
+      if (t["duration"]) { duration = object_cast<double>(t["duration"]); }
+      else if (t["d"]) { duration = object_cast<double>(t["d"]); }
+      else if (t["lua.number1"]) { duration = object_cast<double>(t["lua.number1"]); }
+
+      if (t["mode"]) { mode = object_cast<const char *>(t["mode"]); }
+      else if (t["m"]) { mode = object_cast<const char *>(t["m"]); }
+      else if (t["type"]) { mode = object_cast<const char *>(t["type"]); }
+      else if (t["t"]) { mode = object_cast<const char *>(t["t"]); }
+
+      if (t["lev.image1"])
+      {
+        image* img = object_cast<image *>(t["lev.image1"]);
+        result = tran->set_next(img->clone(), duration, mode);
+      }
+      else if (t["lev.fs.file_path1"])
+      {
+        file_path* path = object_cast<file_path *>(t["lev.fs.file_path1"]);
+        result = tran->set_next(path->get_full_path(), duration, mode);
+      }
+      else if (t["lua.string1"])
+      {
+        std::string path = object_cast<const char *>(t["lua.string1"]);
+        result = tran->set_next(path, duration, mode);
+      }
+      else
+      {
+        result = tran->set_next(boost::shared_ptr<drawable>(), duration, mode);
+      }
+
+      lua_pushboolean(L, result);
+    }
+    catch (...) {
+      fprintf(stderr, "error on transition next image setting\n");
+      fprintf(stderr, "error message: %s\n", lua_tostring(L, -1));
+      lua_pushnil(L);
+    }
+    return 1;
   }
 
   bool transition::texturize(bool force)
@@ -1443,21 +1574,41 @@ namespace lev
 
   class myLayout
   {
-    public:
+    protected:
 
       myLayout(int width_stop = -1)
         : h(-1), w(width_stop), current_x(0), last_index(0),
           font_text(), font_ruby(), spacing(1),
-          index_to_col(), index_to_row(), log(), rows()
+          index_to_col(), index_to_row(), log(), rows(),
+          color_shade()
       {
-        font_text.reset(font::load());
-        font_ruby.reset(font::load());
+        font_text = font::load();
+        font_ruby = font::load();
         if (font_ruby) { font_ruby->set_pixel_size(font_ruby->get_pixel_size() / 2); }
         color_fg = color::white();
+        color_shade = boost::shared_ptr<color>(new color(color::black()));
         hover_bg = color::transparent();
         hover_fg = color::red();
 
         rows.push_back(std::vector<boost::shared_ptr<image> >());
+      }
+
+    public:
+
+      ~myLayout() { }
+
+      static myLayout* Create(int width_stop)
+      {
+        myLayout *lay = NULL;
+        try {
+          lay = new myLayout;
+          if (! lay) { throw -1; }
+          return lay;
+        }
+        catch (...) {
+          delete lay;
+          return NULL;
+        }
       }
 
       int CalcMaxWidth()
@@ -1564,10 +1715,11 @@ namespace lev
 
         for (int i = 0; i < last_index; i++)
         {
-          std::map<int, rect>::iterator found = clickable_areas.find(i);
+          std::map<int, boost::shared_ptr<rect> >::iterator found = clickable_areas.find(i);
           if (found == clickable_areas.end()) { continue; }
-          const rect &r = found->second;
-          if (r.include(x, y))
+          boost::shared_ptr<rect> r = found->second;
+          if (! r) { continue; }
+          if (r->include(x, y))
           {
             if (hover_imgs.find(i) != hover_imgs.end())
             {
@@ -1597,10 +1749,12 @@ namespace lev
 
         for (int i = 0; i < last_index; i++)
         {
-          std::map<int, rect>::iterator found = clickable_areas.find(i);
+          std::map<int, boost::shared_ptr<rect> >::iterator found = clickable_areas.find(i);
           if (found == clickable_areas.end()) { continue; }
-          const rect &r = found->second;
-          if (r.include(x, y))
+          boost::shared_ptr<rect> r = found->second;
+          if (! r) { continue; }
+
+          if (r->include(x, y))
           {
             if (lclick_funcs.find(i) != lclick_funcs.end())
             {
@@ -1655,7 +1809,7 @@ namespace lev
           boost::shared_ptr<image> img;
           boost::shared_ptr<image> hover_img;
 
-          img = image::string(font_text.get(), text, &color_fg, NULL, spacing);
+          img = image::string(font_text.get(), text, &color_fg, color_shade.get(), NULL, spacing);
 //          img->stroke_line(0, img->get_h() - 1,
 //                           img->get_w() - 1, img->get_h() - 1, c, 1, "dot");
           hover_img = image::string(font_text.get(), text, &hover_fg, &hover_bg);
@@ -1706,13 +1860,16 @@ namespace lev
         try {
           boost::shared_ptr<image> img;
           if (ruby.empty()) {
-            img = image::string(font_text.get(), word, &color_fg, NULL, spacing);
+            img = image::string(font_text.get(), word,
+                                &color_fg, color_shade.get(), NULL, spacing);
             return ReserveImage(word, img);
           }
           else
           {
-            boost::shared_ptr<image> img_ruby(image::string(font_ruby.get(), ruby, &color_fg, NULL, spacing));
-            boost::shared_ptr<image> img_word(image::string(font_text.get(), word, &color_fg, NULL, spacing));
+            boost::shared_ptr<image> img_ruby;
+            boost::shared_ptr<image> img_word;
+            img_ruby = image::string(font_ruby.get(), ruby, &color_fg, color_shade.get(), NULL, spacing);
+            img_word = image::string(font_text.get(), word, &color_fg, color_shade.get(), NULL, spacing);
             if (!img_ruby || !img_word) { throw -1; }
             int h = img_ruby->get_h() + img_word->get_h();
             int w = img_ruby->get_w();
@@ -1758,8 +1915,8 @@ namespace lev
 
         if (hover_imgs.find(index) != hover_imgs.end())
         {
-          clickable_areas[index].assign_position_size(vector(x, y),
-                                                      rows[row_index][col_index]->get_size());
+          clickable_areas[index]->assign_position_size(vector(x, y),
+                                                       *rows[row_index][col_index]->get_size());
         }
         if (actives.size() <= index)
         {
@@ -1775,6 +1932,7 @@ namespace lev
 
       // format variables
       color color_fg;
+      boost::shared_ptr<color> color_shade;
       color hover_bg;
       color hover_fg;
       boost::shared_ptr<font> font_text;
@@ -1786,7 +1944,7 @@ namespace lev
       int current_x;
 
       // log and layout variables
-      std::map<int, rect> clickable_areas;
+      std::map<int, boost::shared_ptr<rect> > clickable_areas;
       std::map<int, luabind::object> hover_funcs;
       std::map<int, boost::shared_ptr<image> > hover_imgs;
       std::map<int, luabind::object> lclick_funcs;
@@ -1821,18 +1979,21 @@ namespace lev
     return cast_lay(_obj)->Complete();
   }
 
-  layout* layout::create(int width_stop)
+  boost::shared_ptr<layout> layout::create(int width_stop)
   {
-    layout* img = NULL;
+    boost::shared_ptr<layout> lay;
     try {
-      img = new layout;
-      img->_obj = new myLayout(width_stop);
-      return img;
+      lay.reset(new layout);
+      if (! lay) { throw -1; }
+      lay->_obj = myLayout::Create(width_stop);
+      if (! lay->_obj) { throw -2; }
     }
     catch (...) {
-      delete img;
-      return NULL;
+      lay.reset();
+      fprintf(stderr, "error on image layout instance creation\n");
+
     }
+    return lay;
   }
 
   bool layout::draw_on_image(image *dst, int x, int y, unsigned char alpha)
@@ -1863,6 +2024,11 @@ namespace lev
   font *layout::get_ruby_font()
   {
     return cast_lay(_obj)->font_ruby.get();
+  }
+
+  boost::shared_ptr<color> layout::get_shade_color()
+  {
+    return cast_lay(_obj)->color_shade;
   }
 
   int layout::get_spacing()
@@ -1951,6 +2117,18 @@ namespace lev
   bool layout::set_on_hover(const std::string &name, luabind::object hover_func)
   {
     return cast_lay(_obj)->SetOnHover(name, hover_func);
+  }
+
+  bool layout::set_shade_color(const color *c)
+  {
+    try {
+      if (c) { cast_lay(_obj)->color_shade.reset(new color(*c)); }
+      else { cast_lay(_obj)->color_shade.reset(); }
+      return true;
+    }
+    catch (...) {
+      return false;
+    }
   }
 
   bool layout::show_next()

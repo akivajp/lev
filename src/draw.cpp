@@ -17,6 +17,7 @@
 // dependencies
 #include "lev/font.hpp"
 #include "lev/image.hpp"
+#include "lev/map.hpp"
 #include "lev/util.hpp"
 #include "lev/window.hpp"
 #include "register.hpp"
@@ -150,8 +151,8 @@ namespace lev
           {
             continue;
           }
-          std::auto_ptr<color> pixel(src->get_pixel(real_src_x, real_src_y));
-          if (! pixel.get()) { continue; }
+          boost::shared_ptr<color> pixel(src->get_pixel(real_src_x, real_src_y));
+          if (! pixel) { continue; }
           unsigned char a = (unsigned short)pixel->get_a() * alpha / 255;
           if (a > 0)
           {
@@ -240,19 +241,24 @@ namespace lev
         drawable *src = object_cast<drawable *>(t["lev.image1"]);
         s->draw(src, x, y, a);
       }
-      else if (t["lev.texture1"])
+      else if (t["lev.image.map1"])
       {
-        drawable *src = object_cast<drawable *>(t["lev.texture1"]);
+        drawable *src = object_cast<drawable *>(t["lev.image.map1"]);
         s->draw(src, x, y, a);
       }
-      else if (t["lev.transition1"])
+      else if (t["lev.image.layout1"])
       {
-        drawable *src = object_cast<drawable *>(t["lev.transition1"]);
+        drawable *src = object_cast<drawable *>(t["lev.image.layout1"]);
         s->draw(src, x, y, a);
       }
-      else if (t["lev.layout1"])
+      else if (t["lev.image.texture1"])
       {
-        drawable *src = object_cast<drawable *>(t["lev.layout1"]);
+        drawable *src = object_cast<drawable *>(t["lev.image.texture1"]);
+        s->draw(src, x, y, a);
+      }
+      else if (t["lev.image.transition1"])
+      {
+        drawable *src = object_cast<drawable *>(t["lev.image.transition1"]);
         s->draw(src, x, y, a);
       }
       else if (t["lev.raster1"])
@@ -290,7 +296,7 @@ namespace lev
           return 1;
         }
 
-        std::auto_ptr<raster> r(f->rasterize_utf8(str, spacing));
+        boost::shared_ptr<raster> r = f->rasterize_utf8(str, spacing);
         if (! r.get()) { throw -2; }
         s->draw_raster(r.get(), x, y, c);
       }
@@ -512,61 +518,6 @@ namespace lev
 //    return img->draw_on(this, x, y, alpha);
 //  }
 //
-//
-//  int canvas::draw_l(lua_State *L)
-//  {
-//    using namespace luabind;
-//    canvas *cv = NULL;
-//    drawable *img = NULL;
-//
-//    luaL_checktype(L, 1, LUA_TUSERDATA);
-//    cv = object_cast<canvas *>(object(from_stack(L, 1)));
-//    object t = util::get_merged(L, 2, -1);
-//
-//    if (t["lev.layout1"])
-//    {
-//      img = object_cast<drawable *>(t["lev.layout1"]);
-//    }
-//    else if (t["lev.image1"])
-//    {
-//      img = object_cast<drawable *>(t["lev.image1"]);
-//    }
-//    else if (t["lev.animation1"])
-//    {
-//      img = object_cast<drawable *>(t["lev.animation1"]);
-//    }
-//    else if (t["lev.transition1"])
-//    {
-//      img = object_cast<drawable *>(t["lev.transition1"]);
-//    }
-//
-//    if (img)
-//    {
-//      int x = 0, y = 0;
-//      unsigned char a = 255;
-//
-//      if (t["x"]) { x = object_cast<int>(t["x"]); }
-//      else if (t["lua.number1"]) { x = object_cast<int>(t["lua.number1"]); }
-//
-//      if (t["y"]) { y = object_cast<int>(t["y"]); }
-//      else if (t["lua.number2"]) { y = object_cast<int>(t["lua.number2"]); }
-//
-//      if (t["alpha"]) { a = object_cast<int>(t["alpha"]); }
-//      else if (t["a"]) { a = object_cast<int>(t["a"]); }
-//      else if (t["lua.number3"]) { a = object_cast<int>(t["lua.number3"]); }
-//
-//      cv->draw_image(img, x, y, a);
-//      lua_pushboolean(L, true);
-//      return 1;
-//    }
-//    if (t["lev.prim.point1"])
-//    {
-//      point *pt = object_cast<point *>(t["lev.prim.point1"]);
-//      cv->draw_point(pt);
-//      lua_pushboolean(L, true);
-//      return 1;
-//    }
-//  }
 //
 //  bool canvas::draw_point(point *pt)
 //  {

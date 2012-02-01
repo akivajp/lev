@@ -8,7 +8,7 @@ SLIB = liblev.a
 OUT = a.out
 PCH = prec.h.gch
 RANLIB = ranlib
-SRC  = archive.cpp draw.cpp entry.cpp font.cpp fs.cpp image.cpp package.cpp prim.cpp \
+SRC  = archive.cpp draw.cpp entry.cpp font.cpp fs.cpp image.cpp map.cpp package.cpp prim.cpp \
        sound.cpp string.cpp system.cpp timer.cpp util.cpp window.cpp
 OBJS = $(SRC:%.cpp=%.o)
 DLIB = lev.so
@@ -69,6 +69,7 @@ font.o: font.cpp lev/font.hpp
 fs.o: fs.cpp lev/fs.hpp
 image.o: image.cpp lev/image.hpp
 main.o: main.cpp
+map.o: map.cpp lev/map.hpp
 package.o: package.cpp lev/package.hpp
 prim.o: prim.cpp lev/prim.hpp
 sound.o: sound.cpp lev/sound.hpp

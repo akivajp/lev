@@ -40,7 +40,7 @@ int luaopen_lev_font(lua_State *L)
         .property("w", &raster::get_w)
         .property("width", &raster::get_w),
       class_<font, base>("font")
-        .def("clone", &font::clone, adopt(result))
+        .def("clone", &font::clone)
         .property("family", &font::get_family)
         .property("family_name", &font::get_family)
         .property("index", &font::get_index, &font::set_index)
@@ -49,20 +49,20 @@ int luaopen_lev_font(lua_State *L)
         .property("style_name", &font::get_style)
         .property("pixel_size", &font::get_pixel_size, &font::set_pixel_size)
         .property("px_size", &font::get_pixel_size, &font::set_pixel_size)
-        .def("rasterize", &font::rasterize, adopt(result))
-        .def("rasterize", &font::rasterize1, adopt(result))
-        .def("rasterize", &font::rasterize_utf8, adopt(result))
-        .def("rasterize", &font::rasterize_utf8_1, adopt(result))
-        .def("rasterize", &font::rasterize_utf16, adopt(result))
-        .def("rasterize", &font::rasterize_utf16_1, adopt(result))
+        .def("rasterize", &font::rasterize)
+        .def("rasterize", &font::rasterize1)
+        .def("rasterize", &font::rasterize_utf8)
+        .def("rasterize", &font::rasterize_utf8_1)
+        .def("rasterize", &font::rasterize_utf16)
+        .def("rasterize", &font::rasterize_utf16_1)
         .property("size", &font::get_pixel_size, &font::set_pixel_size)
         .property("sz", &font::get_pixel_size, &font::set_pixel_size)
         .scope
         [
-          def("clone", &font::clone, adopt(result)),
-          def("load", &font::load, adopt(result)),
-          def("load", &font::load0, adopt(result)),
-          def("load", &font::load1, adopt(result))
+          def("clone", &font::clone),
+          def("load", &font::load),
+          def("load", &font::load0),
+          def("load", &font::load1)
         ]
     ]
   ];
@@ -91,9 +91,9 @@ namespace lev
     }
   }
 
-  raster* raster::concat(const std::vector<boost::shared_ptr<raster> > &array)
+  boost::shared_ptr<raster> raster::concat(const std::vector<boost::shared_ptr<raster> > &array)
   {
-    raster *r = NULL;
+    boost::shared_ptr<raster> r;
     try {
       int w = 0, h = 0;
       for (int i = 0; i < array.size(); i++)
@@ -125,30 +125,32 @@ namespace lev
           pos_x += array[i]->get_w();
         }
       }
-      return r;
     }
     catch (...) {
-      delete r;
-      return NULL;
+      r.reset();
+      fprintf(stderr, "error on raster instance concatination\n");
     }
+    return r;
   }
 
-  raster* raster::create(int width, int height)
+  boost::shared_ptr<raster> raster::create(int width, int height)
   {
-    raster* r = NULL;
-    if (width <= 0 || height <= 0) { return NULL; }
+    boost::shared_ptr<raster> r;
     try {
-      r = new raster;
+      if (width <= 0 || height <= 0) { throw -1; }
+      r.reset(new raster);
+      if (! r) { throw -2; }
       r->bitmap = new unsigned char [width * height];
+      if (! r->bitmap) { throw -3; }
       memset(r->bitmap, 0, width * height);
       r->w = width;
       r->h = height;
-      return r;
     }
     catch (...) {
-      delete r;
-      return NULL;
+      r.reset();
+      fprintf(stderr, "error on raster instance creation\n");
     }
+    return r;
   }
 
   unsigned char raster::get_pixel(int x, int y) const
@@ -288,19 +290,20 @@ namespace lev
   }
 
 
-  font* font::clone()
+  boost::shared_ptr<font> font::clone()
   {
-    font *f = NULL;
+    boost::shared_ptr<font> f;
     try {
-      f = new font;
+      f.reset(new font);
+      if (! f) { throw -1; }
       f->_obj = myFont::Clone(cast_font(_obj));
-      if (! f->_obj) { throw -1; }
-      return f;
+      if (! f->_obj) { throw -2; }
     }
     catch (...) {
-      delete f;
-      return NULL;
+      f.reset();
+      fprintf(stderr, "error on font instance cloning\n");
     }
+    return f;
   }
 
 
@@ -324,24 +327,25 @@ namespace lev
     return cast_font(_obj)->size;
   }
 
-  font* font::load(const std::string &file, int index)
+  boost::shared_ptr<font> font::load(const std::string &file, int index)
   {
-    font *f = NULL;
+    boost::shared_ptr<font> f;
     try {
-      f = new font;
+      f.reset(new font);
+      if (! f) { throw -1; }
       f->_obj = myFont::Load(file, index);
-      if (! f->_obj) { throw -1; }
-      return f;
+      if (! f->_obj) { throw -2; }
     }
     catch (...) {
-      delete f;
-      return NULL;
+      f.reset();
+      fprintf(stderr, "error on font instance loading\n");
     }
+    return f;
   }
 
-  raster *font::rasterize(unsigned long code, int spacing)
+  boost::shared_ptr<raster> font::rasterize(unsigned long code, int spacing)
   {
-    raster *r = NULL;
+    boost::shared_ptr<raster> r;
     try {
       FT_Face face = cast_font(_obj)->face;
       if (FT_Load_Char(face, code, 0)) { throw -1; }
@@ -360,6 +364,7 @@ namespace lev
 //      int offset_y = face->glyph->bitmap_top;
       int offset_y = h - face->glyph->bitmap_top;
       if (bmp.width <= 0) { w = get_pixel_size() / 2; }
+
 //      r = raster::create(w, h);
       r = raster::create(w, h * 1.3);
       if (! r) { throw -3; }
@@ -371,33 +376,37 @@ namespace lev
           r->set_pixel(offset_x + x, offset_y + y, bmp.buffer[y * bmp.pitch + x]);
         }
       }
-      return r;
     }
     catch (...) {
-      delete r;
-      return NULL;
+      r.reset();
+      fprintf(stderr, "error on rasterized character image creation\n");
     }
+    return r;
   }
 
-  raster *font::rasterize_utf8(const std::string &str, int spacing)
+  boost::shared_ptr<raster> font::rasterize_utf8(const std::string &str, int spacing)
   {
     return font::rasterize_utf16(unicode_string(str), spacing);
   }
 
-  raster *font::rasterize_utf16(const unicode_string &str, int spacing)
+  boost::shared_ptr<raster> font::rasterize_utf16(const unicode_string &str, int spacing)
   {
-    if (str.empty()) { return NULL; }
+    boost::shared_ptr<raster> r;
     try {
+      if (str.empty()) { throw -1; }
       std::vector<boost::shared_ptr<raster> > array;
       for (int i = 0; i < str.len(); i++)
       {
         array.push_back(boost::shared_ptr<raster>(rasterize(str.index(i), spacing)));
       }
-      return raster::concat(array);
+      r = raster::concat(array);
+      if (! r) { throw -2; }
     }
     catch (...) {
-      return NULL;
+      r.reset();
+      fprintf(stderr, "error on rasterized string image creation\n");
     }
+    return r;
   }
 
   bool font::set_index(int index)

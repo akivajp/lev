@@ -1,5 +1,7 @@
-require 'lev.std'
+require 'lev.system'
+require 'lev.image'
 
+system = lev.system()
 window = system:window()
 screen = window:screen()
 

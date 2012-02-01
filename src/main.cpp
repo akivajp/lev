@@ -109,8 +109,9 @@ static bool execute_path(lua_State *L, const std::string &path)
     std::string entry_name;
     for (int i = 0; i < entry_files_len; i++)
     {
+      std::string arc_name = boost::filesystem::path(path).stem().c_str();
       if (lev::archive::find_direct(path, entry_files[i], entry_name)
-          || lev::archive::find_direct(path, path + "/" + entry_files[i], entry_name))
+          || lev::archive::find_direct(path, arc_name + "/" + entry_files[i], entry_name))
       {
         std::string code;
         package::add_path(L, path);
