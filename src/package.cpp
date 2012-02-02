@@ -38,7 +38,8 @@ int luaopen_lev_package(lua_State *L)
   [
     namespace_("package")
     [
-      def("resolve", &package::resolve, raw(_1))
+      def("resolve", &package::resolve, raw(_1)),
+      def("search_font", &package::search_font, raw(_1))
     ]
   ];
   object lev = globals(L)["lev"];
@@ -50,7 +51,6 @@ int luaopen_lev_package(lua_State *L)
   register_to(package, "clear_search", &package::clear_search_l);
   register_to(package, "dofile", &package::dofile_l);
   register_to(package, "require", &package::require_l);
-  register_to(package, "search_font", &package::search_font_l);
 
   lev["require"] = package["require"];
 
@@ -477,16 +477,6 @@ namespace lev
     return object();
   }
 
-  int package::search_font_l(lua_State *L)
-  {
-    luaL_checkstring(L, 1);
-    const char *file = object_cast<const char *>(object(from_stack(L, 1)));
-    object found = search_font(L, file);
-    if (found) { found.push(L); }
-    else { lua_pushnil(L); }
-    return 1;
-  }
-
   bool package::set_archive_dir(lua_State *L, const std::string &archive_dir)
   {
     open(L);
@@ -527,6 +517,8 @@ namespace lev
       globals(L)["table"]["insert"](list, 1, "C:/Windows/Fonts");
 #endif
       globals(L)["table"]["insert"](list, 1, "./");
+      globals(L)["table"]["insert"](list, 1, "./font");
+      globals(L)["table"]["insert"](list, 1, "./fonts");
       return true;
     }
     catch (...) {

@@ -24,7 +24,6 @@
 
 // libraries
 #include <map>
-#include <luabind/dependency_policy.hpp>
 #include <luabind/luabind.hpp>
 #include <SDL/SDL.h>
 #include <vector>
@@ -895,6 +894,7 @@ printf("DETACHING TIMER!\n");
 
   bool system::is_running()
   {
+    if (! _obj) { return false; }
     return cast_sys(_obj)->running;
   }
 

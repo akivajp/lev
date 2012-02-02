@@ -5,6 +5,7 @@ RANLIB=ranlib
 
 UNZ_OBJS = miniunz.o unzip.o ioapi.o -lz
 ZIP_OBJS = minizip.o zip.o   ioapi.o -lz
+#MIN_OBJS = unzip.o zip.o ioapi.o
 MIN_OBJS = unzip.o zip.o ioapi.o
 
 .c.o:

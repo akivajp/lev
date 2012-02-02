@@ -133,6 +133,7 @@ int luaopen_lev_std(lua_State *L)
     globals(L)["require"]("lev.system");
     globals(L)["require"]("lev.timer");
     globals(L)["require"]("lev.util");
+    globals(L)["require"]("lev.window");
 
     globals(L)["system"] = globals(L)["lev"]["system"]();
 //    globals(L)["mixer"] = globals(L)["lev"]["sound"]["mixer"]();
@@ -176,6 +177,7 @@ namespace lev
     register_to(globals(L)["package"]["preload"], "lev.system", luaopen_lev_system);
     register_to(globals(L)["package"]["preload"], "lev.timer", luaopen_lev_timer);
     register_to(globals(L)["package"]["preload"], "lev.util", luaopen_lev_util);
+    register_to(globals(L)["package"]["preload"], "lev.window", luaopen_lev_window);
   }
 
 }

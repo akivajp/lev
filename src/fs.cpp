@@ -557,7 +557,7 @@ namespace lev
   */
   std::string file_system::get_ext(const std::string &path)
   {
-    return boost::filesystem::path(path).extension().c_str();
+    return boost::filesystem::path(path).extension().generic_string();
   }
 
   /*

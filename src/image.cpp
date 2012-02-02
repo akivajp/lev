@@ -1310,6 +1310,8 @@ namespace lev
           if (grad > 1.0) { grad = 1.0; }
         }
 
+//printf("IMGS.SIZE: %p, %d\n", imgs[0].get(), imgs.size());
+//printf("ALPHA: %ld\n", alpha);
         if (imgs.size() == 0) { return false; }
         if (imgs[0])
         {
@@ -1326,6 +1328,8 @@ namespace lev
         {
           if (modes[0] == LEV_TRAN_CROSS_FADE)
           {
+//printf("IMGS[1]: %p, %d\n", imgs[1].get(), (int)imgs.size());
+//printf("1 FADE: alpha: %d, glad: %lf\n", (int)alpha, grad);
             imgs[1]->draw_on_screen(cv, x, y, alpha * grad);
           }
         }
@@ -1544,7 +1548,8 @@ namespace lev
       }
       else if (t["lev.fs.file_path1"])
       {
-        file_path* path = object_cast<file_path *>(t["lev.fs.file_path1"]);
+        boost::shared_ptr<file_path> path =
+          object_cast<boost::shared_ptr<file_path> >(t["lev.fs.file_path1"]);
         result = tran->set_next(path->get_full_path(), duration, mode);
       }
       else if (t["lua.string1"])
@@ -1577,13 +1582,13 @@ namespace lev
     protected:
 
       myLayout(int width_stop = -1)
-        : h(-1), w(width_stop), current_x(0), last_index(0),
+        : h(0), w(width_stop), current_x(0), last_index(0),
           font_text(), font_ruby(), spacing(1),
           index_to_col(), index_to_row(), log(), rows(),
           color_shade()
       {
-        font_text = font::load();
-        font_ruby = font::load();
+        font_text = font::load0();
+        font_ruby = font::load0();
         if (font_ruby) { font_ruby->set_pixel_size(font_ruby->get_pixel_size() / 2); }
         color_fg = color::white();
         color_shade = boost::shared_ptr<color>(new color(color::black()));
@@ -1601,7 +1606,7 @@ namespace lev
       {
         myLayout *lay = NULL;
         try {
-          lay = new myLayout;
+          lay = new myLayout(width_stop);
           if (! lay) { throw -1; }
           return lay;
         }
@@ -1824,9 +1829,11 @@ namespace lev
       {
         try {
           if (! img) { throw -1; }
+//printf("W: %d, NEW W: %d\n", w, current_x + img->get_w());
           if (w >= 0 && current_x + img->get_w() > w)
           {
             rows.push_back(std::vector<boost::shared_ptr<image> >());
+//printf("NEW LINE!\n");
             current_x = 0;
           }
           current_x += img->get_w();
@@ -1915,8 +1922,8 @@ namespace lev
 
         if (hover_imgs.find(index) != hover_imgs.end())
         {
-          clickable_areas[index]->assign_position_size(vector(x, y),
-                                                       *rows[row_index][col_index]->get_size());
+          clickable_areas[index].reset(new rect(vector(x, y),
+                                                *rows[row_index][col_index]->get_size()));
         }
         if (actives.size() <= index)
         {

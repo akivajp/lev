@@ -9,6 +9,9 @@ img1 = lev.image.load('aaa.png')
 img2 = lev.image.load('test.png')
 map = lev.image.map()
 
+str = lev.image.string(lev.font.load(), 'TEXT')
+map:map_image(str, 0, 0)
+
 local lclick = function()
   print('LEFT CLICKED!!!')
 end

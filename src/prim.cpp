@@ -188,6 +188,7 @@ namespace lev
   int color::create_l(lua_State *L)
   {
     using namespace luabind;
+    unsigned long code = 0;
     unsigned char r = 0, g = 0, b = 0, a = 255;
     const char *name = NULL;
 
@@ -196,6 +197,20 @@ namespace lev
     if (t["name"]) { name = object_cast<const char *>(t["name"]); }
     else if (t["n"]) { name = object_cast<const char *>(t["n"]); }
     else if (t["lua.string1"]) { name = object_cast<const char *>(t["lua.string1"]); }
+
+    if (t["code"])
+    {
+      try {
+        code = object_cast<unsigned long>(t["code"]);
+        color c(code);
+        r = c.get_r();
+        g = c.get_g();
+        b = c.get_b();
+        a = c.get_a();
+      }
+      catch (...) {
+      }
+    }
 
     if (name)
     {

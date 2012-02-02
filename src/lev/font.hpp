@@ -56,7 +56,7 @@ namespace lev
       virtual type_id get_type_id() const { return LEV_TFONT; }
       virtual const char *get_type_name() const { return "lev.font"; }
       static boost::shared_ptr<font> load(const std::string &file = "default.ttf", int index = 0);
-      static boost::shared_ptr<font> load0() { return load(); }
+      static boost::shared_ptr<font> load0();
       static boost::shared_ptr<font> load1(const std::string &file) { return load(file); }
       boost::shared_ptr<raster> rasterize(unsigned long code, int spacing = 1);
       boost::shared_ptr<raster> rasterize1(unsigned long code) { return rasterize(code); }

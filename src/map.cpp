@@ -162,6 +162,7 @@ namespace lev
 
       bool OnLeftClick(int x, int y)
       {
+        lua_State *L = NULL;
         try {
           for (int i = 0; i < rects.size(); i++)
           {
@@ -169,6 +170,7 @@ namespace lev
             {
               if (funcs_lclick[i] && luabind::type(funcs_lclick[i]) == LUA_TFUNCTION)
               {
+                L = funcs_lclick[i].interpreter();
                 funcs_lclick[i]();
               }
             }
@@ -176,6 +178,7 @@ namespace lev
         }
         catch (...) {
           fprintf(stderr, "error on left click process on image map\n");
+          if (L) { fprintf(stderr, "error message: %s\n", lua_tostring(L, -1)); }
           return false;
         }
         return true;

@@ -42,7 +42,6 @@ namespace lev
       static int require_l(lua_State *L);
       static boost::shared_ptr<file_path> resolve(lua_State *L, const std::string &file);
       static luabind::object search_font(lua_State *L, const std::string &filename);
-      static int search_font_l(lua_State *L);
       static bool set_archive_dir(lua_State *L, const std::string &archive_dir);
       static bool set_default_font_dirs(lua_State *L);
   };

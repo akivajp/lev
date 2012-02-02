@@ -24,6 +24,7 @@
 #include "system.hpp"
 #include "timer.hpp"
 #include "util.hpp"
+#include "window.hpp"
 
 #endif // _LEV_HPP
 

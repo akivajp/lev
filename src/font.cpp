@@ -343,6 +343,16 @@ namespace lev
     return f;
   }
 
+  boost::shared_ptr<font> font::load0()
+  {
+    boost::shared_ptr<font> f = font::load("default.ttf");
+    if (f) { return f; }
+    f = font::load("font/default.ttf");
+    if (f) { return f; }
+    f = font::load("fonts/default.ttf");
+    return f;
+  }
+
   boost::shared_ptr<raster> font::rasterize(unsigned long code, int spacing)
   {
     boost::shared_ptr<raster> r;

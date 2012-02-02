@@ -1,3 +1,4 @@
+CC = gcc
 CXX = g++
 #CXXFLAGS = -fPIC -O2 -I/usr/include/freetype2 `/usr/local/bin/sdl-config --cflags` \
 	   -I./minizip
@@ -7,6 +8,7 @@ SHARED= -shared
 SLIB = liblev.a
 OUT = a.out
 PCH = prec.h.gch
+AR = ar
 RANLIB = ranlib
 SRC  = archive.cpp draw.cpp entry.cpp font.cpp fs.cpp image.cpp map.cpp package.cpp prim.cpp \
        sound.cpp string.cpp system.cpp timer.cpp util.cpp window.cpp
@@ -22,13 +24,14 @@ all: pch tags bin lib
 
 bin: $(OUT)
 
-lib: minizip/libminizip.a $(SLIB) $(DLIB)
+lib: $(SLIB) $(DLIB)
 
-dlib: $(DLIB)
-slib: $(SLIB)
+dlib: $(DLIB) minizip/libminizip.a
+slib: $(SLIB) minizip/libminizip.a
 
 minizip/libminizip.a: minizip
-	cd minizip && make MINIZIP_CFLAGS="$(MINIZIP_CFLAGS)"
+	cd minizip && make MINIZIP_CFLAGS="$(MINIZIP_CFLAGS)" RANLIB="$(RANLIB)" \
+		CC="$(CC)" AR=$(AR)
 
 win-bin: $(WIN_OUT)
 
@@ -56,7 +59,7 @@ $(OUT): minizip/libminizip.a $(OBJS) main.o
 	$(CXX) -o $(OUT) main.o $(OBJS) $(LIBS)
 
 $(SLIB): $(OBJS)
-	ar r $(SLIB) $(OBJS)
+	$(AR) r $(SLIB) $(OBJS)
 	$(RANLIB) $(SLIB)
 
 $(DLIB): $(OBJS)

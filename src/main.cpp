@@ -109,7 +109,7 @@ static bool execute_path(lua_State *L, const std::string &path)
     std::string entry_name;
     for (int i = 0; i < entry_files_len; i++)
     {
-      std::string arc_name = boost::filesystem::path(path).stem().c_str();
+      std::string arc_name = boost::filesystem::path(path).stem().generic_string();
       if (lev::archive::find_direct(path, entry_files[i], entry_name)
           || lev::archive::find_direct(path, arc_name + "/" + entry_files[i], entry_name))
       {
@@ -177,6 +177,10 @@ int main(int argc, char **argv)
 
   // nothing was done
   // run entry program
+  if (file_system::dir_exists(entry_dir[0]))
+  {
+    done_something = execute_path(L, entry_dir[0]);
+  }
   for (int i = 0; i < entry_files_len; i++)
   {
     if (done_something) { break; }
