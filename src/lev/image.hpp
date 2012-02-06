@@ -189,17 +189,16 @@ namespace lev
       bool is_done();
       bool on_hover(int x, int y);
       bool on_left_click(int x, int y);
-      bool reserve_clickable(const std::string &name, image *normal, image *hover,
-                             luabind::object lclick_func);
-      bool reserve_clickable_text(const std::string &name, const std::string &text,
-                                  luabind::object lclick_func);
-      bool reserve_image(const std::string &name, image *img);
+      bool reserve_clickable(boost::shared_ptr<image> normal, boost::shared_ptr<image> hover,
+                             luabind::object lclick_func, luabind::object hover_func);
+      bool reserve_clickable_text(const std::string &text,
+                                  luabind::object lclick_func, luabind::object hover_func);
+      bool reserve_image(boost::shared_ptr<image> img);
       bool reserve_new_line();
       bool reserve_word(const std::string &word, const std::string &ruby);
       bool reserve_word1(const std::string &word) { return reserve_word(word, ""); }
       bool set_fg_color(const color &fg);
       bool set_font(font *f);
-      bool set_on_hover(const std::string &name, luabind::object hover_func);
       bool set_shade_color(const color *c);
       bool set_ruby_font(font *f);
       bool set_spacing(int space = 1);

@@ -23,7 +23,7 @@ extern "C" { int luaopen_lev_sound(lua_State *L); }
 
 namespace lev
 {
-
+  class file_path;
   class system;
   class mixer;
 
@@ -43,9 +43,17 @@ namespace lev
       virtual const char *get_type_name() const { return "lev.sound"; }
       bool is_playing();
       bool load(const std::string &filename);
+      bool load_path(boost::shared_ptr<file_path> path);
       bool load_and_play(const std::string &filename, bool repeat = false);
       bool load_and_play1(const std::string &filename) { return load_and_play(filename); }
+      bool load_and_play_path(boost::shared_ptr<file_path> path, bool repeat = false);
+      bool load_and_play_path1(boost::shared_ptr<file_path> path)
+      {
+        return load_and_play_path(path);
+      }
+
       bool open(const std::string &filename);
+      bool open_path(boost::shared_ptr<file_path> path);
       bool pause() { return set_playing(false); }
       bool play(bool repeat = false) { return set_playing(true, repeat); }
       bool play0() { return play(); }

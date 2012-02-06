@@ -319,6 +319,14 @@ namespace lev
 
   bool util::open(const std::string &path, const std::string &type)
   {
+#ifdef _WIN32
+    ShellExecute(0, _T("open"), paht.c_str(), 0, 0, SW_SHOW_DEFAULT);
+    return true;
+#else
+    if (path.empty()) { return false; }
+    system((std::string("xdg-open ") + path).c_str());
+    return true;
+#endif // _WIN32
 //    wxMimeTypesManager manager;
 //    wxFileType *ft = NULL;
 //    if (! type.empty())

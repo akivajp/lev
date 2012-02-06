@@ -141,7 +141,6 @@ int luaopen_lev_image(lua_State *L)
         .property("shade_color", &layout::get_shade_color, &layout::set_shade_color)
         .property("space",  &layout::get_spacing, &layout::set_spacing)
         .property("spacing",  &layout::get_spacing, &layout::set_spacing)
-        .def("set_on_hover", &layout::set_on_hover)
         .def("show_next", &layout::show_next)
         .property("text_font",  &layout::get_font, &layout::set_font)
         .scope
@@ -1367,8 +1366,10 @@ namespace lev
           durations.push_back(duration);
 
           if (type == "cross_fade") { modes.push_back(LEV_TRAN_CROSS_FADE); }
+          else if (type == "crossfade") { modes.push_back(LEV_TRAN_CROSS_FADE); }
           else if (type == "fade") { modes.push_back(LEV_TRAN_CROSS_FADE); }
           else if (type == "fade_out") { modes.push_back(LEV_TRAN_FADE_OUT); }
+          else if (type == "fadeout") { modes.push_back(LEV_TRAN_FADE_OUT); }
           else { modes.push_back(LEV_TRAN_CROSS_FADE); }
         }
         catch (...) {
@@ -1581,11 +1582,19 @@ namespace lev
   {
     protected:
 
+      struct myItem
+      {
+        boost::shared_ptr<drawable> img;
+        boost::shared_ptr<drawable> img_hover;
+        boost::shared_ptr<drawable> img_showing;
+        luabind::object func_hover;
+        luabind::object func_lclick;
+      };
+
       myLayout(int width_stop = -1)
-        : h(0), w(width_stop), current_x(0), last_index(0),
+        : width_stop(width_stop),
           font_text(), font_ruby(), spacing(1),
-          index_to_col(), index_to_row(), log(), rows(),
-          color_shade()
+          items()
       {
         font_text = font::load0();
         font_ruby = font::load0();
@@ -1594,8 +1603,6 @@ namespace lev
         color_shade = boost::shared_ptr<color>(new color(color::black()));
         hover_bg = color::transparent();
         hover_fg = color::red();
-
-        rows.push_back(std::vector<boost::shared_ptr<image> >());
       }
 
     public:
@@ -1618,84 +1625,81 @@ namespace lev
 
       int CalcMaxWidth()
       {
-        int width = 0;
-        for (int i = 0; i < rows.size(); i++)
+        int max_w = 0;
+        int x = 0;
+        for (int i = 0; i < items.size(); i++)
         {
-          int current = CalcRowWidth(rows[i]);
-          if (current > width) { width = current; }
+          myItem &item = items[i];
+          if (! item.img || (width_stop > 0 && x > 0 && x + item.img->get_w() > width_stop))
+          {
+            // newline
+            if (x > max_w) { max_w = x; }
+            x = 0;
+          }
         }
-        return width;
+        return max_w;
       }
 
-      int CalcRowHeight(const std::vector<boost::shared_ptr<image> > &row)
+      vector CalcPosition(int index)
       {
-        int height = 0;
-        for (int i = 0; i < row.size(); i++)
+        int x = 0;
+        int y = 0;
+        int max_h = 0;
+        int final_x = 0;
+        for (int i = 0; i < items.size(); i++)
         {
-          if (row[i]->get_h() > height) { height = row[i]->get_h(); }
+          myItem &item = items[i];
+          if (! item.img || (width_stop > 0 && x > 0 && x + item.img->get_w() > width_stop))
+          {
+            // newline
+            x = 0;
+            y += max_h;
+            max_h = 0;
+            if (i > index) { break; }
+          }
+          if (i == index) { final_x = x; }
+          if (item.img)
+          {
+            // calc by next item
+            x += item.img->get_w();
+            if (item.img->get_h() > max_h) { max_h = item.img->get_h(); }
+          }
         }
-        return height;
-      }
-
-      int CalcRowWidth(const std::vector<boost::shared_ptr<image> > &row)
-      {
-        int width = 0;
-        for (int i = 0; i < row.size(); i++)
-        {
-          width += row[i]->get_w();
-        }
-        return width;
+        y += max_h;
+        return vector(final_x, y - items[index].img->get_h());
       }
 
       int CalcTotalHeight()
       {
-        int height = 0;
-        for (int i = 0; i < rows.size(); i++)
-        {
-          height += CalcRowHeight(rows[i]);
-        }
-        return height;
+        vector vec = CalcPosition(items.size() - 1);
+        return vec.get_y();
       }
 
       bool Clear()
       {
-        current_x = 0;
-        last_index = 0;
-        index_to_col.clear();
-        index_to_row.clear();
-        log.clear();
-        rows.clear();
-
-        actives.clear();
-        clickable_areas.clear();
-        coordinates.clear();
-        hover_funcs.clear();
-        hover_imgs.clear();
-        lclick_funcs.clear();
-        name_to_index.clear();
-
-        rows.push_back(std::vector<boost::shared_ptr<image> >());
+        items.clear();
         return true;
       }
 
       bool Complete()
       {
-        for (; last_index < log.size(); last_index++)
+        for ( ; ; )
         {
-          ShowIndex(last_index);
+          int i = GetNextIndex();
+          if (i < 0) { return true; }
+          ShowIndex(i);
         }
-        return true;
       }
-
 
       bool DrawOn(image *dst, int x, int y, unsigned char alpha)
       {
-        for (int i = 0; i < actives.size(); i++)
+        for (int i = 0; i < items.size(); i++)
         {
-          if (actives[i])
+          myItem &item = items[i];
+          if (item.img_showing)
           {
-            const vector &vec = coordinates[i];
-            actives[i]->draw_on_image(dst, x + vec.get_x(), y + vec.get_y(), alpha);
+            vector pos = CalcPosition(i);
+            item.img_showing->draw_on_image(dst, x + pos.get_x(), y + pos.get_y(), alpha);
           }
         }
         return true;
@@ -1703,46 +1707,62 @@ namespace lev
 
       bool DrawOn(screen *dst, int x, int y, unsigned char alpha)
       {
-        for (int i = 0; i < actives.size(); i++)
+        for (int i = 0; i < items.size(); i++)
         {
-          if (actives[i])
+          myItem &item = items[i];
+          if (item.img_showing)
           {
-            const vector &vec = coordinates[i];
-            actives[i]->draw_on_screen(dst, x + vec.get_x(), y + vec.get_y(), alpha);
+            vector pos = CalcPosition(i);
+//printf("i: %d, x: %d, y: %d\n", i, pos.get_x(), pos.get_y());
+            item.img_showing->draw_on_screen(dst, x + pos.get_x(), y + pos.get_y(), alpha);
           }
         }
+//printf("\n");
         return true;
+      }
+
+      int GetNextIndex()
+      {
+        for (int i = 0; i < items.size(); i++)
+        {
+          if (! items[i].img) { continue; }
+          if (! items[i].img_showing) { return i; }
+        }
+        return -1;
       }
 
       bool OnHover(int x, int y)
       {
         using namespace luabind;
 
-        for (int i = 0; i < last_index; i++)
+        for (int i = 0; i < items.size(); i++)
         {
-          std::map<int, boost::shared_ptr<rect> >::iterator found = clickable_areas.find(i);
-          if (found == clickable_areas.end()) { continue; }
-          boost::shared_ptr<rect> r = found->second;
-          if (! r) { continue; }
-          if (r->include(x, y))
+          myItem &item = items[i];
+
+          if (! item.img_hover) { continue; }
+          if (! item.img_showing) { continue; }
+
+          vector pos = CalcPosition(i);
+          rect r(pos.get_x(), pos.get_y(), item.img->get_w(), item.img->get_h());
+          if (r.include(x, y))
           {
-            if (hover_imgs.find(i) != hover_imgs.end())
+            // (x, y) is in the rect
+            if (item.img_showing != item.img_hover)
             {
-              actives[i] = hover_imgs[i];
-            }
-            if (hover_funcs.find(i) != hover_funcs.end())
-            {
-              if (hover_funcs[i] && type(hover_funcs[i]) == LUA_TFUNCTION)
+              if (item.func_hover && type(item.func_hover) == LUA_TFUNCTION)
               {
-                hover_funcs[i](x, y);
+                item.func_hover(x, y);
               }
+              item.img_showing = item.img_hover;
             }
           }
           else
           {
             // (x, y) isn't in the rect
-            ShowIndex(i);
-            continue;
+            if (item.img_showing != item.img)
+            {
+              item.img_showing = item.img;
+            }
           }
         }
         return true;
@@ -1752,21 +1772,20 @@ namespace lev
       {
         using namespace luabind;
 
-        for (int i = 0; i < last_index; i++)
+        for (int i = 0; i < items.size(); i++)
         {
-          std::map<int, boost::shared_ptr<rect> >::iterator found = clickable_areas.find(i);
-          if (found == clickable_areas.end()) { continue; }
-          boost::shared_ptr<rect> r = found->second;
-          if (! r) { continue; }
+          myItem &item = items[i];
 
-          if (r->include(x, y))
+          if (! item.img_hover) { continue; }
+          if (! item.img_showing) { continue; }
+
+          vector pos = CalcPosition(i);
+          rect r(pos.get_x(), pos.get_y(), item.img->get_w(), item.img->get_h());
+          if (r.include(x, y))
           {
-            if (lclick_funcs.find(i) != lclick_funcs.end())
+            if (item.func_lclick && type(item.func_lclick) == LUA_TFUNCTION)
             {
-              if (lclick_funcs[i] && type(lclick_funcs[i]) == LUA_TFUNCTION)
-              {
-                lclick_funcs[i](x, y);
-              }
+              item.func_lclick(x, y);
             }
             return true;
           }
@@ -1774,29 +1793,21 @@ namespace lev
         return false;
       }
 
-      bool ReserveClickable(const std::string &name,
-                            boost::shared_ptr<image> normal,
+      bool ReserveClickable(boost::shared_ptr<image> normal,
                             boost::shared_ptr<image> hover,
-                            luabind::object lclick_func)
+                            luabind::object lclick_func,
+                            luabind::object hover_func)
       {
         try {
           if (! normal) { throw -1; }
           if (! hover) { throw -1; }
-          if (w >= 0 && current_x + normal->get_w() > w)
-          {
-            rows.push_back(std::vector<boost::shared_ptr<image> >());
-            current_x = 0;
-          }
-          int index = log.size();
-          current_x += normal->get_w();
-          index_to_col.push_back(rows[rows.size() - 1].size());
-          index_to_row.push_back(rows.size() - 1);
-          log.push_back(name);
-          rows[rows.size() - 1].push_back(normal);
 
-          hover_imgs[index] = hover;
-          lclick_funcs[index] = lclick_func;
-          name_to_index[name] = index;
+          items.push_back(myItem());
+          myItem &i = items[items.size() - 1];
+          i.img = normal;
+          i.img_hover = hover;
+          i.func_hover = hover_func;
+          i.func_lclick = lclick_func;
           return true;
         }
         catch (...) {
@@ -1804,9 +1815,9 @@ namespace lev
         }
       }
 
-      bool ReserveClickableText(const std::string &name,
-                                const std::string &text,
-                                luabind::object lclick_func)
+      bool ReserveClickableText(const std::string &text,
+                                luabind::object lclick_func,
+                                luabind::object hover_func)
       {
         if (! font_text) { return false; }
         if (text.empty()) { return false; }
@@ -1818,29 +1829,20 @@ namespace lev
 //          img->stroke_line(0, img->get_h() - 1,
 //                           img->get_w() - 1, img->get_h() - 1, c, 1, "dot");
           hover_img = image::string(font_text.get(), text, &hover_fg, &hover_bg);
-          return ReserveClickable(name, img, hover_img, lclick_func);
+          return ReserveClickable(img, hover_img, lclick_func, hover_func);
         }
         catch (...) {
           return false;
         }
       }
 
-      bool ReserveImage(const std::string &name, boost::shared_ptr<image> img)
+      bool ReserveImage(boost::shared_ptr<drawable> img)
       {
         try {
           if (! img) { throw -1; }
-//printf("W: %d, NEW W: %d\n", w, current_x + img->get_w());
-          if (w >= 0 && current_x + img->get_w() > w)
-          {
-            rows.push_back(std::vector<boost::shared_ptr<image> >());
-//printf("NEW LINE!\n");
-            current_x = 0;
-          }
-          current_x += img->get_w();
-          index_to_col.push_back(rows[rows.size() - 1].size());
-          index_to_row.push_back(rows.size() - 1);
-          log.push_back(name);
-          rows[rows.size() - 1].push_back(img);
+
+          items.push_back(myItem());
+          (items.end() - 1)->img = img;
           return true;
         }
         catch (...) {
@@ -1850,12 +1852,11 @@ namespace lev
 
       bool ReserveNewLine()
       {
-        if (! font_text) { return false; }
-        boost::shared_ptr<image> new_line(image::create(1, font_text->get_pixel_size()));
-        if (! new_line) { return false; }
-        ReserveImage("space", new_line);
-        rows.push_back(std::vector<boost::shared_ptr<image> >());
-        current_x = 0;
+        // adding new line
+        items.push_back(myItem());
+        // height spacing by image
+        items.push_back(myItem());
+        (items.end() - 1)->img = image::create(1, font_text->get_pixel_size());
         return true;
       }
 
@@ -1869,7 +1870,7 @@ namespace lev
           if (ruby.empty()) {
             img = image::string(font_text.get(), word,
                                 &color_fg, color_shade.get(), NULL, spacing);
-            return ReserveImage(word, img);
+            return ReserveImage(img);
           }
           else
           {
@@ -1885,7 +1886,7 @@ namespace lev
             img = image::create(w, h);
             img->draw(img_ruby.get(), (w - img_ruby->get_w()) / 2, 0);
             img->draw(img_word.get(), (w - img_word->get_w()) / 2, img_ruby->get_h());
-            return ReserveImage((boost::format("{ruby,%s,%s}") % word % ruby).str(), img);
+            return ReserveImage(img);
           }
         }
         catch (...) {
@@ -1893,51 +1894,15 @@ namespace lev
         }
       }
 
-      bool SetOnHover(const std::string &name, luabind::object hover_func)
-      {
-        if (name_to_index.find(name) == name_to_index.end()) { return false; }
-        int i = name_to_index[name];
-        hover_funcs[i] = hover_func;
-        return true;
-      }
-
       bool ShowIndex(int index)
       {
-        int col_index = index_to_col[index];
-        int row_index = index_to_row[index];
-
-        int y = 0;
-        for (int i = 0; i <= row_index; i++)
-        {
-          y += CalcRowHeight(rows[i]);
-        }
-        y -= rows[row_index][col_index]->get_h();
-
-        int x = 0;
-        const std::vector<boost::shared_ptr<image> > &row = rows[row_index];
-        for (int i = 0; i < col_index; i++)
-        {
-          x += row[i]->get_w();
-        }
-
-        if (hover_imgs.find(index) != hover_imgs.end())
-        {
-          clickable_areas[index].reset(new rect(vector(x, y),
-                                                *rows[row_index][col_index]->get_size()));
-        }
-        if (actives.size() <= index)
-        {
-          actives.resize(index + 1);
-          coordinates.resize(index + 1);
-        }
-        actives[index] = rows[row_index][col_index];
-        coordinates[index] = vector(x, y);
+        if (index >= items.size()) { return false; }
+        myItem &item = items[index];
+        item.img_showing = item.img;
         return true;
       }
 
-      int h, w;
-
-      // format variables
+      // format properties
       color color_fg;
       boost::shared_ptr<color> color_shade;
       color hover_bg;
@@ -1945,23 +1910,10 @@ namespace lev
       boost::shared_ptr<font> font_text;
       boost::shared_ptr<font> font_ruby;
       int spacing;
+      int width_stop;
 
-      // status variables
-      int last_index;
-      int current_x;
-
-      // log and layout variables
-      std::map<int, boost::shared_ptr<rect> > clickable_areas;
-      std::map<int, luabind::object> hover_funcs;
-      std::map<int, boost::shared_ptr<image> > hover_imgs;
-      std::map<int, luabind::object> lclick_funcs;
-      std::map<std::string, int> name_to_index;
-      std::vector<boost::shared_ptr<image> > actives;
-      std::vector<vector> coordinates;
-      std::vector<int> index_to_row;
-      std::vector<int> index_to_col;
-      std::vector<std::string> log;
-      std::vector<std::vector<boost::shared_ptr<image> > > rows;
+      // all items
+      std::vector<myItem> items;
   };
   static myLayout* cast_lay(void *obj) { return (myLayout *)obj; }
 
@@ -2051,7 +2003,7 @@ namespace lev
   bool layout::is_done()
   {
     myLayout *lay = cast_lay(_obj);
-    return lay->last_index >= lay->log.size();
+    return lay->GetNextIndex() < 0;
   }
 
   bool layout::on_hover(int x, int y)
@@ -2064,24 +2016,27 @@ namespace lev
     return cast_lay(_obj)->OnLeftClick(x, y);
   }
 
-  bool layout::reserve_clickable(const std::string &name, image *normal, image *hover,
-                         luabind::object lclick_func)
+  bool layout::reserve_clickable(boost::shared_ptr<image> normal,
+                                 boost::shared_ptr<image> hover,
+                                 luabind::object lclick_func,
+                                 luabind::object hover_func)
   {
-    return cast_lay(_obj)->ReserveClickable(name,
-                                            boost::shared_ptr<image>(normal->clone()),
-                                            boost::shared_ptr<image>(hover->clone()),
-                                            lclick_func);
+    return cast_lay(_obj)->ReserveClickable(boost::shared_ptr<image>(normal),
+                                            boost::shared_ptr<image>(hover),
+                                            lclick_func,
+                                            hover_func);
   }
 
-  bool layout::reserve_clickable_text(const std::string &name, const std::string &text,
-                                      luabind::object lclick_func)
+  bool layout::reserve_clickable_text(const std::string &text,
+                                      luabind::object lclick_func,
+                                      luabind::object hover_func)
   {
-    return cast_lay(_obj)->ReserveClickableText(name, text, lclick_func);
+    return cast_lay(_obj)->ReserveClickableText(text, lclick_func, hover_func);
   }
 
-  bool layout::reserve_image(const std::string &name, image *img)
+  bool layout::reserve_image(boost::shared_ptr<image> img)
   {
-    return cast_lay(_obj)->ReserveImage(name, boost::shared_ptr<image>(img->clone()));
+    return cast_lay(_obj)->ReserveImage(img);
   }
 
   bool layout::reserve_new_line()
@@ -2121,11 +2076,6 @@ namespace lev
     return true;
   }
 
-  bool layout::set_on_hover(const std::string &name, luabind::object hover_func)
-  {
-    return cast_lay(_obj)->SetOnHover(name, hover_func);
-  }
-
   bool layout::set_shade_color(const color *c)
   {
     try {
@@ -2142,7 +2092,7 @@ namespace lev
   {
     if (is_done()) { return false; }
     myLayout *lay = cast_lay(_obj);
-    return lay->ShowIndex(lay->last_index++);
+    return lay->ShowIndex(lay->GetNextIndex());
   }
 
 }

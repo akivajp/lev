@@ -15,6 +15,7 @@
 #include "lev/sound.hpp"
 
 // dependencies
+#include "lev/fs.hpp"
 #include "lev/system.hpp"
 #include "register.hpp"
 
@@ -50,11 +51,15 @@ int luaopen_lev_sound(lua_State *L)
         .property("len", &sound::get_length)
         .property("length", &sound::get_length)
         .def("load", &sound::load)
+        .def("load", &sound::load_path)
         .def("open", &sound::open)
+        .def("open", &sound::open_path)
         .property("pan", &sound::get_pan, &sound::set_pan)
         .def("pause", &sound::pause)
         .def("play", &sound::load_and_play)
         .def("play", &sound::load_and_play1)
+        .def("play", &sound::load_and_play_path)
+        .def("play", &sound::load_and_play_path1)
         .def("play", &sound::play)
         .def("play", &sound::play0)
         .property("pos", &sound::get_position, &sound::set_position)
@@ -549,13 +554,31 @@ namespace lev
   double sound::get_position() { return cast_snd(_obj)->GetPosition(); }
   bool sound::is_playing() { return ((mySound *)_obj)->GetPlaying(); }
 
-  bool sound::load(const std::string &filename) { return cast_snd(_obj)->LoadSample(filename); }
+  bool sound::load(const std::string &filename)
+  {
+    return cast_snd(_obj)->LoadSample(filename);
+  }
+  bool sound::load_path(boost::shared_ptr<file_path> path)
+  {
+    return load(path->get_full_path());
+  }
   bool sound::load_and_play(const std::string &filename, bool repeat)
   {
     return ((mySound *)_obj)->Play(filename, repeat);
   }
+  bool sound::load_and_play_path(boost::shared_ptr<file_path> path, bool repeat)
+  {
+    return load_and_play(path->get_full_path(), repeat);
+  }
 
-  bool sound::open(const std::string &filename) { return ((mySound *)_obj)->OpenStream(filename); }
+  bool sound::open(const std::string &filename)
+  {
+    return cast_snd(_obj)->OpenStream(filename);
+  }
+  bool sound::open_path(boost::shared_ptr<file_path> path)
+  {
+    return open(path->get_full_path());
+  }
   bool sound::set_pan(float pan) { return ((mySound *)_obj)->SetPan(pan); }
   bool sound::set_playing(bool play, bool repeat)
   {

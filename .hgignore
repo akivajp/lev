@@ -4,8 +4,10 @@ syntax: glob
 .svn
 .*.swp
 bin/
+entry/
 lib/
 kanaf/
+savedata/
 src/*.a
 src/*/*.a
 src/*.dll

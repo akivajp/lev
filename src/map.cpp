@@ -140,12 +140,14 @@ namespace lev
           {
             if (rects[i]->include(x, y))
             {
-              if (drawing[i] != hover_imgs[i] && funcs_hover[i] &&
-                  luabind::type(funcs_hover[i]) == LUA_TFUNCTION)
+              if (drawing[i] != hover_imgs[i])
               {
-                funcs_hover[i]();
+                if (funcs_hover[i] && luabind::type(funcs_hover[i]) == LUA_TFUNCTION)
+                {
+                  funcs_hover[i](x, y);
+                }
+                drawing[i] = hover_imgs[i];
               }
-              drawing[i] = hover_imgs[i];
             }
             else
             {
@@ -171,7 +173,7 @@ namespace lev
               if (funcs_lclick[i] && luabind::type(funcs_lclick[i]) == LUA_TFUNCTION)
               {
                 L = funcs_lclick[i].interpreter();
-                funcs_lclick[i]();
+                funcs_lclick[i](x, y);
               }
             }
           }
