@@ -33,7 +33,7 @@ namespace lev
       virtual type_id get_type_id() const { return LEV_TIMAGE; }
       virtual const char *get_type_name() const { return "lev.image.map"; }
       virtual int get_w() const;
-      bool map_image(boost::shared_ptr<drawable> img, int x, int y);
+      bool map_image(boost::shared_ptr<drawable> img, int x, int y, unsigned char alpha = 255);
       static int map_image_l(lua_State *L);
       bool map_link(boost::shared_ptr<drawable> img, boost::shared_ptr<drawable> hover_img,
                     int x, int y, luabind::object on_lclick, luabind::object on_hover);

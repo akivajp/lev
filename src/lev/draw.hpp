@@ -96,6 +96,7 @@ namespace lev
       bool enable_alpha_blending0() { return enable_alpha_blending(); }
       bool flip();
       void* get_rawobj() { return _obj; }
+      boost::shared_ptr<image> get_screen_shot();
       virtual type_id get_type_id() const { return LEV_TSCREEN; }
       virtual const char *get_type_name() const { return "lev.screen"; }
       bool map2d_auto();

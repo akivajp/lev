@@ -25,6 +25,7 @@
 // libraries
 #include <map>
 #include <luabind/luabind.hpp>
+#include <luabind/raw_policy.hpp>
 #include <SDL/SDL.h>
 #include <vector>
 
@@ -108,7 +109,7 @@ int luaopen_lev_system(lua_State *L)
           def("create_window_c", &window::create),
 //          def("get_c", &system::get),
           def("get", &system::get),
-          def("init", &system::init)
+          def("init", &system::init, raw(_1))
         ]
     ]
   ];
@@ -586,17 +587,18 @@ namespace lev
           on_left_down(),   on_left_up(),
           on_middle_down(), on_middle_up(),
           on_right_down(),  on_right_up(),
-          timers()
+          timers(), L(NULL)
       { }
 
     public:
       ~mySystem() { }
 
-      static mySystem* Create()
+      static mySystem* Create(lua_State *L)
       {
         mySystem *sys = NULL;
         try {
           sys = new mySystem;
+          if (L) { sys->L = L; }
           return sys;
         }
         catch (...) {
@@ -611,7 +613,7 @@ namespace lev
         return true;
       }
 
-//      lua_State *L;
+      lua_State *L;
       std::map<Uint32, luabind::object> funcs;
       std::string name;
       luabind::object on_tick;
@@ -863,8 +865,7 @@ printf("DETACHING TIMER!\n");
     return SDL_GetTicks();
   }
 
-//  system* system::init()
-  boost::shared_ptr<system> system::init()
+  boost::shared_ptr<system> system::init(lua_State *L)
   {
     if (system::singleton) { return system::singleton; }
     try {
@@ -882,7 +883,7 @@ printf("DETACHING TIMER!\n");
       SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
       SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 
-      singleton->_obj = mySystem::Create();
+      singleton->_obj = mySystem::Create(L);
       if (! singleton->_obj) { throw -3; }
     }
     catch (...) {
@@ -918,16 +919,19 @@ printf("DETACHING TIMER!\n");
     mySystem *sys = cast_sys(_obj);
     while (is_running())
     {
-//printf("RUNNING NOW!\n");
-      if (sys->on_tick && luabind::type(sys->on_tick) == LUA_TFUNCTION)
-      {
-//printf("BEGIN CALL!\n");
-        safe_call(sys->on_tick);
-//printf("END CALL!\n");
+      try {
+        if (sys->on_tick && luabind::type(sys->on_tick) == LUA_TFUNCTION)
+        {
+          sys->on_tick();
+//          safe_call(sys->on_tick);
+        }
+        do_events();
       }
-//printf("BEGIN EVENT!\n");
-      do_events();
-//printf("END EVENT!\n\n");
+      catch (...) {
+        fprintf(stderr, "error on system::run\n");
+        fprintf(stderr, "error message: %s\n", lua_tostring(sys->L, -1));
+        return false;
+      }
     }
     return true;
   }
@@ -994,13 +998,15 @@ printf("DETACHING TIMER!\n");
 
   bool system::set_on_quit(luabind::object func)
   {
-    cast_sys(_obj)->funcs[SDL_QUIT] = util::copy_function(func);
+//    cast_sys(_obj)->funcs[SDL_QUIT] = util::copy_function(func);
+    cast_sys(_obj)->funcs[SDL_QUIT] = func;
     return true;
   }
 
   bool system::set_on_right_down(luabind::object func)
   {
-    cast_sys(_obj)->on_right_down = util::copy_function(func);
+//    cast_sys(_obj)->on_right_down = util::copy_function(func);
+    cast_sys(_obj)->on_right_down = func;
     return true;
   }
 

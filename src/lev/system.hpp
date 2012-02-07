@@ -78,7 +78,6 @@ namespace lev
       bool do_event();
       bool do_events();
       bool done();
-//      static system* get() { return singleton; }
       static boost::shared_ptr<system> get() { return singleton; }
       std::string get_name();
 //      static int get_l(lua_State *L);
@@ -98,8 +97,7 @@ namespace lev
       unsigned long get_ticks();
       virtual type_id get_type_id() const { return LEV_TSYSTEM; }
       virtual const char *get_type_name() const { return "lev.system"; }
-//      static system* init();
-      static boost::shared_ptr<system> init();
+      static boost::shared_ptr<system> init(lua_State *L);
       bool is_running();
       bool quit(bool force = false);
       bool quit0() { return quit(); }
@@ -121,7 +119,6 @@ namespace lev
       bool set_running(bool run = true);
     protected:
       void *_obj;
-//      static system *singleton;
       static boost::shared_ptr<system> singleton;
   };
 

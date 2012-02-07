@@ -23,6 +23,7 @@
 #include "register.hpp"
 
 // libraries
+#include <boost/scoped_array.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/weak_ptr.hpp>
 
@@ -70,8 +71,10 @@ int luaopen_lev_draw(lua_State *L)
         .def("enable_alpha_blending", &screen::enable_alpha_blending0)
         .def("enable_alpha_blending", &screen::enable_alpha_blending)
         .def("flip", &screen::flip)
+        .def("get_screen_shot", &screen::get_screen_shot)
         .def("map2d", &screen::map2d)
         .def("map2d", &screen::map2d_auto)
+        .property("screen_shot", &screen::get_screen_shot)
         .def("set_current", &screen::set_current)
         .def("swap", &screen::swap)
 //      class_<canvas, control>("canvas")
@@ -369,6 +372,39 @@ namespace lev
 //    SDL_Surface *screen = SDL_GetVideoSurface();
 //    if (SDL_Flip(screen) == 0) { return true; }
 //    else { return false; }
+  }
+
+  boost::shared_ptr<image> screen::get_screen_shot()
+  {
+    boost::shared_ptr<image> img;
+    try {
+      if (boost::shared_ptr<window> win = holder.lock())
+      {
+        const int w = win->get_w();
+        const int h = win->get_h();
+        boost::scoped_array<unsigned char> buffer(new unsigned char[w * h * 4]);
+        if (! buffer) { throw -1; }
+
+        glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, buffer.get());
+        img = image::create(w, h);
+        if (! img) { throw -2; }
+
+        for (int y = 0 ; y < h; y++)
+        {
+          for (int x = 0; x < w; x++)
+          {
+            unsigned char *pixel = buffer.get() + (w * y + x) * 4;
+            img->set_pixel(x, (h - 1) - y, color(pixel[0], pixel[1], pixel[2], pixel[3]));
+          }
+        }
+      }
+      else { throw -1; }
+    }
+    catch (...) {
+      img.reset();
+      fprintf(stderr, "error on screen shot image creation\n");
+    }
+    return img;
   }
 
   bool screen::map2d_auto()

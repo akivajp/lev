@@ -1,8 +1,8 @@
 CC = gcc
 CXX = g++
-#CXXFLAGS = -fPIC -O2 -I/usr/include/freetype2 `/usr/local/bin/sdl-config --cflags` \
+CXXFLAGS = -fPIC -O2 -I/usr/include/freetype2 `/usr/local/bin/sdl-config --cflags` \
 	   -I./minizip
-CXXFLAGS = -fPIC -g -I/usr/include/freetype2 `/usr/local/bin/sdl-config --cflags` \
+#CXXFLAGS = -fPIC -g -I/usr/include/freetype2 `/usr/local/bin/sdl-config --cflags` \
 	   -I./minizip
 SHARED= -shared
 SLIB = liblev.a

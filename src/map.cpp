@@ -52,6 +52,9 @@ namespace lev
         imgs.clear();
         hover_imgs.clear();
         rects.clear();
+        alphas.clear();
+        funcs_hover.clear();
+        funcs_lclick.clear();
         return true;
       }
 
@@ -61,7 +64,8 @@ namespace lev
         {
           if (drawing[i])
           {
-            drawing[i]->draw_on_image(img, rects[i]->get_x() + x, rects[i]->get_y() + y, alpha);
+            unsigned char a = (short(alpha) * alphas[i]) / 255;
+            drawing[i]->draw_on_image(img, rects[i]->get_x() + x, rects[i]->get_y() + y, a);
           }
         }
         return true;
@@ -73,7 +77,8 @@ namespace lev
         {
           if (drawing[i])
           {
-            drawing[i]->draw_on_screen(s, rects[i]->get_x() + x, rects[i]->get_y() + y, alpha);
+            unsigned char a = (short(alpha) * alphas[i]) / 255;
+            drawing[i]->draw_on_screen(s, rects[i]->get_x() + x, rects[i]->get_y() + y, a);
           }
         }
         return true;
@@ -101,7 +106,7 @@ namespace lev
         return max;
       }
 
-      bool MapImage(boost::shared_ptr<drawable> img, int x, int y)
+      bool MapImage(boost::shared_ptr<drawable> img, int x, int y, unsigned char a)
       {
         if (! img) { return false; }
 
@@ -111,6 +116,7 @@ namespace lev
         drawing.push_back(img);
         hover_imgs.push_back(img);
         rects.push_back(r);
+        alphas.push_back(a);
 
         funcs_hover.push_back(luabind::object());
         funcs_lclick.push_back(luabind::object());
@@ -127,6 +133,7 @@ namespace lev
         drawing.push_back(img);
         hover_imgs.push_back(hover_img);
         rects.push_back(r);
+        alphas.push_back(255);
 
         funcs_hover.push_back(on_hover);
         funcs_lclick.push_back(on_lclick);
@@ -208,6 +215,7 @@ namespace lev
         rects.pop_back();
         funcs_hover.pop_back();
         funcs_lclick.pop_back();
+        alphas.pop_back();
         return true;
       }
 
@@ -217,6 +225,7 @@ namespace lev
       std::vector<boost::shared_ptr<rect> > rects;
       std::vector<luabind::object> funcs_hover;
       std::vector<luabind::object> funcs_lclick;
+      std::vector<unsigned char> alphas;
   };
   static myMap* cast_map(void *obj) { return (myMap *)obj; }
 
@@ -272,9 +281,9 @@ namespace lev
     return cast_map(_obj)->GetWidth();
   }
 
-  bool map::map_image(boost::shared_ptr<drawable> img, int x, int y)
+  bool map::map_image(boost::shared_ptr<drawable> img, int x, int y, unsigned char alpha)
   {
-    return cast_map(_obj)->MapImage(img, x, y);
+    return cast_map(_obj)->MapImage(img, x, y, alpha);
   }
 
   int map::map_image_l(lua_State *L)
@@ -283,6 +292,7 @@ namespace lev
 
     try {
       int x = 0, y = 0;
+      unsigned char alpha = 255;
       bool result = false;
 
       luaL_checktype(L, 1, LUA_TUSERDATA);
@@ -295,10 +305,14 @@ namespace lev
       if (t["y"]) { y = object_cast<int>(t["y"]); }
       else if (t["lua.number2"]) { y = object_cast<int>(t["lua.number2"]); }
 
+      if (t["alpha"]) { alpha = object_cast<unsigned char>(t["alpha"]); }
+      else if (t["a"]) { alpha = object_cast<unsigned char>(t["a"]); }
+      else if (t["lua.number3"]) { alpha = object_cast<unsigned char>(t["lua.number3"]); }
+
       if (t["lev.image1"])
       {
         boost::shared_ptr<image> img = object_cast<boost::shared_ptr<image> >(t["lev.image1"]);
-        result = m->map_image(img, x, y);
+        result = m->map_image(img, x, y, alpha);
       }
       lua_pushboolean(L, result);
     }

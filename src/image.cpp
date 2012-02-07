@@ -72,6 +72,7 @@ int luaopen_lev_image(lua_State *L)
         .def("load", &image::reload)
         .property("rect",  &image::get_rect)
         .def("reload", &image::reload)
+        .def("resize", &image::resize)
         .def("save", &image::save)
         .def("set_color", &image::set_pixel)
         .def("set_pixel", &image::set_pixel)
@@ -751,12 +752,32 @@ namespace lev
 
   bool image::reload(const std::string &filename)
   {
-//    image *img = image::load(filename);
     boost::shared_ptr<image> img = image::load(filename);
     if (! img) { return false; }
     this->swap(img);
-//    delete img;
     return true;
+  }
+
+  boost::shared_ptr<image> image::resize(int width, int height)
+  {
+    boost::shared_ptr<image> img;
+    try {
+      img = image::create(width, height);
+      for (int y = 0; y < height; y++)
+      {
+        for (int x = 0; x < width; x++)
+        {
+          boost::shared_ptr<color> c;
+          c = get_pixel(float(x) * get_w() / width, float(y) * get_h() / height);
+          if (c) { img->set_pixel(x, y, *c); }
+        }
+      }
+    }
+    catch (...) {
+      img.reset();
+      fprintf(stderr, "error on resized image creation\n");
+    }
+    return img;
   }
 
   bool image::save(const std::string &filename) const
@@ -1587,6 +1608,7 @@ namespace lev
         boost::shared_ptr<drawable> img;
         boost::shared_ptr<drawable> img_hover;
         boost::shared_ptr<drawable> img_showing;
+        boost::shared_ptr<lev::vector> pos;
         luabind::object func_hover;
         luabind::object func_lclick;
       };
@@ -1640,12 +1662,16 @@ namespace lev
         return max_w;
       }
 
-      vector CalcPosition(int index)
+      boost::shared_ptr<lev::vector> CalcPosition(int index)
       {
         int x = 0;
         int y = 0;
         int max_h = 0;
         int final_x = 0;
+
+        if (index < 0 || index >= items.size()) { return boost::shared_ptr<lev::vector>(); }
+        if (! items[index].img) { return boost::shared_ptr<lev::vector>(); }
+
         for (int i = 0; i < items.size(); i++)
         {
           myItem &item = items[i];
@@ -1666,13 +1692,33 @@ namespace lev
           }
         }
         y += max_h;
-        return vector(final_x, y - items[index].img->get_h());
+        return lev::vector::create(final_x, y - items[index].img->get_h());
       }
 
       int CalcTotalHeight()
       {
-        vector vec = CalcPosition(items.size() - 1);
-        return vec.get_y();
+        int x = 0;
+        int y = 0;
+        int max_h = 0;
+        for (int i = 0; i < items.size(); i++)
+        {
+          myItem &item = items[i];
+          if (! item.img || (width_stop > 0 && x > 0 && x + item.img->get_w() > width_stop))
+          {
+            // newline
+            x = 0;
+            y += max_h;
+            max_h = 0;
+          }
+          if (item.img)
+          {
+            // calc by next item
+            x += item.img->get_w();
+            if (item.img->get_h() > max_h) { max_h = item.img->get_h(); }
+          }
+        }
+        y += max_h;
+        return y;
       }
 
       bool Clear()
@@ -1698,8 +1744,11 @@ namespace lev
           myItem &item = items[i];
           if (item.img_showing)
           {
-            vector pos = CalcPosition(i);
-            item.img_showing->draw_on_image(dst, x + pos.get_x(), y + pos.get_y(), alpha);
+            if (! item.pos) { item.pos = CalcPosition(i); }
+            if (item.pos)
+            {
+              item.img_showing->draw_on_image(dst, x + item.pos->get_x(), y + item.pos->get_y(), alpha);
+            }
           }
         }
         return true;
@@ -1712,9 +1761,12 @@ namespace lev
           myItem &item = items[i];
           if (item.img_showing)
           {
-            vector pos = CalcPosition(i);
+            if (! item.pos) { item.pos = CalcPosition(i); }
+            if (item.pos)
+            {
 //printf("i: %d, x: %d, y: %d\n", i, pos.get_x(), pos.get_y());
-            item.img_showing->draw_on_screen(dst, x + pos.get_x(), y + pos.get_y(), alpha);
+              item.img_showing->draw_on_screen(dst, x + item.pos->get_x(), y + item.pos->get_y(), alpha);
+            }
           }
         }
 //printf("\n");
@@ -1741,9 +1793,13 @@ namespace lev
 
           if (! item.img_hover) { continue; }
           if (! item.img_showing) { continue; }
+          if (! item.pos)
+          {
+            item.pos = CalcPosition(i);
+            if (! item.pos) { continue; }
+          }
 
-          vector pos = CalcPosition(i);
-          rect r(pos.get_x(), pos.get_y(), item.img->get_w(), item.img->get_h());
+          rect r(item.pos->get_x(), item.pos->get_y(), item.img->get_w(), item.img->get_h());
           if (r.include(x, y))
           {
             // (x, y) is in the rect
@@ -1778,9 +1834,12 @@ namespace lev
 
           if (! item.img_hover) { continue; }
           if (! item.img_showing) { continue; }
-
-          vector pos = CalcPosition(i);
-          rect r(pos.get_x(), pos.get_y(), item.img->get_w(), item.img->get_h());
+          if (! item.pos)
+          {
+            item.pos = CalcPosition(i);
+            if (! item.pos) { continue; }
+          }
+          rect r(item.pos->get_x(), item.pos->get_y(), item.img->get_w(), item.img->get_h());
           if (r.include(x, y))
           {
             if (item.func_lclick && type(item.func_lclick) == LUA_TFUNCTION)
@@ -1793,6 +1852,15 @@ namespace lev
         return false;
       }
 
+      bool RecalcAll()
+      {
+        for (int i = 0; i < items.size(); i++)
+        {
+          items[i].pos = CalcPosition(i);
+        }
+        return true;
+      }
+
       bool ReserveClickable(boost::shared_ptr<image> normal,
                             boost::shared_ptr<image> hover,
                             luabind::object lclick_func,
@@ -1800,7 +1868,7 @@ namespace lev
       {
         try {
           if (! normal) { throw -1; }
-          if (! hover) { throw -1; }
+          if (! hover) { hover = normal->clone(); }
 
           items.push_back(myItem());
           myItem &i = items[items.size() - 1];
@@ -1857,6 +1925,7 @@ namespace lev
         // height spacing by image
         items.push_back(myItem());
         (items.end() - 1)->img = image::create(1, font_text->get_pixel_size());
+        RecalcAll();
         return true;
       }
 

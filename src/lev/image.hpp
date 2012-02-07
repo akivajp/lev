@@ -75,6 +75,7 @@ namespace lev
       static boost::shared_ptr<image> load(const std::string &filename);
       static boost::shared_ptr<image> load_path(boost::shared_ptr<file_path> path);
       bool reload(const std::string &filename);
+      boost::shared_ptr<image> resize(int width, int height);
       bool save(const std::string &filename) const;
       bool set_pixel(int x, int y, const color &c);
       static boost::shared_ptr<image> string(font *f, const std::string &str,
