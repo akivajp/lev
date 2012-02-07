@@ -38,6 +38,7 @@ int luaopen_lev_package(lua_State *L)
   [
     namespace_("package")
     [
+      def("add_path", &package::add_path, raw(_1)),
       def("resolve", &package::resolve, raw(_1)),
       def("search_font", &package::search_font, raw(_1))
     ]
@@ -46,7 +47,6 @@ int luaopen_lev_package(lua_State *L)
   object package = lev["package"];
 
   register_to(package, "add_font", &package::add_font_l);
-  register_to(package, "add_path", &package::add_path_l);
   register_to(package, "add_search", &package::add_search_l);
   register_to(package, "clear_search", &package::clear_search_l);
   register_to(package, "dofile", &package::dofile_l);
@@ -117,23 +117,9 @@ namespace lev
     {
       globals(L)["lev"]["package"]["path_list"] = newtable(L);
     }
-    globals(L)["table"]["insert"](globals(L)["lev"]["package"]["path_list"], 1, path);
+//    globals(L)["table"]["insert"](globals(L)["lev"]["package"]["path_list"], 1, path);
+    globals(L)["table"]["insert"](globals(L)["lev"]["package"]["path_list"], path);
     return true;
-  }
-
-  int package::add_path_l(lua_State *L)
-  {
-    using namespace luabind;
-    const char *path = NULL;
-
-    object t = util::get_merged(L, 1, -1);
-    if (t["path"]) { path = object_cast<const char *>(t["path"]); }
-    else if (t["p"]) { path = object_cast<const char *>(t["p"]); }
-    else if (t["lua.string1"]) { path = object_cast<const char *>(t["lua.string1"]); }
-    if (path == NULL) { luaL_error(L, "path (string) is not given"); }
-
-    lua_pushboolean(L, package::add_path(L, path));
-    return 1;
   }
 
   bool package::add_search(lua_State *L, const std::string &search)

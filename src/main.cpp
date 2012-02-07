@@ -94,6 +94,7 @@ static bool execute_path(lua_State *L, const std::string &path)
     // given path is directory
     // run entry program in path directory
     package::add_path(L, path);
+    package::add_path(L, "./");
     for (int i = 0; i < entry_files_len; i++)
     {
       std::string filename = path + "/" + entry_files[i];
@@ -115,6 +116,7 @@ static bool execute_path(lua_State *L, const std::string &path)
       {
         std::string code;
         package::add_path(L, path);
+        package::add_path(L, "./");
         if (! lev::archive::read_direct(path, entry_name, code)) { continue; }
         do_string(L, code);
         return true;
