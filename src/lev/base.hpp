@@ -57,7 +57,11 @@ namespace lev
 
           LEV_TUNICODE_STRING,
           LEV_TVECTOR,
+
           LEV_TWINDOW,
+            LEV_TDEBUG_WINDOW,
+          LEV_TWINDOW_END,
+
         LEV_TBASE_END,
       };
     protected:

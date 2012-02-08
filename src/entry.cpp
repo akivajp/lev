@@ -119,6 +119,7 @@ int luaopen_lev_std(lua_State *L)
     globals(L)["require"]("lev");
     globals(L)["require"]("lev.archive");
   //  globals(L)["require"]("lev.db");
+    globals(L)["require"]("lev.debug");
     globals(L)["require"]("lev.draw");
   //  globals(L)["require"]("lev.gui");
     globals(L)["require"]("lev.font");
@@ -159,6 +160,7 @@ namespace lev
     register_to(globals(L)["package"]["preload"], "lev.archive", luaopen_lev_archive);
     register_to(globals(L)["package"]["preload"], "lev.base", luaopen_lev_base);
 //    register_to(globals(L)["package"]["preload"], "lev.db", luaopen_lev_db);
+    register_to(globals(L)["package"]["preload"], "lev.debug", luaopen_lev_debug);
     register_to(globals(L)["package"]["preload"], "lev.draw", luaopen_lev_draw);
     register_to(globals(L)["package"]["preload"], "lev.font", luaopen_lev_font);
     register_to(globals(L)["package"]["preload"], "lev.fs", luaopen_lev_fs);

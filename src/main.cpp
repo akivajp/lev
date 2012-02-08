@@ -93,8 +93,8 @@ static bool execute_path(lua_State *L, const std::string &path)
   {
     // given path is directory
     // run entry program in path directory
-    package::add_path(L, path);
     package::add_path(L, "./");
+    package::add_path(L, path);
     for (int i = 0; i < entry_files_len; i++)
     {
       std::string filename = path + "/" + entry_files[i];

@@ -10,8 +10,8 @@ OUT = a.out
 PCH = prec.h.gch
 AR = ar
 RANLIB = ranlib
-SRC  = archive.cpp draw.cpp entry.cpp font.cpp fs.cpp image.cpp map.cpp package.cpp prim.cpp \
-       sound.cpp string.cpp system.cpp timer.cpp util.cpp window.cpp
+SRC  = archive.cpp debug.cpp draw.cpp entry.cpp font.cpp fs.cpp image.cpp map.cpp \
+       package.cpp prim.cpp sound.cpp string.cpp system.cpp timer.cpp util.cpp window.cpp
 OBJS = $(SRC:%.cpp=%.o)
 DLIB = lev.so
 #LIBS = -llua -lluabind -lSDL -lvorbisfile -lfreetype -lGL
@@ -66,6 +66,7 @@ $(DLIB): $(OBJS)
 	$(CXX) $(SHARED) -o $(DLIB) $(OBJS) $(LIBS)
 
 archive.o: archive.cpp lev/archive.hpp
+debug.o: debug.cpp lev/debug.hpp
 draw.o: draw.cpp lev/draw.hpp
 entry.o: entry.cpp lev/entry.hpp
 font.o: font.cpp lev/font.hpp

@@ -71,10 +71,12 @@ int luaopen_lev_draw(lua_State *L)
         .def("enable_alpha_blending", &screen::enable_alpha_blending0)
         .def("enable_alpha_blending", &screen::enable_alpha_blending)
         .def("flip", &screen::flip)
-        .def("get_screen_shot", &screen::get_screen_shot)
+        .def("get_screen_shot", &screen::get_screenshot)
+        .def("get_screenshot", &screen::get_screenshot)
         .def("map2d", &screen::map2d)
         .def("map2d", &screen::map2d_auto)
-        .property("screen_shot", &screen::get_screen_shot)
+        .property("screen_shot", &screen::get_screenshot)
+        .property("screenshot", &screen::get_screenshot)
         .def("set_current", &screen::set_current)
         .def("swap", &screen::swap)
 //      class_<canvas, control>("canvas")
@@ -374,7 +376,7 @@ namespace lev
 //    else { return false; }
   }
 
-  boost::shared_ptr<image> screen::get_screen_shot()
+  boost::shared_ptr<image> screen::get_screenshot()
   {
     boost::shared_ptr<image> img;
     try {
@@ -449,112 +451,6 @@ namespace lev
     return false;
   }
 
-//  bool canvas::call_compiled(drawable *img)
-//  {
-//    return img->call_compiled(this);
-//  }
-//
-//  bool canvas::call_texture(drawable *img)
-//  {
-//    return img->call_texture(this);
-//  }
-//
-//  bool canvas::clear()
-//  {
-//    set_current();
-//    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-//    return true;
-//  }
-//
-//  bool canvas::clear_color(unsigned char r, unsigned char g, unsigned char b, unsigned char a)
-//  {
-//    set_current();
-//    glClearColor(r / 255.0, g / 255.0, b / 255.0, a / 255.0);
-//    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-//    return true;
-//  }
-//
-//  bool canvas::clear_color1(const color &c)
-//  {
-//    return clear_color(c.get_r(), c.get_g(), c.get_b(), c.get_a());
-//  }
-//
-//  bool canvas::compile(drawable *img, bool force)
-//  {
-//    if (! this->is_valid()) { return false; }
-//    return img->compile(this, force);
-//  }
-//
-//  canvas* canvas::create(control *parent, int width, int height)
-//  {
-//    int attribs[] = { WX_GL_RGBA, WX_GL_DOUBLEBUFFER, 0 };
-//    canvas *cv = NULL;
-//    wxWindow *p = NULL;
-//    myCanvas *obj = NULL;
-//    try
-//    {
-//      cv = new canvas();
-//      if (parent) { p = (wxWindow *)parent->get_rawobj(); }
-//      cv->_obj = obj = new myCanvas(p, attribs, width, height);
-//      cv->_id = obj->GetId();
-//      cv->connector = obj->GetConnector();
-//      cv->func_getter = obj->GetFuncGetter();
-//
-//      cv->system_managed = true;
-//      cv->set_current();
-//      glViewport(0, 0, width, height);
-//      return cv;
-//    }
-//    catch (...)
-//    {
-//      delete cv;
-//      return NULL;
-//    }
-//  }
-//
-//  int canvas::create_l(lua_State *L)
-//  {
-//    using namespace luabind;
-//    object p;
-//    int w = -1, h = -1;
-//
-//    int n = lua_gettop(L);
-//    lua_pushcfunction(L, &util::merge);
-//    newtable(L).push(L);
-//    for (int i = 1; i <= n; i++)
-//    {
-//      object(from_stack(L, i)).push(L);
-//    }
-//    lua_call(L, n + 1, 1);
-//    object t(from_stack(L, -1));
-//    lua_remove(L, -1);
-//
-//    if (t["parent"]) { p = t["parent"]; }
-//    else if (t["p"]) { p = t["p"]; }
-//    else if (t["lua.userdata1"]) { p = t["lua.userdata1"]; }
-//
-//    if (t["width"]) { w = object_cast<int>(t["width"]); }
-//    else if (t["w"]) { w = object_cast<int>(t["w"]); }
-//    else if (t["lua.number1"]) { w = object_cast<int>(t["lua.number1"]); }
-//
-//    if (t["height"]) { h = object_cast<int>(t["height"]); }
-//    else if (t["h"]) { h = object_cast<int>(t["h"]); }
-//    else if (t["lua.number2"]) { h = object_cast<int>(t["lua.number2"]); }
-//
-//    object func = globals(L)["lev"]["classes"]["canvas"]["create_c"];
-//    object result = func(p, w, h);
-//    result.push(L);
-//    return 1;
-//  }
-//
-//  bool canvas::draw_image(drawable *img, int x, int y, unsigned char alpha)
-//  {
-//    if (! this->is_valid()) { return false; }
-//    if (! img) { return false; }
-//    return img->draw_on(this, x, y, alpha);
-//  }
-//
-//
 //  bool canvas::draw_point(point *pt)
 //  {
 //    set_current();
@@ -575,8 +471,8 @@ namespace lev
 //
 //    return true;
 //  }
-//
-//
+
+
 //  int canvas::draw_points(lua_State *L)
 //  {
 //    using namespace luabind;
@@ -607,28 +503,12 @@ namespace lev
 //    glEnd();
 //  }
 //
-//
-//  bool canvas::enable_alpha_blending(bool enable)
-//  {
-//    set_current();
-//    if (enable)
-//    {
-//      glEnable(GL_BLEND);
-//      glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-//    }
-//    else
-//    {
-//      glDisable(GL_BLEND);
-//    }
-//    return true;
-//  }
-//
-//
+
 //  void canvas::flush()
 //  {
 //    glFlush();
 //  }
-//
+
 //  void canvas::line(int x1, int y1, int x2, int y2)
 //  {
 //    glBegin(GL_LINES);
@@ -636,25 +516,6 @@ namespace lev
 //      glVertex2i(x2, y2);
 //    glEnd();
 //  }
-//
-//  bool canvas::map2d_auto()
-//  {
-//    int w, h;
-//    ((wxGLCanvas *)_obj)->GetSize(&w, &h);
-//    set_current();
-//    glLoadIdentity();
-//    glOrtho(0, w, h, 0, -1, 1);
-//    return true;
-//  }
-//
-//  bool canvas::map2d(int left, int right, int top, int bottom)
-//  {
-//    set_current();
-//    glLoadIdentity();
-//    glOrtho(left, right, bottom, top, -1, 256);
-//    return true;
-//  }
-//
 //
 //  bool canvas::print(const char *text)
 //  {
@@ -665,32 +526,6 @@ namespace lev
 //    catch (...) {
 //      return false;
 //    }
-//  }
-//
-//  bool canvas::redraw()
-//  {
-//    wxPaintEvent e;
-//    cast_draw(_obj)->AddPendingEvent(e);
-//    return true;
-//  }
-//
-//  bool canvas::set_current()
-//  {
-//    cast_draw(_obj)->SetCurrent();
-//    return true;
-//  }
-//
-//  bool canvas::swap()
-//  {
-//    if (! this->is_valid()) { return false; }
-//    cast_draw(_obj)->SwapBuffers();
-//    return true;
-//  }
-//
-//  bool canvas::texturize(drawable *img, bool force)
-//  {
-//    if (! this->is_valid()) { return false; }
-//    return img->texturize(this, force);
 //  }
 
 }

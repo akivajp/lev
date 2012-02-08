@@ -12,6 +12,7 @@
 /////////////////////////////////////////////////////////////////////////////
 
 #include "base.hpp"
+#include "draw.hpp"
 #include <boost/shared_ptr.hpp>
 
 extern "C" {
@@ -20,8 +21,6 @@ extern "C" {
 
 namespace lev
 {
-
-  class screen;
 
   class window : public base
   {
@@ -41,6 +40,9 @@ namespace lev
       virtual type_id get_type_id() const { return LEV_TWINDOW; }
       virtual const char *get_type_name() const { return "lev.window"; }
       bool hide();
+      bool is_fullscreen();
+      bool set_fullscreen(bool enable = true);
+      bool set_fullscreen0() { return set_fullscreen(); }
       bool set_h(int h);
       bool set_w(int w);
       bool show(bool showing = true);

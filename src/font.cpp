@@ -7,13 +7,20 @@
 // Licence:     MIT License
 /////////////////////////////////////////////////////////////////////////////
 
+// pre-compiled header
 #include "prec.h"
 
+// delcarations
 #include "lev/font.hpp"
+
+// dependencies
 #include "lev/image.hpp"
+#include "lev/package.hpp"
+#include "lev/system.hpp"
 #include "lev/util.hpp"
 #include "register.hpp"
 
+// libraries
 #include <ft2build.h>
 #include FT_FREETYPE_H
 
@@ -345,11 +352,13 @@ namespace lev
 
   boost::shared_ptr<font> font::load0()
   {
-    boost::shared_ptr<font> f = font::load("default.ttf");
-    if (f) { return f; }
-    f = font::load("font/default.ttf");
-    if (f) { return f; }
-    f = font::load("fonts/default.ttf");
+    boost::shared_ptr<font> f;
+    if (system::get())
+    {
+      f = package::search_font(system::get()->get_interpreter());
+      if (f) { return f; }
+    }
+    if (file_system::file_exists("default.ttf")) { f = font::load("default.ttf"); }
     return f;
   }
 

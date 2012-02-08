@@ -27,7 +27,7 @@
 #include <map>
 #include <vorbis/vorbisfile.h>
 
-// singleton initialization
+// static member variable initialization
 boost::shared_ptr<lev::mixer> lev::mixer::singleton;
 
 int luaopen_lev_sound(lua_State *L)

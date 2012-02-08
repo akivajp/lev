@@ -79,8 +79,8 @@ namespace lev
       bool do_events();
       bool done();
       static boost::shared_ptr<system> get() { return singleton; }
+      lua_State *get_interpreter();
       std::string get_name();
-//      static int get_l(lua_State *L);
       luabind::object get_on_button_down();
       luabind::object get_on_button_up();
       luabind::object get_on_key_down();

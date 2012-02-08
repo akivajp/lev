@@ -29,7 +29,7 @@
 #include <SDL/SDL.h>
 #include <vector>
 
-// globals initialization
+// static member variable initialization
 boost::shared_ptr<lev::system> lev::system::singleton;
 
 int luaopen_lev_system(lua_State *L)
@@ -581,13 +581,13 @@ namespace lev
   class mySystem
   {
     private:
-      mySystem()
+      mySystem(lua_State *L)
         : funcs(), name("lev"), running(true),
           on_tick(),
           on_left_down(),   on_left_up(),
           on_middle_down(), on_middle_up(),
           on_right_down(),  on_right_up(),
-          timers(), L(NULL)
+          timers(), L(L)
       { }
 
     public:
@@ -597,8 +597,7 @@ namespace lev
       {
         mySystem *sys = NULL;
         try {
-          sys = new mySystem;
-          if (L) { sys->L = L; }
+          sys = new mySystem(L);
           return sys;
         }
         catch (...) {
@@ -790,6 +789,11 @@ printf("DETACHING TIMER!\n");
     return true;
   }
 
+  lua_State *system::get_interpreter()
+  {
+    return cast_sys(_obj)->L;
+  }
+
   std::string system::get_name()
   {
     return cast_sys(_obj)->name;
@@ -874,6 +878,10 @@ printf("DETACHING TIMER!\n");
 //printf("INITTING!\n");
       if (SDL_Init(SDL_INIT_EVERYTHING) < 0) { throw -2; }
 //printf("INITTED!\n");
+
+// Fullscreen feature of SDL is not yet completed.
+//      SDL_DisplayMode mode = { 0 };
+//      SDL_SetFullscreenDisplayMode(&mode);
 
       SDL_EnableUNICODE(1);
       SDL_GL_SetAttribute(SDL_GL_RED_SIZE,    8);

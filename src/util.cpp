@@ -21,6 +21,9 @@
 // libraries
 #include <boost/format.hpp>
 #include <luabind/luabind.hpp>
+#ifdef _WIN32
+  #include <windows.h>
+#endif // _WIN32
 
 static const char *code_using =
 "-- looking up of varnames\n\
@@ -320,11 +323,11 @@ namespace lev
   bool util::open(const std::string &path, const std::string &type)
   {
 #ifdef _WIN32
-    ShellExecute(0, _T("open"), paht.c_str(), 0, 0, SW_SHOW_DEFAULT);
+    ShellExecute(0, "open", path.c_str(), 0, 0, SW_SHOWDEFAULT);
     return true;
 #else
     if (path.empty()) { return false; }
-    system((std::string("xdg-open ") + path).c_str());
+    int unused = system((std::string("xdg-open ") + path).c_str());
     return true;
 #endif // _WIN32
 //    wxMimeTypesManager manager;

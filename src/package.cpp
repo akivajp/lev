@@ -31,14 +31,17 @@ int luaopen_lev_package(lua_State *L)
   using namespace luabind;
 
   open(L);
-//  globals(L)["require"]("lev.archive");
-//  globals(L)["require"]("lev.fs");
+  globals(L)["require"]("table");
 
   module(L, "lev")
   [
     namespace_("package")
     [
+      def("add_font", &package::add_font, raw(_1)),
+      def("add_font_dir", &package::add_font_dir, raw(_1)),
       def("add_path", &package::add_path, raw(_1)),
+      def("get_font_dirs", &package::get_font_dirs, raw(_1)),
+      def("get_font_list", &package::get_font_list, raw(_1)),
       def("resolve", &package::resolve, raw(_1)),
       def("search_font", &package::search_font, raw(_1))
     ]
@@ -46,7 +49,6 @@ int luaopen_lev_package(lua_State *L)
   object lev = globals(L)["lev"];
   object package = lev["package"];
 
-  register_to(package, "add_font", &package::add_font_l);
   register_to(package, "add_search", &package::add_search_l);
   register_to(package, "clear_search", &package::clear_search_l);
   register_to(package, "dofile", &package::dofile_l);
@@ -77,48 +79,29 @@ namespace lev
   bool package::add_font(lua_State *L, const std::string &filename)
   {
     open(L);
-    globals(L)["require"]("table");
-    module(L, "lev")
-    [
-      namespace_("package")
-    ];
-    if (! globals(L)["lev"]["package"]["fonts"])
-    {
-      globals(L)["lev"]["package"]["fonts"] = newtable(L);
-    }
-    globals(L)["table"]["insert"](globals(L)["lev"]["package"]["fonts"], 1, filename);
+    globals(L)["require"]("lev.package");
+    object t = globals(L)["lev"]["package"]["get_font_list"]();
+    globals(L)["table"]["insert"](t, 1, filename);
     return true;
   }
 
-  int package::add_font_l(lua_State *L)
+  bool package::add_font_dir(lua_State *L, const std::string &dir)
   {
-    using namespace luabind;
-    const char *file = NULL;
-
-    object t = util::get_merged(L, 1, -1);
-    if (t["file_name"]) { file = object_cast<const char *>(t["file_name"]); }
-    else if (t["file"]) { file = object_cast<const char *>(t["file"]); }
-    else if (t["lua.string1"]) { file = object_cast<const char *>(t["lua.string1"]); }
-    if (file == NULL) { luaL_error(L, "file (string) is not given"); }
-
-    lua_pushboolean(L, package::add_font(L, file));
-    return 1;
+    open(L);
+    globals(L)["require"]("lev.package");
+    object t = globals(L)["lev"]["package"]["get_font_dirs"]();
+    globals(L)["table"]["insert"](t, 1, dir);
   }
 
   bool package::add_path(lua_State *L, const std::string &path)
   {
     open(L);
-    globals(L)["require"]("table");
-    module(L, "lev")
-    [
-      namespace_("package")
-    ];
+    globals(L)["require"]("lev.package");
     if (! globals(L)["lev"]["package"]["path_list"])
     {
       globals(L)["lev"]["package"]["path_list"] = newtable(L);
     }
-//    globals(L)["table"]["insert"](globals(L)["lev"]["package"]["path_list"], 1, path);
-    globals(L)["table"]["insert"](globals(L)["lev"]["package"]["path_list"], path);
+    globals(L)["table"]["insert"](globals(L)["lev"]["package"]["path_list"], 1, path);
     return true;
   }
 
@@ -187,35 +170,32 @@ namespace lev
     return 0;
   }
 
-  const char *package::get_archive_dir(lua_State *L)
+  luabind::object package::get_font_dirs(lua_State *L)
   {
     open(L);
     module(L, "lev")
     [
       namespace_("package")
     ];
-    if (! globals(L)["lev"]["package"]["archive_dir"]) { return NULL; }
-    return object_cast<const char *>(globals(L)["lev"]["package"]["archive_dir"]);
+    if (! globals(L)["lev"]["package"]["font_dirs"])
+    {
+      object t = newtable(L);
+      globals(L)["lev"]["package"]["font_dirs"] = t;
+      globals(L)["table"]["insert"](t, 1, "./");
+      return t;
+    }
+    return globals(L)["lev"]["package"]["font_dirs"];
   }
-
 
   luabind::object package::get_font_list(lua_State *L)
   {
     open(L);
-    module(L, "lev")
-    [
-      namespace_("package")
-    ];
-    if (! globals(L)["lev"]["package"]["fonts"])
+    globals(L)["require"]("lev.package");
+    if (! globals(L)["lev"]["package"]["font_list"])
     {
-      object fonts = newtable(L);
-      globals(L)["table"]["insert"](fonts, "msgothic.ttc");
-      globals(L)["table"]["insert"](fonts, "msgothic.ttf");
-      globals(L)["table"]["insert"](fonts, "msmincho.ttc");
-      globals(L)["table"]["insert"](fonts, "msmincho.ttf");
-      globals(L)["lev"]["package"]["fonts"] = fonts;
+      globals(L)["lev"]["package"]["font_list"] = newtable(L);
     }
-    return globals(L)["lev"]["package"]["fonts"];
+    return globals(L)["lev"]["package"]["font_list"];
   }
 
   luabind::object package::get_path_list(lua_State *L)
@@ -443,35 +423,35 @@ namespace lev
 //    return NULL;
 //  }
 
-  luabind::object package::search_font(lua_State *L, const std::string &filename)
+  boost::shared_ptr<font> package::search_font(lua_State *L)
   {
-    globals(L)["require"]("lev.font");
-    object dirs = globals(L)["lev"]["package"]["font_dirs"];
+    boost::shared_ptr<font> f;
+    try {
+      globals(L)["require"]("lev.font");
+      object dirs = globals(L)["lev"]["package"]["get_font_dirs"]();
+      object fonts = globals(L)["lev"]["package"]["get_font_list"]();
 
-    if (file_system::file_exists(filename))
-    {
-      return globals(L)["lev"]["font"]["load"](filename);
-    }
-    for (iterator i(dirs), end; i != end; i++)
-    {
-      std::string path = object_cast<const char *>(*i);
-      if (file_system::file_exists(path + "/" + filename))
+      for (iterator i(dirs), end; i != end; i++)
       {
-        return globals(L)["lev"]["font"]["load"](path + "/" + filename);
+        std::string path = object_cast<const char *>(*i);
+        for (iterator j(fonts), end; j != end; j++)
+        {
+          std::string filename = object_cast<const char *>(*j);
+          if (file_system::file_exists(path + "/" + filename))
+          {
+            f = font::load(path + "/" + filename);
+// printf("FONT %s is found!\n", (path + "/" + filename).c_str());
+            if (f) { break; }
+          }
+        }
       }
     }
-    return object();
-  }
-
-  bool package::set_archive_dir(lua_State *L, const std::string &archive_dir)
-  {
-    open(L);
-    module(L, "lev")
-    [
-      namespace_("package")
-    ];
-    globals(L)["lev"]["package"]["archive_dir"] = archive_dir;
-    return true;
+    catch (...) {
+      f.reset();
+      fprintf(stderr, "error on font finding\n");
+      fprintf(stderr, "error essage: %s\n", lua_tostring(L, -1));
+    }
+    return f;
   }
 
   bool package::set_default_font_dirs(lua_State *L)
@@ -485,23 +465,12 @@ namespace lev
     try {
       object list = newtable(L);
       globals(L)["lev"]["package"]["font_dirs"] = list;
-#ifdef __WXGTK__
-//      boost::shared_ptr<file_system> fs(file_system::open("/usr/share/fonts/"));
-//      if (! fs) { throw -1; }
-//      std::string path;
-//      fs->find("*", path);
-//      while (! path.empty())
-//      {
-//        if (file_system::dir_exists(path))
-//        {
-//          globals(L)["table"]["insert"](list, 1, path);
-//        }
-//        fs->find_next(path);
-//      }
-#endif
-#ifdef __WXMSW__
+#if (defined(_WIN32))
       globals(L)["table"]["insert"](list, 1, "C:/Windows/Fonts");
-#endif
+#elif (defined(__linux))
+      globals(L)["table"]["insert"](list, 1, "/usr/share/fonts/");
+#else
+#endif // _WIN32
       globals(L)["table"]["insert"](list, 1, "./");
       globals(L)["table"]["insert"](list, 1, "./font");
       globals(L)["table"]["insert"](list, 1, "./fonts");

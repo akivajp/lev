@@ -12,6 +12,7 @@
 /////////////////////////////////////////////////////////////////////////////
 
 #include "archive.hpp"
+#include "debug.hpp"
 #include "draw.hpp"
 #include "entry.hpp"
 #include "font.hpp"

@@ -15,7 +15,6 @@
 #include "lev/window.hpp"
 
 // dependencies
-#include "lev/draw.hpp"
 #include "lev/system.hpp"
 #include "lev/util.hpp"
 #include "register.hpp"
@@ -47,8 +46,12 @@ int luaopen_lev_window(lua_State *L)
         .property("h", &window::get_h, &window::set_h)
         .property("height", &window::get_h, &window::set_h)
         .property("id", &window::get_id)
+        .property("is_full_screen", &window::is_fullscreen, &window::set_fullscreen)
+        .property("is_fullscreen", &window::is_fullscreen, &window::set_fullscreen)
         .def("hide", &window::hide)
         .def("screen", &screen::create)
+        .def("set_full_screen", &window::set_fullscreen)
+        .def("set_fullscreen", &window::set_fullscreen)
         .def("show", &window::show)
         .def("show", &window::show0)
         .property("w", &window::get_w, &window::set_w)
@@ -89,11 +92,10 @@ namespace lev
     return false;
   }
 
-//  window* window::create(const char *title, int x, int y, int w, int h, unsigned long flags)
   boost::shared_ptr<window> window::create(const char *title, int x, int y, int w, int h, unsigned long flags)
   {
-//    window* win = NULL;
     boost::shared_ptr<window> win;
+    if (! system::get()) { return win; }
     try {
       win.reset(new window);
       if (! win) { throw -1; }
@@ -190,6 +192,21 @@ namespace lev
   bool window::hide()
   {
     SDL_HideWindow(cast_win(_obj));
+  }
+
+  bool window::is_fullscreen()
+  {
+    if (SDL_GetWindowFlags(cast_win(_obj)) & SDL_WINDOW_FULLSCREEN) { return true; }
+    return false;
+  }
+
+  bool window::set_fullscreen(bool enable)
+  {
+    if (SDL_SetWindowFullscreen(cast_win(_obj), (SDL_bool)enable) == 0)
+    {
+      return true;
+    }
+    return false;
   }
 
   bool window::set_h(int h)
