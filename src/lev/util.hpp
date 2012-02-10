@@ -23,6 +23,7 @@ namespace lev
   {
     public:
       static luabind::object copy_function(luabind::object func);
+      static luabind::object copy_table(luabind::object table);
       static bool execute(const std::string &target);
       static int execute_code_l(lua_State *L);
       static luabind::object get_merged(lua_State *L, int start, int end);

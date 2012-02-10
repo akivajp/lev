@@ -14,6 +14,9 @@
 // declarations
 #include "lev/string.hpp"
 
+// dependencies
+#include "lev/debug.hpp"
+
 // libraries
 #include <luabind/raw_policy.hpp>
 
@@ -40,15 +43,15 @@ int luaopen_lev_string(lua_State *L)
         .def("find", &unicode_string::find_utf8)
         .def("index_code", &unicode_string::index)
         .def("index", &unicode_string::index_str)
-        .property("len", &unicode_string::len)
-        .property("length", &unicode_string::len)
+        .property("len", &unicode_string::length)
+        .property("length", &unicode_string::length)
         .property("str", &unicode_string::to_utf8, &unicode_string::assign_utf8)
         .property("string", &unicode_string::to_utf8, &unicode_string::assign_utf8)
         .def("sub", &unicode_string::sub_string)
         .def("sub", &unicode_string::sub_string1)
         .def("__eq", &unicode_string::compare)
         .def("__concat", &unicode_string::concat, raw(_1))
-        .def("__len", &unicode_string::len)
+        .def("__len", &unicode_string::length)
         .def("__tostring", &unicode_string::to_utf8)
         .scope
         [
@@ -319,7 +322,7 @@ namespace lev
     }
     catch (...) {
       uni.reset();
-      fprintf(stderr, "error on unicode string concatination of two strings\n");
+      lev::debug_print("error on unicode string concatination of two strings");
     }
     return uni;
   }
@@ -345,7 +348,7 @@ namespace lev
     }
     catch (...) {
       u.reset();
-      fprintf(stderr, "error on unicode string instance creation from utf8 string\n");
+      lev::debug_print("error on unicode string instance creation from utf8 string");
     }
     return u;
   }
@@ -356,7 +359,7 @@ namespace lev
     else { return -1; }
   }
 
-  size_t unicode_string::len() const
+  size_t unicode_string::length() const
   {
     return cast_str(_obj)->str.length();
   }
@@ -373,7 +376,7 @@ namespace lev
     }
     catch (...) {
       uni.reset();
-      fprintf(stderr, "error on unicode sub string creation\n");
+      lev::debug_print("error on unicode sub string creation");
     }
     return uni;
   }

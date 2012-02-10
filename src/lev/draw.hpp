@@ -12,7 +12,6 @@
 /////////////////////////////////////////////////////////////////////////////
 
 #include "base.hpp"
-#include "prim.hpp"
 
 #include <boost/shared_ptr.hpp>
 #include <boost/weak_ptr.hpp>
@@ -26,9 +25,7 @@ namespace lev
 {
 
   class image;
-  class raster;
   class screen;
-  class window;
 
   class drawable : public base
   {
@@ -60,58 +57,6 @@ namespace lev
       virtual bool is_texturized() { false; }
       virtual bool texturize(bool force = false) { return false; }
       virtual bool texturize0() { return texturize(); }
-  };
-
-  // screen (graphic context manager) class
-  class screen : public base
-  {
-    protected:
-      screen();
-    public:
-      ~screen();
-      bool blit(int x, int y, image *src,
-                int src_x = 0, int src_y = 0, int w = -1, int h = -1,
-                unsigned char alpha = 255);
-      bool blit1(image *src) { return blit(0, 0, src); }
-      bool blit2(image *src, unsigned char alpha) { return blit(0, 0, src, 0, 0, -1, -1, alpha); }
-      bool blit3(int x, int y, image *src) { return blit(x, y, src); }
-      bool blit4(int x, int y, image *src, unsigned char alpha) { return blit(x, y, src, 0, 0, -1, -1, alpha); }
-
-      virtual bool clear() { return clear_color(0, 0, 0, 0); }
-      virtual bool clear_color(unsigned char r,
-                               unsigned char g,
-                               unsigned char b,
-                               unsigned char a = 255);
-      virtual bool clear_color1(const color &c);
-      virtual bool clear_color3(unsigned char r, unsigned char g, unsigned char b)
-      { return clear_color(r, g, b); }
-
-      static boost::shared_ptr<screen> create(boost::shared_ptr<window> holder);
-      bool draw(drawable *src, int x = 0, int y = 0, unsigned char alpha = 255);
-      static int draw_l(lua_State *L);
-//      bool draw_point(point *pt);
-//      static int draw_points(lua_State *L);
-//      void draw_line(int x1, int y1, int x2, int y2);
-      bool draw_pixel(int x, int y, const color &c);
-      bool draw_raster(const raster *r, int x = 0, int y = 0, const color *c = NULL);
-      bool enable_alpha_blending(bool enable = true);
-      bool enable_alpha_blending0() { return enable_alpha_blending(); }
-//      bool fill_rect(int x, int y, int w, int h, color *filling);
-      bool flip();
-//      void flush();
-      void* get_rawobj() { return _obj; }
-//      bool print(const char *text);
-//      bool redraw();
-      boost::shared_ptr<image> get_screenshot();
-      virtual type_id get_type_id() const { return LEV_TSCREEN; }
-      virtual const char *get_type_name() const { return "lev.screen"; }
-      bool map2d_auto();
-      bool map2d(int left, int right, int top, int bottom);
-      bool set_current();
-      bool swap();
-    protected:
-      boost::weak_ptr<window> holder;
-      void *_obj;
   };
 
 }

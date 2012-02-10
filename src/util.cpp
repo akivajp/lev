@@ -98,12 +98,12 @@ int luaopen_lev_util(lua_State *L)
 
   open(L);
   globals(L)["require"]("lev.base");
-//  globals(L)["require"]("lev.fs");
 
   module(L, "lev")
   [
     namespace_("util")
     [
+      def("copy_table", &util::copy_table),
       def("execute", &util::execute),
       def("print_table", &util::print_table),
       def("open", &util::open),
@@ -133,7 +133,27 @@ namespace lev
   {
     using namespace luabind;
     lua_State *L = func.interpreter();
+    if (! L) { return object(); }
     return globals(L)["loadstring"](globals(L)["string"]["dump"](func));
+  }
+
+  luabind::object util::copy_table(luabind::object table)
+  {
+    using namespace luabind;
+    lua_State *L = table.interpreter();
+    if (L and type(table) == LUA_TTABLE)
+    {
+      object t = newtable(L);
+      for (iterator i(table), end; i != end; i++)
+      {
+        t[i.key()] = *i;
+      }
+      return t;
+    }
+    else
+    {
+      return object();
+    }
   }
 
   bool util::execute(const std::string &target)

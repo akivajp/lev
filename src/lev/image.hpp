@@ -28,6 +28,7 @@ namespace lev
   class file_path;
   class font;
   class raster;
+  class window;
 
   class image : public drawable
   {
@@ -93,6 +94,7 @@ namespace lev
       bool stroke_rect(int x, int y, int w, int h, color *border, int width);
       boost::shared_ptr<image> sub_image(int x, int y, int w, int h);
       static int sub_image_l(lua_State *L);
+      static boost::shared_ptr<image> take_screenshot(boost::shared_ptr<window> win);
       virtual bool texturize(bool force = false);
 //      bool swap(image *img);
       bool swap(boost::shared_ptr<image> img);
@@ -172,14 +174,13 @@ namespace lev
       layout();
     public:
       virtual ~layout();
-      virtual bool clear(const color &c);
-      virtual bool clear0() { return clear(color::transparent()); }
+      virtual bool clear();
       bool complete();
       static boost::shared_ptr<layout> create(int width_stop = -1);
       virtual bool draw_on_image(image *dst, int x = 0, int y = 0, unsigned char alpha = 255);
       virtual bool draw_on_screen(screen *dst, int x = 0, int y = 0, unsigned char alpha = 255);
       color &get_fg_color();
-      font *get_font();
+      boost::shared_ptr<font> get_font();
       virtual int get_h() const;
       font *get_ruby_font();
       int get_spacing();
@@ -190,6 +191,7 @@ namespace lev
       bool is_done();
       bool on_hover(int x, int y);
       bool on_left_click(int x, int y);
+      bool rearrange();
       bool reserve_clickable(boost::shared_ptr<image> normal, boost::shared_ptr<image> hover,
                              luabind::object lclick_func, luabind::object hover_func);
       bool reserve_clickable_text(const std::string &text,
@@ -204,6 +206,7 @@ namespace lev
       bool set_ruby_font(font *f);
       bool set_spacing(int space = 1);
       bool show_next();
+      virtual bool texturize(bool force = false);
     protected:
       void *_obj;
   };

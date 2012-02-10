@@ -15,6 +15,7 @@
 #include "lev/timer.hpp"
 
 // dependencies
+#include "lev/debug.hpp"
 #include "lev/system.hpp"
 
 // libraries
@@ -178,7 +179,7 @@ namespace lev
     }
     catch(...) {
       sw.reset();
-      fprintf(stderr, "error on stop watch instance creation\n");
+      lev::debug_print("error on stop watch instance creation");
     }
     return sw;
   }
@@ -316,34 +317,6 @@ namespace lev
       boost::weak_ptr<system> sys;
   };
 
-//  static Uint32 timer_callback(Uint32 interval, void *param)
-//  {
-//    myTimer *t= (myTimer *)param;
-//
-////printf("CALLBACK!\n");
-//    if (t->running)
-//    {
-//      if (t->notify && luabind::type(t->notify) == LUA_TFUNCTION)
-//      {
-//        try {
-//          luabind::object result = t->notify();
-//          if (luabind::type(result) == LUA_TBOOLEAN && result == false)
-//          {
-//            t->running = false;
-//          }
-//        }
-//        catch (...) {
-//          fprintf(stderr, "%s\n", lua_tostring(t->notify.interpreter(), -1));
-//        }
-//        if (t->one_shot)
-//        {
-//          t->running = false;
-//        }
-//      }
-//    }
-//    return t->interval;
-//  }
-
   static myTimer* cast_timer(void *obj) { return (myTimer *)obj; }
 
   timer::timer() : _obj(NULL) { }
@@ -373,7 +346,7 @@ namespace lev
     }
     catch (...) {
       t.reset();
-      fprintf(stderr, "error on timer class creation\n");
+      lev::debug_print("error on timer class creation");
     }
     return t;
   }
@@ -483,7 +456,7 @@ namespace lev
     }
     catch (...) {
       c.reset();
-      fprintf(stderr, "error on clock instance creation\n");
+      lev::debug_print("error on clock instance creation");
     }
     return c;
   }

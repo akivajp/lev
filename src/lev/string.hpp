@@ -46,7 +46,7 @@ namespace lev
       bool is_valid() { return _obj != NULL; }
       virtual type_id get_type_id() const { return LEV_TUNICODE_STRING; }
       virtual const char *get_type_name() const { return "lev.unicode_string"; }
-      size_t len() const;
+      size_t length() const;
       boost::shared_ptr<unicode_string> sub_string(size_t from, size_t to = -1) const;
       boost::shared_ptr<unicode_string> sub_string1(size_t from) const { return sub_string(from); }
       std::string to_utf8() const;

@@ -15,12 +15,14 @@
 #include "lev/image.hpp"
 
 // dependencies
+#include "lev/debug.hpp"
 #include "lev/font.hpp"
 #include "lev/fs.hpp"
 #include "lev/map.hpp"
 #include "lev/util.hpp"
 #include "lev/system.hpp"
 #include "lev/timer.hpp"
+#include "lev/window.hpp"
 #include "register.hpp"
 //#include "resource/levana.xpm"
 
@@ -119,7 +121,6 @@ int luaopen_lev_image(lua_State *L)
         ],
       class_<layout, drawable, boost::shared_ptr<base> >("layout")
         .def("clear", &layout::clear)
-        .def("clear", &layout::clear0)
         .property("color",  &layout::get_fg_color, &layout::set_fg_color)
         .def("complete", &layout::complete)
         .property("fg",  &layout::get_fg_color, &layout::set_fg_color)
@@ -130,6 +131,7 @@ int luaopen_lev_image(lua_State *L)
         .def("on_hover", &layout::on_hover)
         .def("on_lclick", &layout::on_left_click)
         .def("on_left_click", &layout::on_left_click)
+        .def("rearrange", &layout::rearrange)
         .def("reserve_clickable", &layout::reserve_clickable)
         .def("reserve_clickable", &layout::reserve_clickable_text)
         .def("reserve_image", &layout::reserve_image)
@@ -444,7 +446,7 @@ namespace lev
     }
     catch (...) {
       img.reset();
-      fprintf(stderr, "error on image memory allocation or copying\n");
+      lev::debug_print("error on image memory allocation or copying");
     }
     return img;
   }
@@ -464,7 +466,7 @@ namespace lev
     }
     catch (...) {
       img.reset();
-      fprintf(stderr, "error on image memory allocation\n");
+      lev::debug_print("error on image memory allocation");
     }
     return img;
   }
@@ -740,7 +742,7 @@ namespace lev
     }
     catch (...) {
       img.reset();
-      fprintf(stderr, "error on image data loading\n");
+      lev::debug_print("error on image data loading");
     }
     return img;
   }
@@ -768,14 +770,14 @@ namespace lev
         for (int x = 0; x < width; x++)
         {
           boost::shared_ptr<color> c;
-          c = get_pixel(float(x) * get_w() / width, float(y) * get_h() / height);
+          c = get_pixel(long(x) * get_w() / width, long(y) * get_h() / height);
           if (c) { img->set_pixel(x, y, *c); }
         }
       }
     }
     catch (...) {
       img.reset();
-      fprintf(stderr, "error on resized image creation\n");
+      lev::debug_print("error on resized image creation");
     }
     return img;
   }
@@ -838,7 +840,7 @@ namespace lev
     }
     catch (...) {
       img.reset();
-      fprintf(stderr, "error on string image instance creation\n");
+      lev::debug_print("error on string image instance creation");
     }
     return img;
   }
@@ -976,7 +978,7 @@ namespace lev
     }
     catch (...) {
       img.reset();
-      fprintf(stderr, "error on sub image instance creation\n");
+      lev::debug_print("error on sub image instance creation");
     }
     return img;
   }
@@ -1025,11 +1027,42 @@ namespace lev
     return true;
   }
 
+  boost::shared_ptr<image> image::take_screenshot(boost::shared_ptr<window> win)
+  {
+    boost::shared_ptr<image> img;
+    if (! win) { return img; }
+    try {
+      if (win->get_id() > 0)
+      {
+        const int w = win->get_w();
+        const int h = win->get_h();
+        img = image::create(w, h);
+        if (! img) { throw -1; }
+        glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, cast_image(img->_obj)->buf);
+        Uint32 *buf = (Uint32 *)cast_image(img->_obj)->buf;
+        for (int y = 0; y < h / 2; y++)
+        {
+          for (int x = 0; x < w; x++)
+          {
+            Uint32 tmp = buf[y * w + x];
+            buf[y * w + x] = buf[(h - 1 - y) * w + x];
+            buf[(h - 1 - y) * w + x] = tmp;
+          }
+        }
+      }
+      else { throw -1; }
+    }
+    catch (...) {
+      img.reset();
+      lev::debug_print("error on screen shot image creation");
+    }
+    return img;
+  }
+
   bool image::texturize(bool force)
   {
     return cast_image(_obj)->Texturize(this, force);
   }
-
 
   class myTexture
   {
@@ -1107,7 +1140,7 @@ namespace lev
     }
     catch (...) {
       tex.reset();
-      fprintf(stderr, "error on texture instance creation\n");
+      lev::debug_print("error on texture instance creation");
     }
     return tex;
   }
@@ -1161,7 +1194,7 @@ namespace lev
       return texture::create(img.get());
     }
     catch (...) {
-      fprintf(stderr, "error on texture image loading\n");
+      lev::debug_print("error on texture image loading");
       return boost::shared_ptr<texture>();
     }
   }
@@ -1295,7 +1328,7 @@ namespace lev
 
     protected:
 
-      myTransition() : imgs(), sw() { }
+      myTransition() : imgs(), sw(), texturized(false) { }
 
     public:
 
@@ -1375,6 +1408,7 @@ namespace lev
         durations.clear();
         modes.clear();
         imgs.push_back(img);
+        texturized = false;
         return true;
       }
 
@@ -1385,6 +1419,7 @@ namespace lev
         try {
           imgs.push_back(img);
           durations.push_back(duration);
+          texturized = false;
 
           if (type == "cross_fade") { modes.push_back(LEV_TRAN_CROSS_FADE); }
           else if (type == "crossfade") { modes.push_back(LEV_TRAN_CROSS_FADE); }
@@ -1401,19 +1436,21 @@ namespace lev
 
       bool TexturizeAll(bool force)
       {
-        bool at_least_one = false;
+        if (texturized && !force) { return false; }
         for (int i = 0; i < imgs.size(); i++)
         {
           if (! imgs[i]) { continue; }
-          if (imgs[i]->texturize(force)) { at_least_one = true; }
+          imgs[i]->texturize(force);
         }
-        return at_least_one;
+        texturized = true;
+        return true;
       }
 
       std::vector<boost::shared_ptr<drawable> > imgs;
       std::vector<double> durations;
       std::vector<transition_mode> modes;
       boost::shared_ptr<stop_watch> sw;
+      bool texturized;
   };
   static myTransition* cast_tran(void *obj) { return (myTransition *)obj; }
 
@@ -1435,7 +1472,7 @@ namespace lev
     }
     catch (...) {
       tran.reset();
-      fprintf(stderr, "error on transition instance creation\n");
+      lev::debug_print("error on transition instance creation");
     }
     return tran;
   }
@@ -1523,8 +1560,8 @@ namespace lev
       lua_pushboolean(L, result);
     }
     catch (...) {
-      fprintf(stderr, "error on transition current image setting\n");
-      fprintf(stderr, "error message: %s\n", lua_tostring(L, -1));
+      lev::debug_print(lua_tostring(L, -1));
+      lev::debug_print("error on transition current image setting");
       lua_pushnil(L);
     }
     return 1;
@@ -1587,8 +1624,8 @@ namespace lev
       lua_pushboolean(L, result);
     }
     catch (...) {
-      fprintf(stderr, "error on transition next image setting\n");
-      fprintf(stderr, "error message: %s\n", lua_tostring(L, -1));
+      lev::debug_print(lua_tostring(L, -1));
+      lev::debug_print("error on transition next image setting");
       lua_pushnil(L);
     }
     return 1;
@@ -1616,7 +1653,7 @@ namespace lev
       myLayout(int width_stop = -1)
         : width_stop(width_stop),
           font_text(), font_ruby(), spacing(1),
-          items()
+          items(), texturized(false)
       {
         font_text = font::load0();
         font_ruby = font::load0();
@@ -1658,8 +1695,12 @@ namespace lev
             if (x > max_w) { max_w = x; }
             x = 0;
           }
+          if (item.img)
+          {
+            x += item.img->get_w();
+          }
         }
-        return max_w;
+        return (max_w > x ? max_w : x);
       }
 
       boost::shared_ptr<lev::vector> CalcPosition(int index)
@@ -1724,6 +1765,7 @@ namespace lev
       bool Clear()
       {
         items.clear();
+        texturized = false;
         return true;
       }
 
@@ -1876,6 +1918,7 @@ namespace lev
           i.img_hover = hover;
           i.func_hover = hover_func;
           i.func_lclick = lclick_func;
+          texturized = false;
           return true;
         }
         catch (...) {
@@ -1911,6 +1954,7 @@ namespace lev
 
           items.push_back(myItem());
           (items.end() - 1)->img = img;
+          texturized = false;
           return true;
         }
         catch (...) {
@@ -1926,6 +1970,7 @@ namespace lev
         items.push_back(myItem());
         (items.end() - 1)->img = image::create(1, font_text->get_pixel_size());
         RecalcAll();
+        texturized = false;
         return true;
       }
 
@@ -1971,6 +2016,19 @@ namespace lev
         return true;
       }
 
+      bool TexturizeAll(bool force)
+      {
+        if (texturized && !force) { return false; }
+        for (int i = 0; i < items.size(); i++)
+        {
+          myItem &item = items[i];
+          if (item.img) { item.img->texturize(force); }
+          if (item.img_hover) { item.img_hover->texturize(force); }
+        }
+        texturized = true;
+        return true;
+      }
+
       // format properties
       color color_fg;
       boost::shared_ptr<color> color_shade;
@@ -1983,6 +2041,8 @@ namespace lev
 
       // all items
       std::vector<myItem> items;
+
+      bool texturized;
   };
   static myLayout* cast_lay(void *obj) { return (myLayout *)obj; }
 
@@ -1996,7 +2056,7 @@ namespace lev
     if (_obj) { delete cast_lay(_obj); }
   }
 
-  bool layout::clear(const color &c)
+  bool layout::clear()
   {
     return cast_lay(_obj)->Clear();
   }
@@ -2018,7 +2078,7 @@ namespace lev
     }
     catch (...) {
       lay.reset();
-      fprintf(stderr, "error on image layout instance creation\n");
+      lev::debug_print("error on image layout instance creation");
 
     }
     return lay;
@@ -2039,14 +2099,14 @@ namespace lev
     return cast_lay(_obj)->color_fg;
   }
 
-  font *layout::get_font()
+  boost::shared_ptr<font> layout::get_font()
   {
-    return cast_lay(_obj)->font_text.get();
+    return cast_lay(_obj)->font_text;
   }
 
   int layout::get_h() const
   {
-    return cast_lay(_obj)->CalcMaxWidth();
+    return cast_lay(_obj)->CalcTotalHeight();
   }
 
   font *layout::get_ruby_font()
@@ -2066,7 +2126,8 @@ namespace lev
 
   int layout::get_w() const
   {
-    return cast_lay(_obj)->CalcTotalHeight();
+    if (cast_lay(_obj)->width_stop > 0) { return cast_lay(_obj)->width_stop; }
+    return cast_lay(_obj)->CalcMaxWidth();
   }
 
   bool layout::is_done()
@@ -2083,6 +2144,11 @@ namespace lev
   bool layout::on_left_click(int x, int y)
   {
     return cast_lay(_obj)->OnLeftClick(x, y);
+  }
+
+  bool layout::rearrange()
+  {
+    return cast_lay(_obj)->RecalcAll();
   }
 
   bool layout::reserve_clickable(boost::shared_ptr<image> normal,
@@ -2162,6 +2228,11 @@ namespace lev
     if (is_done()) { return false; }
     myLayout *lay = cast_lay(_obj);
     return lay->ShowIndex(lay->GetNextIndex());
+  }
+
+  bool layout::texturize(bool force)
+  {
+    return cast_lay(_obj)->TexturizeAll(force);
   }
 
 }

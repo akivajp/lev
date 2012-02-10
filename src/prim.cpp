@@ -9,6 +9,7 @@
 
 #include "prec.h"
 
+#include "lev/debug.hpp"
 #include "lev/prim.hpp"
 #include "lev/util.hpp"
 #include "register.hpp"
@@ -180,7 +181,7 @@ namespace lev
     }
     catch (...) {
       c.reset();
-      fprintf(stderr, "error on color instance creation\n");
+      lev::debug_print("error on color instance creation");
     }
     return c;
   }
@@ -281,7 +282,7 @@ namespace lev
     }
     catch (...) {
       s.reset();
-      fprintf(stderr, "error on size instance creation\n");
+      lev::debug_print("error on size instance creation");
     }
     return s;
   }
@@ -332,7 +333,7 @@ namespace lev
     }
     catch (...) {
       vec.reset();
-      fprintf(stderr, "error on vector instance creation\n");
+      lev::debug_print("error on vector instance creation");
     }
     return vec;
   }
@@ -383,7 +384,7 @@ namespace lev
     }
     catch (...) {
       pt.reset();
-      fprintf(stderr, "error on point instance creation\n");
+      lev::debug_print("error on point instance creation");
     }
     return pt;
   }
@@ -445,8 +446,8 @@ namespace lev
       return 1;
     }
     catch (...) {
-      fprintf(stderr, "error on point instance creation\n");
-      fprintf(stderr, "error message: %s\n", lua_tostring(L, -1));
+      lev::debug_print(lua_tostring(L, -1));
+      lev::debug_print("error on point instance creation");
     }
   }
 
@@ -457,7 +458,7 @@ namespace lev
       else { col.reset(); }
     }
     catch (...) {
-      fprintf(stderr, "error on point color setting\n");
+      lev::debug_print("error on point color setting");
       return false;
     }
     return true;
@@ -470,7 +471,7 @@ namespace lev
       vertex.reset(new vector(*v));
     }
     catch (...) {
-      fprintf(stderr, "error on point vertex setting\n");
+      lev::debug_print("error on point vertex setting");
       return false;
     }
     return true;
@@ -520,7 +521,7 @@ namespace lev
     }
     catch (...) {
       r.reset();
-      fprintf(stderr, "error on rect instance creation\n");
+      lev::debug_print("error on rect instance creation");
     }
     return r;
   }

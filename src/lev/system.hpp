@@ -24,6 +24,8 @@ namespace lev
 
   // class dependencies
   class clock;
+  class debug_window;
+  class window;
   class timer;
 
   class input
@@ -40,6 +42,7 @@ namespace lev
       std::string get_button() const;
       int get_dx() const;
       int get_dy() const;
+      int get_id() const;
       std::string get_key() const;
       long get_key_code() const;
       void *get_rawobj() { return _obj; }
@@ -67,6 +70,10 @@ namespace lev
                                                    double freq = 50);
       static boost::shared_ptr<clock> create_clock1(boost::shared_ptr<system> sys)
       { return create_clock(sys); }
+
+      boost::shared_ptr<window>
+        create_window(const char *title, int x, int y, int w, int h, unsigned long flags);
+      static int create_window_l(lua_State *L);
 
       static boost::shared_ptr<timer> create_timer(boost::shared_ptr<system> sys,
                                                    double interval = 1000);
@@ -98,6 +105,7 @@ namespace lev
       virtual type_id get_type_id() const { return LEV_TSYSTEM; }
       virtual const char *get_type_name() const { return "lev.system"; }
       static boost::shared_ptr<system> init(lua_State *L);
+      bool is_debugging();
       bool is_running();
       bool quit(bool force = false);
       bool quit0() { return quit(); }
@@ -117,6 +125,8 @@ namespace lev
       bool set_on_right_up(luabind::object func);
       bool set_on_tick(luabind::object func);
       bool set_running(bool run = true);
+      boost::shared_ptr<debug_window> start_debug();
+      bool stop_debug();
     protected:
       void *_obj;
       static boost::shared_ptr<system> singleton;

@@ -13,6 +13,7 @@
 
 #include "base.hpp"
 #include "draw.hpp"
+#include "image.hpp"
 #include "window.hpp"
 
 #include <boost/shared_ptr.hpp>
@@ -25,20 +26,8 @@ extern "C" {
 namespace lev
 {
 
-  class debug_window : public window
-  {
-    protected:
-      debug_window();
-    public:
-      virtual ~debug_window();
-      static boost::shared_ptr<debug_window> get() { return singleton; }
-      virtual type_id get_type_id() const { return LEV_TDEBUG_WINDOW; }
-      virtual const char *get_type_name() const { return "lev.debug_window"; }
-      static boost::shared_ptr<debug_window> init();
-    protected:
-      boost::shared_ptr<screen> ptr_screen;
-      static boost::shared_ptr<debug_window> singleton;
-  };
+  bool debug_print(const std::string &message_utf8);
+
 }
 
 #endif // _DEBUG_HPP

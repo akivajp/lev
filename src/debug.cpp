@@ -15,7 +15,9 @@
 #include "lev/debug.hpp"
 
 // dependencies
+#include "lev/font.hpp"
 #include "lev/system.hpp"
+#include "lev/string.hpp"
 
 // static member variable initialization
 boost::shared_ptr<lev::debug_window> lev::debug_window::singleton;
@@ -33,45 +35,54 @@ int luaopen_lev_debug(lua_State *L)
 
   module(L, "lev")
   [
+    namespace_("debug")
+    [
+      def("print", &debug_print)
+    ],
     namespace_("classes")
     [
       class_<debug_window, window, boost::shared_ptr<base> >("debug_window")
-        .scope
-        [
-          def("get", &debug_window::get),
-          def("init", &debug_window::init)
-        ]
+        .def("clear", &debug_window::clear)
+        .def("get_log", &debug_window::get_log)
+        .property("log", &debug_window::get_log)
+        .def("print", &debug_window::print)
+        .def("print", &debug_window::print1)
+//        .scope
+//        [
+//          def("get", &debug_window::get),
+//          def("init", &debug_window::init)
+//        ]
     ]
   ];
+  object lev = globals(L)["lev"];
+  object classes = lev["classes"];
+  object debug = lev["debug"];
 
-  globals(L)["package"]["loaded"]["debug"] = true;
+//  debug["window"] = classes["debug_window"]["init"];
+
+  globals(L)["package"]["loaded"]["lev.debug"] = true;
   return 0;
 }
 
 namespace lev
 {
 
-  debug_window::debug_window() : window(), ptr_screen() { }
-
-  debug_window::~debug_window() { }
-
-  boost::shared_ptr<debug_window> debug_window::init()
+  bool debug_print(const std::string &message_utf8)
   {
-    // singleton already exists
-    if (singleton) { return singleton; }
-    // system is not yet initialized
-    if (! system::get()) { return singleton; }
-    try {
-      singleton.reset(new debug_window);
-      if (! singleton) { throw -1; }
-      singleton->ptr_screen = screen::create(singleton);
-      if (! singleton->ptr_screen) { throw -2; }
+    time_t t;
+    struct tm *t_st;
+    time(&t);
+    t_st = localtime(&t);
+    char buf[9];
+    strftime(buf, 9, "%H:%M:%S", t_st);
+
+    if (debug_window::get())
+    {
+      debug_window::get()->show();
+      return debug_window::get()->print1(std::string("[") + buf + "]: " + message_utf8 + "\n");
     }
-    catch (...) {
-      singleton.reset();
-      fprintf(stderr, "error on debug window singleton initialization\n");
-    }
-    return singleton;
+    printf("Debug Message (%s): %s\n", buf, message_utf8.c_str());
   }
+
 }
 

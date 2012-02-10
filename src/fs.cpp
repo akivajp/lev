@@ -15,6 +15,7 @@
 #include "lev/fs.hpp"
 
 // dependencies
+#include "lev/debug.hpp"
 #include "lev/util.hpp"
 #include "register.hpp"
 
@@ -186,7 +187,7 @@ namespace lev
     }
     catch (...) {
       tmp.reset();
-      fprintf(stderr, "error on temp name instance creation\n");
+      lev::debug_print("error on temp name instance creation");
     }
     return tmp;
   }
@@ -259,7 +260,7 @@ namespace lev
     }
     catch (...) {
       fpath.reset();
-      fprintf(stderr, "error on file path instance creation\n");
+      lev::debug_print("error on file path instance creation");
     }
     return fpath;
   }
@@ -307,7 +308,7 @@ namespace lev
     }
     catch (...) {
       fpath.reset();
-      fprintf(stderr, "error on temp file path instance creation\n");
+      lev::debug_print("error on temp file path instance creation");
     }
     return fpath;
   }

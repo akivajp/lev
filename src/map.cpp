@@ -15,6 +15,7 @@
 #include "lev/map.hpp"
 
 // dependencies
+#include "lev/debug.hpp"
 #include "lev/image.hpp"
 #include "lev/prim.hpp"
 #include "lev/util.hpp"
@@ -28,7 +29,7 @@ namespace lev
   class myMap
   {
     protected:
-      myMap() : rects(), imgs() { }
+      myMap() : rects(), imgs(), texturized(false) { }
     public:
       ~myMap() { }
 
@@ -55,6 +56,7 @@ namespace lev
         alphas.clear();
         funcs_hover.clear();
         funcs_lclick.clear();
+        texturized = false;
         return true;
       }
 
@@ -120,6 +122,7 @@ namespace lev
 
         funcs_hover.push_back(luabind::object());
         funcs_lclick.push_back(luabind::object());
+        texturized = false;
         return true;
       }
 
@@ -137,6 +140,7 @@ namespace lev
 
         funcs_hover.push_back(on_hover);
         funcs_lclick.push_back(on_lclick);
+        texturized = false;
         return true;
       }
 
@@ -163,7 +167,7 @@ namespace lev
           }
         }
         catch (...) {
-          fprintf(stderr, "error on hovering process on image map\n");
+          lev::debug_print("error on hovering process on image map");
           return false;
         }
         return true;
@@ -186,8 +190,8 @@ namespace lev
           }
         }
         catch (...) {
-          fprintf(stderr, "error on left click process on image map\n");
-          if (L) { fprintf(stderr, "error message: %s\n", lua_tostring(L, -1)); }
+          lev::debug_print("error on left click process on image map");
+          if (L) { lev::debug_print(lua_tostring(L, -1)); }
           return false;
         }
         return true;
@@ -195,15 +199,14 @@ namespace lev
 
       bool TexturizeAll(bool force)
       {
-        bool result_final = false;
+        if (texturized && !force) { return false; }
         for (int i = 0; i < imgs.size(); i++)
         {
-          bool result = imgs[i]->texturize(force);
-          if (result) { result_final = true; }
-          result = hover_imgs[i]->texturize(force);
-          if (result) { result_final = true; }
+          imgs[i]->texturize(force);
+          hover_imgs[i]->texturize(force);
         }
-        return result_final;
+        texturized = true;
+        return true;
       }
 
       bool PopBack()
@@ -216,6 +219,7 @@ namespace lev
         funcs_hover.pop_back();
         funcs_lclick.pop_back();
         alphas.pop_back();
+        texturized = false;
         return true;
       }
 
@@ -226,6 +230,7 @@ namespace lev
       std::vector<luabind::object> funcs_hover;
       std::vector<luabind::object> funcs_lclick;
       std::vector<unsigned char> alphas;
+      bool texturized;
   };
   static myMap* cast_map(void *obj) { return (myMap *)obj; }
 
@@ -256,7 +261,7 @@ namespace lev
     }
     catch (...) {
       m.reset();
-      fprintf(stderr, "error on image map instance creation\n");
+      lev::debug_print("error on image map instance creation");
     }
     return m;
   }
@@ -370,7 +375,7 @@ namespace lev
       lua_pushboolean(L, result);
     }
     catch (...) {
-      fprintf(stderr, "error on map link setting\n");
+      lev::debug_print("error on map link setting");
       lua_pushboolean(L, false);
     }
     return 1;

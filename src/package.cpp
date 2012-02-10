@@ -16,6 +16,7 @@
 
 // dependencies
 #include "lev/archive.hpp"
+#include "lev/debug.hpp"
 #include "lev/fs.hpp"
 #include "lev/util.hpp"
 #include "lev/system.hpp"
@@ -40,10 +41,11 @@ int luaopen_lev_package(lua_State *L)
       def("add_font", &package::add_font, raw(_1)),
       def("add_font_dir", &package::add_font_dir, raw(_1)),
       def("add_path", &package::add_path, raw(_1)),
+      def("find_font", &package::find_font, raw(_1)),
+      def("find_font", &package::find_font0, raw(_1)),
       def("get_font_dirs", &package::get_font_dirs, raw(_1)),
       def("get_font_list", &package::get_font_list, raw(_1)),
-      def("resolve", &package::resolve, raw(_1)),
-      def("search_font", &package::search_font, raw(_1))
+      def("resolve", &package::resolve, raw(_1))
     ]
   ];
   object lev = globals(L)["lev"];
@@ -158,7 +160,7 @@ namespace lev
     {
       if (luaL_dofile(L, fpath->get_full_path().c_str()) != 0)
       {
-        fprintf(stderr, "%s\n", lua_tostring(L, -1));
+        lev::debug_print(lua_tostring(L, -1));
         lua_pushnil(L);
         return 1;
       }
@@ -168,6 +170,53 @@ namespace lev
 
     luaL_error(L, ("cannnot open " + filename + ": No such file or directory").c_str());
     return 0;
+  }
+
+  boost::shared_ptr<font> package::find_font(lua_State *L, const std::string &filename)
+  {
+    boost::shared_ptr<font> f;
+    try {
+      globals(L)["require"]("lev.font");
+      object dirs = globals(L)["lev"]["package"]["get_font_dirs"]();
+
+      for (iterator i(dirs), end; i != end; i++)
+      {
+        std::string path = object_cast<const char *>(*i);
+        if (file_system::file_exists(path + "/" + filename))
+        {
+          f = font::load(path + "/" + filename);
+          if (f) { break; }
+        }
+      }
+    }
+    catch (...) {
+      f.reset();
+      lev::debug_print(lua_tostring(L, -1));
+      lev::debug_print("error on font finding");
+    }
+    return f;
+  }
+
+  boost::shared_ptr<font> package::find_font0(lua_State *L)
+  {
+    boost::shared_ptr<font> f;
+    try {
+      globals(L)["require"]("lev.font");
+      object fonts = globals(L)["lev"]["package"]["get_font_list"]();
+
+      for (iterator i(fonts), end; i != end; i++)
+      {
+        std::string filename = object_cast<const char *>(*i);
+        f = package::find_font(L, filename);
+        if (f) { break; }
+      }
+    }
+    catch (...) {
+      f.reset();
+      lev::debug_print(lua_tostring(L, -1));
+      lev::debug_print("error on font finding\n");
+    }
+    return f;
   }
 
   luabind::object package::get_font_dirs(lua_State *L)
@@ -251,7 +300,7 @@ namespace lev
     {
       if (luaL_dofile(L, fpath->get_full_path().c_str()))
       {
-        fprintf(stderr, "%s\n", lua_tostring(L, -1));
+        lev::debug_print(lua_tostring(L, -1));
         lua_pushnil(L);
         return 1;
       }
@@ -342,7 +391,7 @@ namespace lev
       }
     }
     catch (...) {
-      fprintf(stderr, "error on file path resolving\n");
+      lev::debug_print("error on file path resolving");
     }
     return boost::shared_ptr<file_path>();
   }
@@ -422,37 +471,6 @@ namespace lev
 //
 //    return NULL;
 //  }
-
-  boost::shared_ptr<font> package::search_font(lua_State *L)
-  {
-    boost::shared_ptr<font> f;
-    try {
-      globals(L)["require"]("lev.font");
-      object dirs = globals(L)["lev"]["package"]["get_font_dirs"]();
-      object fonts = globals(L)["lev"]["package"]["get_font_list"]();
-
-      for (iterator i(dirs), end; i != end; i++)
-      {
-        std::string path = object_cast<const char *>(*i);
-        for (iterator j(fonts), end; j != end; j++)
-        {
-          std::string filename = object_cast<const char *>(*j);
-          if (file_system::file_exists(path + "/" + filename))
-          {
-            f = font::load(path + "/" + filename);
-// printf("FONT %s is found!\n", (path + "/" + filename).c_str());
-            if (f) { break; }
-          }
-        }
-      }
-    }
-    catch (...) {
-      f.reset();
-      fprintf(stderr, "error on font finding\n");
-      fprintf(stderr, "error essage: %s\n", lua_tostring(L, -1));
-    }
-    return f;
-  }
 
   bool package::set_default_font_dirs(lua_State *L)
   {

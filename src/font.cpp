@@ -14,6 +14,7 @@
 #include "lev/font.hpp"
 
 // dependencies
+#include "lev/debug.hpp"
 #include "lev/image.hpp"
 #include "lev/package.hpp"
 #include "lev/system.hpp"
@@ -135,7 +136,7 @@ namespace lev
     }
     catch (...) {
       r.reset();
-      fprintf(stderr, "error on raster instance concatination\n");
+      lev::debug_print("error on raster instance concatination");
     }
     return r;
   }
@@ -155,7 +156,7 @@ namespace lev
     }
     catch (...) {
       r.reset();
-      fprintf(stderr, "error on raster instance creation\n");
+      lev::debug_print("error on raster instance creation");
     }
     return r;
   }
@@ -308,7 +309,7 @@ namespace lev
     }
     catch (...) {
       f.reset();
-      fprintf(stderr, "error on font instance cloning\n");
+      lev::debug_print("error on font instance cloning");
     }
     return f;
   }
@@ -345,7 +346,7 @@ namespace lev
     }
     catch (...) {
       f.reset();
-      fprintf(stderr, "error on font instance loading\n");
+      lev::debug_print("error on font instance loading");
     }
     return f;
   }
@@ -355,7 +356,7 @@ namespace lev
     boost::shared_ptr<font> f;
     if (system::get())
     {
-      f = package::search_font(system::get()->get_interpreter());
+      f = package::find_font0(system::get()->get_interpreter());
       if (f) { return f; }
     }
     if (file_system::file_exists("default.ttf")) { f = font::load("default.ttf"); }
@@ -398,7 +399,7 @@ namespace lev
     }
     catch (...) {
       r.reset();
-      fprintf(stderr, "error on rasterized character image creation\n");
+      lev::debug_print("error on rasterized character image creation");
     }
     return r;
   }
@@ -414,7 +415,7 @@ namespace lev
     try {
       if (str.empty()) { throw -1; }
       std::vector<boost::shared_ptr<raster> > array;
-      for (int i = 0; i < str.len(); i++)
+      for (int i = 0; i < str.length(); i++)
       {
         array.push_back(boost::shared_ptr<raster>(rasterize(str.index(i), spacing)));
       }
@@ -423,7 +424,7 @@ namespace lev
     }
     catch (...) {
       r.reset();
-      fprintf(stderr, "error on rasterized string image creation\n");
+      lev::debug_print("error on rasterized string image creation");
     }
     return r;
   }

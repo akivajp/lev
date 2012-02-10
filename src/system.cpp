@@ -15,6 +15,7 @@
 #include "lev/system.hpp"
 
 // dependencies
+#include "lev/debug.hpp"
 #include "lev/draw.hpp"
 #include "lev/sound.hpp"
 #include "lev/timer.hpp"
@@ -54,6 +55,7 @@ int luaopen_lev_system(lua_State *L)
         .property("button", &event::get_button)
         .property("dx", &event::get_dx)
         .property("dy", &event::get_dy)
+        .property("id", &event::get_id)
         .property("is_pressed", &event::is_pressed)
         .property("is_released", &event::is_released)
         .property("key", &event::get_key)
@@ -77,10 +79,12 @@ int luaopen_lev_system(lua_State *L)
         .def("create_mixer", &mixer::init)
         .def("create_timer", &system::create_timer)
         .def("create_timer", &system::create_timer1)
+        .def("debug", &system::start_debug)
         .def("delay", &system::delay)
         .def("do_event", &system::do_event)
         .def("do_events", &system::do_events)
         .def("done", &system::done)
+        .property("is_debugging", &system::is_debugging)
         .property("is_running", &system::is_running, &system::set_running)
         .def("mixer", &mixer::init)
         .property("name", &system::get_name, &system::set_name)
@@ -101,12 +105,14 @@ int luaopen_lev_system(lua_State *L)
         .def("quit", &system::quit0)
         .def("run", &system::run)
         .def("set_running", &system::set_running)
+        .def("start_debug", &system::start_debug)
+        .def("stop_debug", &system::stop_debug)
         .property("ticks", &system::get_ticks)
         .def("timer", &system::create_timer)
         .def("timer", &system::create_timer1)
         .scope
         [
-          def("create_window_c", &window::create),
+          def("create_window_c", &system::create_window),
 //          def("get_c", &system::get),
           def("get", &system::get),
           def("init", &system::init, raw(_1))
@@ -115,9 +121,8 @@ int luaopen_lev_system(lua_State *L)
   ];
   object lev = globals(L)["lev"];
   object classes = lev["classes"];
-//  register_to(classes["system"], "get", &system::get_l);
-  register_to(classes["system"], "create_window", &window::create_l);
-  register_to(classes["system"], "window", &window::create_l);
+  register_to(classes["system"], "create_window", &system::create_window_l);
+  register_to(classes["system"], "window", &system::create_window_l);
   lev["system"] = classes["system"]["init"];
 
   // post-requirement
@@ -380,7 +385,7 @@ namespace lev
     func.push(L);
     if (lua_pcall(L, 0 /* nargs */, 1 /* nreturns */, 0 /* std errror */))
     {
-      fprintf(stderr, "%s\n", lua_tostring(L, -1));
+      lev::debug_print(lua_tostring(L, -1));
     }
     luabind::object o(from_stack(L, -1));
     lua_pop(L, 1);
@@ -393,7 +398,7 @@ namespace lev
     arg1.push(L);
     if (lua_pcall(L, 1 /* nargs */, 1 /* nreturns */, 0 /* std errror */))
     {
-      fprintf(stderr, "%s\n", lua_tostring(L, -1));
+      lev::debug_print(lua_tostring(L, -1));
     }
     luabind::object o(from_stack(L, -1));
     lua_pop(L, 1);
@@ -457,6 +462,12 @@ namespace lev
     return 0;
   }
 
+  int event::get_id() const
+  {
+    SDL_WindowEvent &evt = (SDL_WindowEvent &)cast_evt(_obj)->evt;
+    return evt.windowID;
+  }
+
   std::string event::get_key() const
   {
     SDL_Event &evt = cast_evt(_obj)->evt;
@@ -504,6 +515,11 @@ namespace lev
       SDL_MouseButtonEvent &mouse = (SDL_MouseButtonEvent &)evt;
       return mouse.x;
     }
+    else if (evt.type == SDL_MOUSEWHEEL)
+    {
+      SDL_MouseWheelEvent &wheel = (SDL_MouseWheelEvent &)evt;
+      return wheel.x;
+    }
     return -1;
   }
 
@@ -519,6 +535,11 @@ namespace lev
     {
       SDL_MouseButtonEvent &mouse = (SDL_MouseButtonEvent &)evt;
       return mouse.y;
+    }
+    else if (evt.type == SDL_MOUSEWHEEL)
+    {
+      SDL_MouseWheelEvent &wheel = (SDL_MouseWheelEvent &)evt;
+      return wheel.y;
     }
     return -1;
   }
@@ -587,6 +608,7 @@ namespace lev
           on_left_down(),   on_left_up(),
           on_middle_down(), on_middle_up(),
           on_right_down(),  on_right_up(),
+          windows(),
           timers(), L(L)
       { }
 
@@ -619,6 +641,7 @@ namespace lev
       luabind::object on_left_down,   on_left_up;
       luabind::object on_middle_down, on_middle_up;
       luabind::object on_right_down,  on_right_up;
+      std::map<Uint32, boost::weak_ptr<window> > windows;
       bool running;
 //      std::vector<timer *> timers;
       std::vector<boost::shared_ptr<timer> > timers;
@@ -631,9 +654,7 @@ namespace lev
 
   system::~system()
   {
-//printf("BEGIN DELETING SYSTEM\n");
     done();
-//printf("END DELETING SYSTEM\n");
   }
 
   boost::shared_ptr<clock> system::create_clock(boost::shared_ptr<system> sys,
@@ -648,9 +669,85 @@ namespace lev
     }
     catch (...) {
       c.reset();
-      fprintf(stderr, "error on clock instance creation within system instance\n");
+      lev::debug_print("error on clock instance creation within system instance");
     }
     return c;
+  }
+
+  boost::shared_ptr<window>
+    system::create_window(const char *title, int x, int y, int w, int h, unsigned long flags)
+  {
+    boost::shared_ptr<window> win = window::create(title, x, y, w, h, flags);
+    if (! win) { return win; }
+//printf("ATTACHING WINDOW: %d\n", (int)win->get_id());
+    cast_sys(_obj)->windows[win->get_id()] = win;
+    return win;
+  }
+
+  int system::create_window_l(lua_State *L)
+  {
+    using namespace luabind;
+    const char *title = "Lev Application";
+    int x = SDL_WINDOWPOS_UNDEFINED, y = SDL_WINDOWPOS_UNDEFINED;
+    int w = 640, h = 480;
+    const char *flags_str = NULL;
+    unsigned long flags = SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN;
+
+    try {
+      luaL_checktype(L, 1, LUA_TUSERDATA);
+      boost::shared_ptr<system> sys =
+        object_cast<boost::shared_ptr<system> >(object(from_stack(L, 1)));
+      object t = util::get_merged(L, 2, -1);
+
+      if (t["title"]) { title = object_cast<const char *>(t["title"]); }
+      else if (t["t"]) { title = object_cast<const char *>(t["t"]); }
+      else if (t["name"]) { title = object_cast<const char *>(t["name"]); }
+      else if (t["n"]) { title = object_cast<const char *>(t["n"]); }
+      else if (t["caption"]) { title = object_cast<const char *>(t["caption"]); }
+      else if (t["c"]) { title = object_cast<const char *>(t["c"]); }
+      else if (t["lua.string1"]) { title = object_cast<const char *>(t["lua.string1"]); }
+
+      if (t["w"]) { w = object_cast<int>(t["w"]); }
+      else if (t["lua.number1"]) { w = object_cast<int>(t["lua.number1"]); }
+
+      if (t["h"]) { h = object_cast<int>(t["h"]); }
+      else if (t["lua.number2"]) { h = object_cast<int>(t["lua.number2"]); }
+
+      if (t["x"]) { x = object_cast<int>(t["x"]); }
+      else if (t["lua.number3"]) { x = object_cast<int>(t["lua.number3"]); }
+
+      if (t["y"]) { y = object_cast<int>(t["y"]); }
+      else if (t["lua.number4"]) { y = object_cast<int>(t["lua.number4"]); }
+
+      if (t["flags"]) { flags_str = object_cast<const char *>(t["flags"]); }
+      else if (t["f"]) { flags_str = object_cast<const char *>(t["f"]); }
+      else if (t["lua.string2"]) { flags_str = object_cast<const char *>(t["lua.string2"]); }
+      if (flags_str)
+      {
+        if (strstr(flags_str, "borderless"))    { flags |= SDL_WINDOW_BORDERLESS; }
+        if (strstr(flags_str, "full"))          { flags |= SDL_WINDOW_FULLSCREEN; }
+  //      if (strstr(flags_str, "fullscreen"))    { flags |= SDL_WINDOW_FULLSCREEN; }
+        if (strstr(flags_str, "hidden"))        { flags |= SDL_WINDOW_HIDDEN; }
+  //      if (strstr(flags_str, "input"))         { flags |= SDL_WINDOW_INPUT_GRABBED; }
+        if (strstr(flags_str, "input_grabbed")) { flags |= SDL_WINDOW_INPUT_GRABBED; }
+        if (strstr(flags_str, "max"))           { flags |= SDL_WINDOW_MAXIMIZED; }
+  //      if (strstr(flags_str, "maximized"))     { flags |= SDL_WINDOW_MAXIMIZED; }
+        if (strstr(flags_str, "min"))           { flags |= SDL_WINDOW_MINIMIZED; }
+  //      if (strstr(flags_str, "minimized"))     { flags |= SDL_WINDOW_MINIMIZED; }
+        if (strstr(flags_str, "resizable"))     { flags |= SDL_WINDOW_RESIZABLE; }
+        if (strstr(flags_str, "shown"))         { flags |= SDL_WINDOW_SHOWN; }
+      }
+
+      object o = globals(L)["lev"]["classes"]["system"]["create_window_c"](sys, title, x, y, w, h, flags);
+      o.push(L);
+      return 1;
+    }
+    catch (...) {
+      lev::debug_print(lua_tostring(L, -1));
+      lev::debug_print("error on wrapped window creation");
+      lua_pushnil(L);
+      return 1;
+    }
   }
 
   boost::shared_ptr<timer> system::create_timer(boost::shared_ptr<system> sys,
@@ -665,7 +762,7 @@ namespace lev
     }
     catch (...) {
       t.reset();
-      fprintf(stderr, "error on timer instance creation within system instance\n");
+      lev::debug_print("error on timer instance creation within system instance");
     }
     return t;
   }
@@ -678,6 +775,7 @@ namespace lev
 
   bool system::done()
   {
+    debug_window::stop();
 //printf("QUITING1\n");
     if (_obj)
     {
@@ -724,58 +822,107 @@ printf("DETACHING TIMER!\n");
     if (SDL_PollEvent(&sdl_evt))
     {
       mySystem *sys = cast_sys(_obj);
-      luabind::object f = sys->funcs[sdl_evt.type];
+      luabind::object f;
       cast_evt(e.get_rawobj())->evt = sdl_evt;
 
       if (sdl_evt.type == SDL_KEYDOWN || sdl_evt.type == SDL_KEYUP)
       {
         SDL_KeyboardEvent &keyboard = (SDL_KeyboardEvent &)sdl_evt;
+        if (boost::shared_ptr<window> win = sys->windows[keyboard.windowID].lock())
+        {
+          if (sdl_evt.type == SDL_KEYDOWN) { f = win->get_on_key_down(); }
+          else { f = win->get_on_key_up(); }
+        }
       }
       else if (sdl_evt.type == SDL_MOUSEBUTTONDOWN || sdl_evt.type == SDL_MOUSEBUTTONUP)
       {
         SDL_MouseButtonEvent &mouse = (SDL_MouseButtonEvent &)sdl_evt;
-        if (mouse.button == SDL_BUTTON_LEFT)
+        if (boost::shared_ptr<window> win = sys->windows[mouse.windowID].lock())
         {
-          if (mouse.state == SDL_PRESSED && sys->on_left_down)
-          { f = sys->on_left_down; }
-          if (mouse.state == SDL_RELEASED && sys->on_left_up)
-          { f = sys->on_left_up; }
+          if (mouse.button == SDL_BUTTON_LEFT)
+          {
+            if (mouse.state == SDL_PRESSED)       { f = win->get_on_left_down(); }
+            else if (mouse.state == SDL_RELEASED) { f = win->get_on_left_up(); }
+          }
+          else if (mouse.button == SDL_BUTTON_MIDDLE)
+          {
+            if (mouse.state == SDL_PRESSED)       { f = win->get_on_middle_down(); }
+            else if (mouse.state == SDL_RELEASED) { f = win->get_on_middle_up(); }
+          }
+          else if (mouse.button == SDL_BUTTON_RIGHT)
+          {
+            if (mouse.state == SDL_PRESSED)       { f = win->get_on_right_down(); }
+            else if (mouse.state == SDL_RELEASED) { f = win->get_on_right_up(); }
+          }
         }
-        if (mouse.button == SDL_BUTTON_MIDDLE)
+        if (! f.is_valid())
         {
-          if (mouse.state == SDL_PRESSED && sys->on_middle_down)
-          { f = sys->on_middle_down; }
-          if (mouse.state == SDL_RELEASED && sys->on_middle_up)
-          { f = sys->on_middle_up; }
-        }
-        if (mouse.button == SDL_BUTTON_RIGHT)
-        {
-          if (mouse.state == SDL_PRESSED && sys->on_right_down)
-          { f = sys->on_right_down; }
-          if (mouse.state == SDL_RELEASED && sys->on_right_up)
-          { f = sys->on_right_up; }
+          if (mouse.button == SDL_BUTTON_LEFT)
+          {
+            if (mouse.state == SDL_PRESSED)       { f = sys->on_left_down; }
+            else if (mouse.state == SDL_RELEASED) { f = sys->on_left_up; }
+          }
+          if (mouse.button == SDL_BUTTON_MIDDLE)
+          {
+            if (mouse.state == SDL_PRESSED)       { f = sys->on_middle_down; }
+            else if (mouse.state == SDL_RELEASED) { f = sys->on_middle_up; }
+          }
+          if (mouse.button == SDL_BUTTON_RIGHT)
+          {
+            if (mouse.state == SDL_PRESSED)       { f = sys->on_right_down; }
+            else if (mouse.state == SDL_RELEASED) { f = sys->on_right_up; }
+          }
         }
       }
       else if (sdl_evt.type == SDL_MOUSEMOTION)
       {
         SDL_MouseMotionEvent &motion = (SDL_MouseMotionEvent &)sdl_evt;
+        if (boost::shared_ptr<window> win = sys->windows[motion.windowID].lock())
+        {
+          f = win->get_on_motion();
+        }
+      }
+      else if (sdl_evt.type == SDL_MOUSEWHEEL)
+      {
+        SDL_MouseWheelEvent &wheel = (SDL_MouseWheelEvent &)sdl_evt;
+        if (boost::shared_ptr<window> win = sys->windows[wheel.windowID].lock())
+        {
+          f = win->get_on_wheel();
+        }
+      }
+      else if (sdl_evt.type == SDL_WINDOWEVENT)
+      {
+        SDL_WindowEvent &win_evt = (SDL_WindowEvent &)sdl_evt;
+        if (boost::shared_ptr<window> win = sys->windows[win_evt.windowID].lock())
+        {
+          if (win_evt.event == SDL_WINDOWEVENT_CLOSE)
+          {
+            f = win->get_on_close();
+            if (! f.is_valid()) { win->close(); }
+          }
+        }
       }
       else if (sdl_evt.type == SDL_QUIT)
       {
-        if (! f) { set_running(false); }
+        f = sys->funcs[SDL_QUIT];
+//        if (! f.is_valid()) { set_running(false); }
       }
       else
       {
         // OTHERS
       }
 
-      if (f && luabind::type(f) == LUA_TFUNCTION)
+      if (! f.is_valid())
+      {
+        f = sys->funcs[sdl_evt.type];
+      }
+      if (f.is_valid() && luabind::type(f) == LUA_TFUNCTION)
       {
         try {
           f(&e);
         }
         catch (...) {
-          fprintf(stderr, "%s\n", lua_tostring(f.interpreter(), -1));
+          lev::debug_print(lua_tostring(cast_sys(_obj)->L, -1));
         }
       }
       return true;
@@ -896,9 +1043,16 @@ printf("DETACHING TIMER!\n");
     }
     catch (...) {
       singleton.reset();
-      fprintf(stderr, "error on system instance creation\n");
+      lev::debug_print("error on system instance creation");
     }
     return singleton;
+  }
+
+  bool system::is_debugging()
+  {
+    if (! _obj) { return false; }
+    if (debug_window::get()) { return true; }
+    return false;
   }
 
   bool system::is_running()
@@ -925,6 +1079,7 @@ printf("DETACHING TIMER!\n");
   bool system::run()
   {
     mySystem *sys = cast_sys(_obj);
+    sys->running = true;
     while (is_running())
     {
       try {
@@ -936,8 +1091,8 @@ printf("DETACHING TIMER!\n");
         do_events();
       }
       catch (...) {
-        fprintf(stderr, "error on system::run\n");
-        fprintf(stderr, "error message: %s\n", lua_tostring(sys->L, -1));
+        lev::debug_print(lua_tostring(sys->L, -1));
+        lev::debug_print("error on system::run");
         return false;
       }
     }
@@ -952,87 +1107,104 @@ printf("DETACHING TIMER!\n");
 
   bool system::set_on_button_down(luabind::object func)
   {
-    cast_sys(_obj)->funcs[SDL_MOUSEBUTTONDOWN] = util::copy_function(func);
+    cast_sys(_obj)->funcs[SDL_MOUSEBUTTONDOWN] = func;
     return true;
   }
 
   bool system::set_on_button_up(luabind::object func)
   {
-    cast_sys(_obj)->funcs[SDL_MOUSEBUTTONUP] = util::copy_function(func);
+    cast_sys(_obj)->funcs[SDL_MOUSEBUTTONUP] = func;
     return true;
   }
 
   bool system::set_on_key_down(luabind::object func)
   {
-    cast_sys(_obj)->funcs[SDL_KEYDOWN] = util::copy_function(func);
+    cast_sys(_obj)->funcs[SDL_KEYDOWN] = func;
     return true;
   }
 
   bool system::set_on_key_up(luabind::object func)
   {
-    cast_sys(_obj)->funcs[SDL_KEYUP] = util::copy_function(func);
+    cast_sys(_obj)->funcs[SDL_KEYUP] = func;
     return true;
   }
 
   bool system::set_on_left_down(luabind::object func)
   {
-    cast_sys(_obj)->on_left_down = util::copy_function(func);
+    cast_sys(_obj)->on_left_down = func;
     return true;
   }
 
   bool system::set_on_left_up(luabind::object func)
   {
-    cast_sys(_obj)->on_left_up = util::copy_function(func);
+    cast_sys(_obj)->on_left_up = func;
     return true;
   }
 
   bool system::set_on_middle_down(luabind::object func)
   {
-    cast_sys(_obj)->on_middle_down = util::copy_function(func);
+    cast_sys(_obj)->on_middle_down = func;
     return true;
   }
 
   bool system::set_on_middle_up(luabind::object func)
   {
-    cast_sys(_obj)->on_middle_up = util::copy_function(func);
+    cast_sys(_obj)->on_middle_up = func;
     return true;
   }
 
   bool system::set_on_motion(luabind::object func)
   {
-    cast_sys(_obj)->funcs[SDL_MOUSEMOTION] = util::copy_function(func);
+    cast_sys(_obj)->funcs[SDL_MOUSEMOTION] = func;
     return true;
   }
 
   bool system::set_on_quit(luabind::object func)
   {
-//    cast_sys(_obj)->funcs[SDL_QUIT] = util::copy_function(func);
     cast_sys(_obj)->funcs[SDL_QUIT] = func;
     return true;
   }
 
   bool system::set_on_right_down(luabind::object func)
   {
-//    cast_sys(_obj)->on_right_down = util::copy_function(func);
     cast_sys(_obj)->on_right_down = func;
     return true;
   }
 
   bool system::set_on_right_up(luabind::object func)
   {
-    cast_sys(_obj)->on_right_up = util::copy_function(func);
+    cast_sys(_obj)->on_right_up = func;
     return true;
   }
 
   bool system::set_on_tick(luabind::object func)
   {
-    cast_sys(_obj)->on_tick = util::copy_function(func);
+    cast_sys(_obj)->on_tick = func;
     return true;
   }
 
   bool system::set_running(bool run)
   {
     return cast_sys(_obj)->SetRunning(run);
+  }
+
+  boost::shared_ptr<debug_window> system::start_debug()
+  {
+    boost::shared_ptr<debug_window> win = debug_window::init();
+    if (! win) { return win; }
+//printf("ATTACHING DEBUG WINDOW: %d\n", (int)win->get_id());
+    cast_sys(_obj)->windows[win->get_id()] = win;
+    return win;
+  }
+
+  bool system::stop_debug()
+  {
+    if (debug_window::get())
+    {
+      debug_window::get()->close();
+      return true;
+    }
+    return false;
   }
 
 }

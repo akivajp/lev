@@ -15,6 +15,7 @@
 #include "lev/sound.hpp"
 
 // dependencies
+#include "lev/debug.hpp"
 #include "lev/fs.hpp"
 #include "lev/system.hpp"
 #include "register.hpp"
@@ -543,7 +544,7 @@ namespace lev
     }
     catch (...) {
       snd.reset();
-      fprintf(stderr, "error on sound instance creation\n");
+      lev::debug_print("error on sound instance creation");
     }
     return snd;
   }
@@ -835,7 +836,7 @@ namespace lev
     }
     catch (...) {
       singleton.reset();
-      fprintf(stderr, "error on mixer instance creation\n");
+      lev::debug_print("error on mixer instance creation");
     }
     return singleton;
   }

@@ -13,6 +13,7 @@
 
 // dependencies
 #include "lev/archive.hpp"
+#include "lev/debug.hpp"
 #include "lev/entry.hpp"
 #include "lev/fs.hpp"
 #include "lev/package.hpp"
@@ -34,7 +35,7 @@ static bool do_file(lua_State *L, const std::string &filename)
 {
   if (luaL_dofile(L, filename.c_str()))
   {
-    fprintf(stderr, "%s\n", lua_tostring(L, -1));
+    lev::debug_print(lua_tostring(L, -1));
     return false;
   }
   return true;
@@ -45,7 +46,7 @@ static bool do_string(lua_State *L, const std::string &str)
 {
   if (luaL_dostring(L, str.c_str()))
   {
-    fprintf(stderr, "%s\n", lua_tostring(L, -1));
+    lev::debug_print(lua_tostring(L, -1));
     return false;
   }
   return true;
@@ -192,16 +193,16 @@ int main(int argc, char **argv)
   }
   if (! done_something)
   {
-    fprintf(stderr, "Usage: create \"entry.txt\" file and put in the same directory with the program\n");
-//    wxMessageBox(_("Usage: create \"entry.txt\" file and put in the same directory with the program"), _("About usage"));
+    lev::debug_print("Usage: create \"entry.txt\" file and put in the same directory with the program");
     return -1;
   }
 
-//printf("GC START\n");
+  if (system::get())
+  {
+    system::get()->done();
+  }
   lua_gc(L, LUA_GCCOLLECT, 0);
-//printf("BEGIN ALL CLOSING!\n");
   lua_close(L);
-//printf("END ALL CLOSING!\n");
 
   return 0;
 }

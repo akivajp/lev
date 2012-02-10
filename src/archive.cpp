@@ -14,6 +14,7 @@
 #include "lev/archive.hpp"
 
 // dependencies
+#include "lev/debug.hpp"
 #include "lev/fs.hpp"
 #include "lev/util.hpp"
 #include "register.hpp"
@@ -90,8 +91,8 @@ int luaopen_lev_archive(lua_State *L)
     globals(L)["package"]["loaded"]["lev.archive"] = true;
   }
   catch (...) {
-    fprintf(stderr, "error on initializing \"lev.archive\" library\n");
-    fprintf(stderr, "error message: %s\n", lua_tostring(L, -1));
+    lev::debug_print(lua_tostring(L, -1));
+    lev::debug_print("error on initializing \"lev.archive\" library");
   }
   return 0;
 }
@@ -167,7 +168,6 @@ namespace lev
           return arc;
         }
         catch (...) {
-          fprintf(stderr, "error on myArchive creation");
           delete arc;
           return NULL;
         }
@@ -487,7 +487,7 @@ namespace lev
       fclose(w);
     }
     catch (...) {
-      fprintf(stderr, "error on data extracting from archive\n");
+      lev::debug_print("error on data extracting from archive");
     }
     return false;
   }
@@ -642,7 +642,7 @@ namespace lev
     }
     catch (...) {
       arc.reset();
-      fprintf(stderr, "error on archive instance creation\n");
+      lev::debug_print("error on archive instance creation");
     }
     return arc;
   }
@@ -687,7 +687,7 @@ namespace lev
       data = "";
     }
     catch (...) {
-      fprintf(stderr, "error on read data from archive\n");
+      lev::debug_print("error on read data from archive");
       return false;
     }
 

@@ -7,10 +7,14 @@
 // Licence:     MIT License
 /////////////////////////////////////////////////////////////////////////////
 
+// pre-compiled header
 #include "prec.h"
-#include "register.hpp"
-#include "lev/lev.hpp"
 
+// dependencies
+#include "lev/lev.hpp"
+#include "register.hpp"
+
+// libraries
 #include <sstream>
 #include <luabind/adopt_policy.hpp>
 
@@ -143,8 +147,8 @@ int luaopen_lev_std(lua_State *L)
     globals(L)["collectgarbage"]();
   }
   catch (...) {
-    fprintf(stderr, "error on initializing \"lev.std\" library\n");
-    fprintf(stderr, "error message: %s\n", lua_tostring(L, -1));
+    lev::debug_print(lua_tostring(L, -1));
+    lev::debug_print("error on initializing \"lev.std\" library");
   }
   return 0;
 }
