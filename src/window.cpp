@@ -889,7 +889,7 @@ namespace lev
         else { ptr_layout->reserve_word1(unit); }
       }
 //      ptr_layout->reserve_new_line();
-      ptr_layout->rearrange();
+//      ptr_layout->rearrange();
       ptr_layout->complete();
       ptr_screen->clear();
       if (ptr_layout->get_h() > get_h())

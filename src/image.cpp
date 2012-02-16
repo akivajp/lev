@@ -136,8 +136,8 @@ int luaopen_lev_image(lua_State *L)
         .def("reserve_clickable", &layout::reserve_clickable_text)
         .def("reserve_image", &layout::reserve_image)
         .def("reserve_new_line", &layout::reserve_new_line)
-        .def("reserve_word", &layout::reserve_word)
-        .def("reserve_word", &layout::reserve_word1)
+        .def("reserve_word", &layout::reserve_word_lua)
+        .def("reserve_word", &layout::reserve_word_lua1)
         .property("ruby",  &layout::get_ruby_font, &layout::set_ruby_font)
         .property("ruby_font",  &layout::get_ruby_font, &layout::set_ruby_font)
         .property("shade", &layout::get_shade_color, &layout::set_shade_color)
@@ -1642,12 +1642,15 @@ namespace lev
 
       struct myItem
       {
-        boost::shared_ptr<drawable> img;
-        boost::shared_ptr<drawable> img_hover;
-        boost::shared_ptr<drawable> img_showing;
-        boost::shared_ptr<lev::vector> pos;
-        luabind::object func_hover;
-        luabind::object func_lclick;
+        public:
+          myItem() : x(-1), y(-1), fixed(false) { }
+          boost::shared_ptr<drawable> img;
+          boost::shared_ptr<drawable> img_hover;
+          boost::shared_ptr<drawable> img_showing;
+          luabind::object func_hover;
+          luabind::object func_lclick;
+          int x, y;
+          bool fixed;
       };
 
       myLayout(int width_stop = -1)
@@ -1703,17 +1706,35 @@ namespace lev
         return (max_w > x ? max_w : x);
       }
 
-      boost::shared_ptr<lev::vector> CalcPosition(int index)
+      bool CalcPosition(int index)
       {
         int x = 0;
         int y = 0;
         int max_h = 0;
-        int final_x = 0;
 
-        if (index < 0 || index >= items.size()) { return boost::shared_ptr<lev::vector>(); }
-        if (! items[index].img) { return boost::shared_ptr<lev::vector>(); }
+        if (index < 0 || index >= items.size()) { return false; }
+        if (! items[index].img) { return false; }
 
-        for (int i = 0; i < items.size(); i++)
+        // if position is already fixed, return it
+        if (items[index].fixed) { return true; }
+
+        // back scan
+        int i = index - 1;
+        for (; i >= 0; i--)
+        {
+          myItem &item = items[i];
+          if (item.fixed)
+          {
+            x = item.x;
+            y = item.y;
+            max_h = item.img->get_h();
+            break;
+          }
+        }
+        if (i < 0) { i = 0; }
+
+        // fore scan
+        for (; i < items.size(); i++)
         {
           myItem &item = items[i];
           if (! item.img || (width_stop > 0 && x > 0 && x + item.img->get_w() > width_stop))
@@ -1722,18 +1743,32 @@ namespace lev
             x = 0;
             y += max_h;
             max_h = 0;
-            if (i > index) { break; }
+            // back scan for position fixing
+            for (int j = i - 1; j >= 0; j--)
+            {
+              if (items[j].fixed) { break; }
+              if (items[j].img)
+              {
+                items[j].y = y - items[j].img->get_h();
+                items[j].fixed = true;
+              }
+            }
+            if (i > index)
+            {
+              return true;
+            }
           }
-          if (i == index) { final_x = x; }
           if (item.img)
           {
             // calc by next item
+            item.x = x;
             x += item.img->get_w();
             if (item.img->get_h() > max_h) { max_h = item.img->get_h(); }
           }
         }
         y += max_h;
-        return lev::vector::create(final_x, y - items[index].img->get_h());
+        items[index].y = y - items[index].img->get_h();
+        return true;
       }
 
       int CalcTotalHeight()
@@ -1786,11 +1821,8 @@ namespace lev
           myItem &item = items[i];
           if (item.img_showing)
           {
-            if (! item.pos) { item.pos = CalcPosition(i); }
-            if (item.pos)
-            {
-              item.img_showing->draw_on_image(dst, x + item.pos->get_x(), y + item.pos->get_y(), alpha);
-            }
+            CalcPosition(i);
+            item.img_showing->draw_on_image(dst, x + item.x, y + item.y, alpha);
           }
         }
         return true;
@@ -1803,12 +1835,8 @@ namespace lev
           myItem &item = items[i];
           if (item.img_showing)
           {
-            if (! item.pos) { item.pos = CalcPosition(i); }
-            if (item.pos)
-            {
-//printf("i: %d, x: %d, y: %d\n", i, pos.get_x(), pos.get_y());
-              item.img_showing->draw_on_screen(dst, x + item.pos->get_x(), y + item.pos->get_y(), alpha);
-            }
+            CalcPosition(i);
+            item.img_showing->draw_on_screen(dst, x + item.x, y + item.y, alpha);
           }
         }
 //printf("\n");
@@ -1835,13 +1863,9 @@ namespace lev
 
           if (! item.img_hover) { continue; }
           if (! item.img_showing) { continue; }
-          if (! item.pos)
-          {
-            item.pos = CalcPosition(i);
-            if (! item.pos) { continue; }
-          }
 
-          rect r(item.pos->get_x(), item.pos->get_y(), item.img->get_w(), item.img->get_h());
+          CalcPosition(i);
+          rect r(item.x, item.y, item.img->get_w(), item.img->get_h());
           if (r.include(x, y))
           {
             // (x, y) is in the rect
@@ -1876,12 +1900,9 @@ namespace lev
 
           if (! item.img_hover) { continue; }
           if (! item.img_showing) { continue; }
-          if (! item.pos)
-          {
-            item.pos = CalcPosition(i);
-            if (! item.pos) { continue; }
-          }
-          rect r(item.pos->get_x(), item.pos->get_y(), item.img->get_w(), item.img->get_h());
+
+          CalcPosition(i);
+          rect r(item.x, item.y, item.img->get_w(), item.img->get_h());
           if (r.include(x, y))
           {
             if (item.func_lclick && type(item.func_lclick) == LUA_TFUNCTION)
@@ -1898,7 +1919,11 @@ namespace lev
       {
         for (int i = 0; i < items.size(); i++)
         {
-          items[i].pos = CalcPosition(i);
+          items[i].fixed = false;
+        }
+        for (int i = 0; i < items.size(); i++)
+        {
+          CalcPosition(i);
         }
         return true;
       }
@@ -1964,17 +1989,17 @@ namespace lev
 
       bool ReserveNewLine()
       {
-        // adding new line
-        items.push_back(myItem());
         // height spacing by image
         items.push_back(myItem());
-        (items.end() - 1)->img = image::create(1, font_text->get_pixel_size());
-        RecalcAll();
+//        (items.end() - 1)->img = image::create(1, font_text->get_pixel_size());
+        (items.end() - 1)->img = image::create(1, font_text->get_pixel_size() * 1.25);
+        // adding new line
+        items.push_back(myItem());
         texturized = false;
         return true;
       }
 
-      bool ReserveWord(const std::string &word, const std::string &ruby)
+      bool ReserveWord(const std::string &word, const std::string &ruby = "")
       {
         if (! font_text) { return false; }
         if (! ruby.empty() && ! font_ruby) { return false; }
@@ -2184,6 +2209,15 @@ namespace lev
     return cast_lay(_obj)->ReserveWord(word, ruby);
   }
 
+  bool layout::reserve_word_lua(luabind::object word, luabind::object ruby)
+  {
+    return cast_lay(_obj)->ReserveWord(util::tostring(word), util::tostring(ruby));
+  }
+
+  bool layout::reserve_word_lua1(luabind::object word)
+  {
+    return cast_lay(_obj)->ReserveWord(util::tostring(word));
+  }
 
   bool layout::set_fg_color(const color &fg)
   {

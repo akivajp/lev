@@ -14,6 +14,7 @@
 #include "lev/util.hpp"
 
 // dependencies
+#include "lev/debug.hpp"
 //#include "lev/fs.hpp"
 #include "lev/string.hpp"
 #include "register.hpp"
@@ -104,11 +105,13 @@ int luaopen_lev_util(lua_State *L)
     namespace_("util")
     [
       def("copy_table", &util::copy_table),
+      def("find_member", &util::find_member),
       def("execute", &util::execute),
       def("print_table", &util::print_table),
       def("open", &util::open),
       def("open", &util::open1),
-      def("serialize", &util::serialize1)
+      def("serialize", &util::serialize1),
+      def("tostring", &util::tostring)
     ]
   ];
   object lev = globals(L)["lev"];
@@ -154,6 +157,19 @@ namespace lev
     {
       return object();
     }
+  }
+
+  luabind::object util::find_member(luabind::object table, luabind::object var)
+  {
+    using namespace luabind;
+
+    if (! table.is_valid()) { return object(); }
+    if (type(table) != LUA_TTABLE) { return object(); }
+    for (iterator i(table), end; i != end; i++)
+    {
+      if (*i == var) { return i.key(); }
+    }
+    return object();
   }
 
   bool util::execute(const std::string &target)
@@ -480,8 +496,13 @@ namespace lev
       return "";
     }
 
-    if (! var) { return "nil"; }
+    if (! var.is_valid()) { return "nil"; }
     if (type(var) == LUA_TNIL) { return "nil"; }
+    if (type(var) == LUA_TBOOLEAN)
+    {
+      if (var) { return "true"; }
+      else { return "false"; }
+    }
     if (type(var) == LUA_TNUMBER)
     {
       return object_cast<const char *>(globals(L)["tostring"](var));
@@ -521,6 +542,24 @@ namespace lev
       return str_exp;
     }
     return "nil";
+  }
+
+  std::string util::tostring(luabind::object obj)
+  {
+    using namespace luabind;
+    if (! obj.is_valid()) { return ""; }
+
+    lua_State *L = obj.interpreter();
+    size_t len;
+    try {
+      const char *str = object_cast<const char *>(globals(L)["tostring"](obj));
+      if (! str) { return ""; }
+      return str;
+    }
+    catch (...) {
+      lev::debug_print("error on util::tostring");
+      return "";
+    }
   }
 
 }

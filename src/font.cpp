@@ -386,7 +386,8 @@ namespace lev
       if (bmp.width <= 0) { w = get_pixel_size() / 2; }
 
 //      r = raster::create(w, h);
-      r = raster::create(w, h * 1.3);
+//      r = raster::create(w, h * 1.3);
+      r = raster::create(w, h * 1.25);
       if (! r) { throw -3; }
 
       for (int y = 0; y < bmp.rows; y++)

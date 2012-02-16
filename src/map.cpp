@@ -319,6 +319,11 @@ namespace lev
         boost::shared_ptr<image> img = object_cast<boost::shared_ptr<image> >(t["lev.image1"]);
         result = m->map_image(img, x, y, alpha);
       }
+      else if (t["lev.image.layout1"])
+      {
+        boost::shared_ptr<layout> img = object_cast<boost::shared_ptr<layout> >(t["lev.image.layout1"]);
+        result = m->map_image(img, x, y, alpha);
+      }
       lua_pushboolean(L, result);
     }
     catch (...) {

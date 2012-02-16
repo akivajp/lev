@@ -33,6 +33,20 @@
 // static member variable initialization
 boost::shared_ptr<lev::system> lev::system::singleton;
 
+class auto_closer
+{
+  public:
+    auto_closer() { }
+    ~auto_closer()
+    {
+//printf("CLOSING!\n");
+      if (lev::system::get())
+      {
+        lev::system::get()->done();
+      }
+    }
+};
+
 int luaopen_lev_system(lua_State *L)
 {
   using namespace luabind;
@@ -51,6 +65,8 @@ int luaopen_lev_system(lua_State *L)
     namespace_("system"),
     namespace_("classes")
     [
+      class_<auto_closer>("auto_closer")
+        .def(constructor<>()),
       class_<event, base, boost::shared_ptr<base> >("event")
         .property("button", &event::get_button)
         .property("dx", &event::get_dx)
@@ -115,7 +131,8 @@ int luaopen_lev_system(lua_State *L)
           def("create_window_c", &system::create_window),
 //          def("get_c", &system::get),
           def("get", &system::get),
-          def("init", &system::init, raw(_1))
+          def("init_c", &system::init, raw(_1)),
+          def("init", &system::init_in_lua, raw(_1))
         ]
     ]
   ];
@@ -1046,6 +1063,15 @@ printf("DETACHING TIMER!\n");
       lev::debug_print("error on system instance creation");
     }
     return singleton;
+  }
+
+  luabind::object system::init_in_lua(lua_State *L)
+  {
+    using namespace luabind;
+    object sys = globals(L)["lev"]["classes"]["system"]["init_c"]();
+    if (! sys) { return object(); }
+    sys["auto_closer"] = globals(L)["lev"]["classes"]["auto_closer"]();
+    return sys;
   }
 
   bool system::is_debugging()

@@ -105,6 +105,7 @@ namespace lev
       virtual type_id get_type_id() const { return LEV_TSYSTEM; }
       virtual const char *get_type_name() const { return "lev.system"; }
       static boost::shared_ptr<system> init(lua_State *L);
+      static luabind::object init_in_lua(lua_State *L);
       bool is_debugging();
       bool is_running();
       bool quit(bool force = false);

@@ -27,6 +27,7 @@ namespace lev
 {
 
   bool debug_print(const std::string &message_utf8);
+  bool debug_print_lua(luabind::object obj);
 
 }
 

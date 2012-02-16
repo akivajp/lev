@@ -24,6 +24,7 @@ namespace lev
     public:
       static luabind::object copy_function(luabind::object func);
       static luabind::object copy_table(luabind::object table);
+      static luabind::object find_member(luabind::object table, luabind::object var);
       static bool execute(const std::string &target);
       static int execute_code_l(lua_State *L);
       static luabind::object get_merged(lua_State *L, int start, int end);
@@ -35,6 +36,7 @@ namespace lev
       static int reverse(lua_State *L);
       static std::string serialize(luabind::object var, int indent = 0);
       static std::string serialize1(luabind::object var) { return serialize(var); }
+      static std::string tostring(luabind::object obj);
       static int using_l(lua_State *L);
   };
 

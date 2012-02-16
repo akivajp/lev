@@ -18,6 +18,7 @@
 #include "lev/font.hpp"
 #include "lev/system.hpp"
 #include "lev/string.hpp"
+#include "lev/util.hpp"
 
 // static member variable initialization
 boost::shared_ptr<lev::debug_window> lev::debug_window::singleton;
@@ -37,7 +38,7 @@ int luaopen_lev_debug(lua_State *L)
   [
     namespace_("debug")
     [
-      def("print", &debug_print)
+      def("print", &debug_print_lua)
     ],
     namespace_("classes")
     [
@@ -82,6 +83,11 @@ namespace lev
       return debug_window::get()->print1(std::string("[") + buf + "]: " + message_utf8 + "\n");
     }
     printf("Debug Message (%s): %s\n", buf, message_utf8.c_str());
+  }
+
+  bool debug_print_lua(luabind::object obj)
+  {
+    return debug_print(util::tostring(obj));
   }
 
 }

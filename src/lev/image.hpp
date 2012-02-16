@@ -198,8 +198,9 @@ namespace lev
                                   luabind::object lclick_func, luabind::object hover_func);
       bool reserve_image(boost::shared_ptr<image> img);
       bool reserve_new_line();
-      bool reserve_word(const std::string &word, const std::string &ruby);
-      bool reserve_word1(const std::string &word) { return reserve_word(word, ""); }
+      bool reserve_word(const std::string &word, const std::string &ruby = "");
+      bool reserve_word_lua(luabind::object word, luabind::object ruby);
+      bool reserve_word_lua1(luabind::object word);
       bool set_fg_color(const color &fg);
       bool set_font(font *f);
       bool set_shade_color(const color *c);
