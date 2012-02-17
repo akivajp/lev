@@ -886,10 +886,8 @@ namespace lev
         std::string unit = str->index_str(i)->to_utf8();
         if (unit == "\r") { continue; }
         else if (unit == "\n") { ptr_layout->reserve_new_line(); }
-        else { ptr_layout->reserve_word1(unit); }
+        else { ptr_layout->reserve_word(unit); }
       }
-//      ptr_layout->reserve_new_line();
-//      ptr_layout->rearrange();
       ptr_layout->complete();
       ptr_screen->clear();
       if (ptr_layout->get_h() > get_h())
@@ -917,7 +915,7 @@ namespace lev
           std::string unit = str->index_str(i)->to_utf8();
           if (unit == "\r") { continue; }
           else if (unit == "\n") { ptr_layout->reserve_new_line(); }
-          else { ptr_layout->reserve_word1(unit); }
+          else { ptr_layout->reserve_word(unit); }
         }
       }
     }

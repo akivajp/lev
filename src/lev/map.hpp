@@ -36,7 +36,8 @@ namespace lev
       bool map_image(boost::shared_ptr<drawable> img, int x, int y, unsigned char alpha = 255);
       static int map_image_l(lua_State *L);
       bool map_link(boost::shared_ptr<drawable> img, boost::shared_ptr<drawable> hover_img,
-                    int x, int y, luabind::object on_lclick, luabind::object on_hover);
+                    int x, int y, luabind::object on_lclick, luabind::object on_hover,
+                    unsigned char alpha = 255);
       static int map_link_l(lua_State *L);
       bool on_hover(int x, int y);
       bool on_left_click(int x, int y);

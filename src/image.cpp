@@ -427,7 +427,6 @@ namespace lev
     return clear_rect(r.get_x(), r.get_y(), r.get_w(), r.get_h(), c);
   }
 
-//  image* image::clone()
   boost::shared_ptr<image> image::clone()
   {
     boost::shared_ptr<image> img;
