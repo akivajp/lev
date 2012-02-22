@@ -16,9 +16,11 @@
 
 // dependencies
 #include "lev/debug.hpp"
+#include "lev/util.hpp"
 
 // libraries
 #include <luabind/raw_policy.hpp>
+#include <boost/xpressive/xpressive.hpp>
 
 int luaopen_lev_string(lua_State *L)
 {
@@ -33,31 +35,60 @@ int luaopen_lev_string(lua_State *L)
     namespace_("string"),
     namespace_("classes")
     [
-      class_<unicode_string, base>("unicode_string")
-        .def("append", &unicode_string::append)
-        .def("append", &unicode_string::append_utf8)
-        .def("cmp", &unicode_string::compare_with)
-        .def("compare", &unicode_string::compare_with)
-        .def("empty", &unicode_string::empty)
-        .def("find", &unicode_string::find)
-        .def("find", &unicode_string::find_utf8)
-        .def("index_code", &unicode_string::index)
-        .def("index", &unicode_string::index_str)
-        .property("len", &unicode_string::length)
-        .property("length", &unicode_string::length)
-        .property("str", &unicode_string::to_utf8, &unicode_string::assign_utf8)
-        .property("string", &unicode_string::to_utf8, &unicode_string::assign_utf8)
-        .def("sub", &unicode_string::sub_string)
-        .def("sub", &unicode_string::sub_string1)
-        .def("__eq", &unicode_string::compare)
-        .def("__concat", &unicode_string::concat, raw(_1))
-        .def("__len", &unicode_string::length)
-        .def("__tostring", &unicode_string::to_utf8)
+      class_<unicode, base, boost::shared_ptr<base> >("unicode")
+        .def("append", &unicode::append)
+        .def("append", &unicode::append_utf8)
+        .def("cmp", &unicode::compare_with)
+        .def("compare", &unicode::compare_with)
+        .def("empty", &unicode::empty)
+        .def("find", &unicode::find)
+        .def("find", &unicode::find_utf8)
+        .def("index_code", &unicode::index)
+        .def("index", &unicode::index_str)
+        .property("len", &unicode::length)
+        .property("length", &unicode::length)
+        .property("str", &unicode::to_utf8, &unicode::assign_utf8)
+        .property("string", &unicode::to_utf8, &unicode::assign_utf8)
+        .def("sub", &unicode::sub_string)
+        .def("sub", &unicode::sub_string1)
+        .def("__eq", &unicode::compare)
+        .def("__concat", &unicode::concat, raw(_1))
+        .def("__len", &unicode::length)
+        .def("__tostring", &unicode::to_utf8)
         .scope
         [
-          def("concat", &unicode_string::concat, raw(_1)),
-          def("create", &unicode_string::create),
-          def("create", &unicode_string::from_utf8)
+          def("concat", &unicode::concat, raw(_1)),
+          def("create", &unicode::create),
+          def("create", &unicode::from_utf8)
+        ],
+      class_<sregex, base, boost::shared_ptr<base> >("sregex")
+        .def("assign", &sregex::assign)
+        .def("concat", &sregex::concat_lua, raw(_1))
+        .def("gmatch", &sregex::gmatch, raw(_2))
+        .def("mark", &sregex::mark_tag)
+        .def("mark_tag", &sregex::mark_tag)
+        .def("op_or", &sregex::choose)
+        .def("replace", &sregex::replace)
+        .def("__concat", &sregex::concat_lua, raw(_1))
+        .def("__div", &sregex::choose)
+        .scope
+        [
+          def("choose", &sregex::choose),
+          def("compile", &sregex::compile),
+          def("concat", &sregex::concat_lua, raw(_1)),
+          def("create", &sregex::create),
+          def("gmatch", &sregex::gmatch_static, raw(_1)),
+          def("gmatch", &sregex::gmatch_string, raw(_1)),
+          def("mark_tag", &sregex::mark_tag),
+          def("plane", &sregex::plane),
+          def("replace", &sregex::replace_static),
+          def("replace", &sregex::replace_string)
+        ],
+      class_<sregex_compiler, base, boost::shared_ptr<base> >("sregex_compiler")
+        .def("compile", &sregex_compiler::compile)
+        .scope
+        [
+          def("create", &sregex_compiler::create)
         ]
     ]
   ];
@@ -65,11 +96,22 @@ int luaopen_lev_string(lua_State *L)
   object classes = lev["classes"];
   object string = lev["string"];
 
-  string["concat"] = classes["unicode_string"]["concat"];
-  string["create"] = classes["unicode_string"]["create"];
-  string["unicode"] = classes["unicode_string"]["create"];
-  string["unistr"] = classes["unicode_string"]["create"];
-  string["utf16"] = classes["unicode_string"]["create"];
+  string["compiler"] = classes["sregex_compiler"]["create"];
+  string["concat"] = classes["unicode"]["concat"];
+  string["create"] = classes["unicode"]["create"];
+  string["gmatch"] = classes["sregex"]["gmatch"];
+  string["mark_tag"] = classes["sregex"]["mark_tag"];
+  string["regex"] = classes["sregex"]["create"];
+  string["regex_choose"] = classes["sregex"]["choose"];
+  string["regex_compile"] = classes["sregex"]["compile"];
+  string["regex_concat"] = classes["sregex"]["concat"];
+  string["regex_or"] = classes["sregex"]["choose"];
+  string["regex_plane"] = classes["sregex"]["plane"];
+  string["replace"] = classes["sregex"]["replace"];
+  string["sregex"] = classes["sregex"]["compile"];
+  string["unicode"] = classes["unicode"]["create"];
+  string["unistr"] = classes["unicode"]["create"];
+  string["utf16"] = classes["unicode"]["create"];
 
   globals(L)["package"]["loaded"]["lev.string"] = string;
   return 0;
@@ -235,21 +277,21 @@ namespace lev
 
   static myString* cast_str(void *obj) { return (myString *)obj; }
 
-  unicode_string::unicode_string() : base(), _obj(NULL) { }
+  unicode::unicode() : base(), _obj(NULL) { }
 
-  unicode_string::unicode_string(const std::string &src) : base(), _obj(NULL)
+  unicode::unicode(const std::string &src) : base(), _obj(NULL)
   {
     _obj = myString::FromUTF8(src);
     if (! _obj) { _obj = myString::FromUTF8(""); }
   }
 
-  unicode_string::unicode_string(const unicode_string &src) : base(), _obj(NULL)
+  unicode::unicode(const unicode &src) : base(), _obj(NULL)
   {
     _obj = myString::Clone(*cast_str(src._obj));
     if (! _obj) { _obj = myString::FromUTF8(""); }
   }
 
-  unicode_string::~unicode_string()
+  unicode::~unicode()
   {
     if (_obj)
     {
@@ -258,13 +300,13 @@ namespace lev
     }
   }
 
-  unicode_string &unicode_string::append(const unicode_string &str)
+  unicode &unicode::append(const unicode &str)
   {
     cast_str(_obj)->str.append(cast_str(str._obj)->str);
     return *this;
   }
 
-  bool unicode_string::assign_utf8(const std::string &src)
+  bool unicode::assign_utf8(const std::string &src)
   {
     myString *str = myString::FromUTF8(src);
     if (! str) { return false; }
@@ -273,7 +315,7 @@ namespace lev
     return true;
   }
 
-  bool unicode_string::compare(luabind::object op1, luabind::object op2)
+  bool unicode::compare(luabind::object op1, luabind::object op2)
   {
     using namespace luabind;
 
@@ -289,7 +331,7 @@ namespace lev
     }
   }
 
-  bool unicode_string::compare_with(luabind::object rhs)
+  bool unicode::compare_with(luabind::object rhs)
   {
     using namespace luabind;
 
@@ -304,16 +346,15 @@ namespace lev
     }
   }
 
-  boost::shared_ptr<unicode_string> unicode_string::concat(lua_State *L,
-                                                           luabind::object op1,
-                                                           luabind::object op2)
+  boost::shared_ptr<unicode>
+    unicode::concat(lua_State *L, luabind::object op1, luabind::object op2)
   {
     using namespace luabind;
 
-    boost::shared_ptr<unicode_string> uni;
+    boost::shared_ptr<unicode> uni;
     if (! L) { return uni; }
     try {
-      uni.reset(new unicode_string);
+      uni.reset(new unicode);
       if (! uni) { throw -1; }
       const char *str1 = object_cast<const char *>(globals(L)["tostring"](op1));
       const char *str2 = object_cast<const char *>(globals(L)["tostring"](op2));
@@ -327,21 +368,21 @@ namespace lev
     return uni;
   }
 
-  bool unicode_string::empty() const
+  bool unicode::empty() const
   {
     return cast_str(_obj)->str.empty();
   }
 
-  int unicode_string::find(const unicode_string &str)
+  int unicode::find(const unicode &str)
   {
     return cast_str(_obj)->str.find(cast_str(str._obj)->str);
   }
 
-  boost::shared_ptr<unicode_string> unicode_string::from_utf8(const std::string &src)
+  boost::shared_ptr<unicode> unicode::from_utf8(const std::string &src)
   {
-    boost::shared_ptr<unicode_string> u;
+    boost::shared_ptr<unicode> u;
     try {
-      u.reset(new unicode_string);
+      u.reset(new unicode);
       if (! u) { throw -1; }
       u->_obj = myString::FromUTF8(src);
       if (! u->_obj) { throw -2; }
@@ -353,23 +394,23 @@ namespace lev
     return u;
   }
 
-  long unicode_string::index(size_t pos) const
+  long unicode::index(size_t pos) const
   {
     if (pos < cast_str(_obj)->str.length()) { return cast_str(_obj)->str[pos]; }
     else { return -1; }
   }
 
-  size_t unicode_string::length() const
+  size_t unicode::length() const
   {
     return cast_str(_obj)->str.length();
   }
 
-  boost::shared_ptr<unicode_string> unicode_string::sub_string(size_t from,
+  boost::shared_ptr<unicode> unicode::sub_string(size_t from,
                                                                size_t to) const
   {
-    boost::shared_ptr<unicode_string> uni;
+    boost::shared_ptr<unicode> uni;
     try {
-      uni.reset(new unicode_string);
+      uni.reset(new unicode);
       if (! uni) { throw -1; }
       uni->_obj = myString::FromUTF16(cast_str(_obj)->str.substr(from, to));
       if (! uni->_obj) { throw -2; }
@@ -381,11 +422,285 @@ namespace lev
     return uni;
   }
 
-  std::string unicode_string::to_utf8() const
+  std::string unicode::to_utf8() const
   {
     std::string buf;
     cast_str(_obj)->ToUTF8(buf);
     return buf;
+  }
+
+
+  static boost::xpressive::sregex *cast_regex(void *obj) { return (boost::xpressive::sregex *)obj; }
+
+  sregex::sregex() : _obj(NULL) { }
+
+  sregex::~sregex()
+  {
+    if (_obj)
+    {
+      delete cast_regex(_obj);
+      _obj = NULL;
+    }
+  }
+
+  boost::shared_ptr<sregex> sregex::assign(boost::shared_ptr<sregex> self, boost::shared_ptr<sregex> src)
+  {
+    if (! self || ! src) { return boost::shared_ptr<sregex>(); }
+    try {
+      *cast_regex(self->_obj) = *cast_regex(src->_obj);
+    }
+    catch (...) {
+      lev::debug_print("error on static regex assignment");
+      return boost::shared_ptr<sregex>();
+    }
+    return self;
+  }
+
+  boost::shared_ptr<sregex> sregex::choose(boost::shared_ptr<sregex> lhs, boost::shared_ptr<sregex> rhs)
+  {
+    boost::shared_ptr<lev::sregex> re;
+    if (! lhs || ! rhs) { return re; }
+    try {
+      re.reset(new lev::sregex);
+      if (! re) { throw -1; }
+      boost::xpressive::sregex r =
+        boost::xpressive::by_ref(*cast_regex(lhs->_obj)) |
+        boost::xpressive::by_ref(*cast_regex(rhs->_obj));
+      re->_obj = new boost::xpressive::sregex(r);
+      if (! re->_obj) { throw -2; }
+    }
+    catch (...) {
+      re.reset();
+      lev::debug_print("error on static regex \"or\" concatination");
+    }
+    return re;
+  }
+
+  boost::shared_ptr<sregex> sregex::compile(const std::string &exp)
+  {
+    boost::shared_ptr<lev::sregex> re;
+    try {
+      re.reset(new lev::sregex);
+      if (! re) { throw -1; }
+      boost::xpressive::sregex r = boost::xpressive::sregex::compile(exp);
+      re->_obj = new boost::xpressive::sregex(r);
+      if (! re->_obj) { throw -2; }
+    }
+    catch (...) {
+      re.reset();
+      lev::debug_print("error on static regex instance compilation");
+    }
+    return re;
+  }
+
+  boost::shared_ptr<sregex> sregex::concat(boost::shared_ptr<sregex> lhs, boost::shared_ptr<sregex> rhs)
+  {
+    boost::shared_ptr<lev::sregex> re;
+    if (! lhs || ! rhs) { return re; }
+    try {
+      re.reset(new lev::sregex);
+      if (! re) { throw -1; }
+      boost::xpressive::sregex r =
+        boost::xpressive::by_ref(*cast_regex(lhs->_obj)) >>
+        boost::xpressive::by_ref(*cast_regex(rhs->_obj));
+      re->_obj = new boost::xpressive::sregex(r);
+      if (! re->_obj) { throw -2; }
+    }
+    catch (...) {
+      re.reset();
+      lev::debug_print("error on static regex instance concatination");
+    }
+    return re;
+  }
+
+  boost::shared_ptr<sregex> sregex::concat_lua(lua_State *L, luabind::object op1, luabind::object op2)
+  {
+    using namespace luabind;
+    if (! op1.is_valid() || ! op2.is_valid()) { return boost::shared_ptr<sregex>(); }
+    boost::shared_ptr<sregex> lhs, rhs;
+    try {
+      if (type(op1) == LUA_TUSERDATA)
+      {
+        lhs = object_cast<boost::shared_ptr<sregex> >(op1);
+      }
+      else { lhs = sregex::plane( util::tostring(op1) ); }
+      if (type(op2) == LUA_TUSERDATA)
+      {
+        rhs = object_cast<boost::shared_ptr<sregex> >(op2);
+      }
+      else { rhs = sregex::plane( util::tostring(op2) ); }
+    }
+    catch (...) {
+      lev::debug_print("lua error on static regex instance concatination");
+      return boost::shared_ptr<sregex>();
+    }
+    return sregex::concat(lhs, rhs);
+  }
+
+  boost::shared_ptr<sregex> sregex::create()
+  {
+    boost::shared_ptr<lev::sregex> re;
+    try {
+      re.reset(new lev::sregex);
+      if (! re) { throw -1; }
+      re->_obj = new boost::xpressive::sregex();
+      if (! re->_obj) { throw -2; }
+    }
+    catch (...) {
+      re.reset();
+      lev::debug_print("error on static regex instance creation");
+    }
+    return re;
+  }
+
+  int sregex::find_l(lua_State *L)
+  {
+  }
+
+  luabind::object sregex::gmatch(lua_State *L, const std::string &str)
+  {
+    using namespace luabind;
+    boost::xpressive::smatch m;
+    object t;
+    try {
+      boost::xpressive::sregex_iterator cur(str.begin(), str.end(), *cast_regex(_obj)), end;
+      if (cur == end) { return t; }
+      t = newtable(L);
+      for (; cur != end; cur++)
+      {
+        object hit = newtable(L);
+        for (int i = 0; i < cur->size(); i++)
+        {
+          object match = newtable(L);
+          match["len"]      = cur->length(i);
+          match["length"]   = cur->length(i);
+          match["pos"]      = cur->position(i);
+          match["position"] = cur->position(i);
+          match["str"]      = cur->str(i);
+          match["string"]   = cur->str(i);
+          hit[i] = match;
+        }
+        globals(L)["table"]["insert"](t, hit);
+      }
+    }
+    catch (...) {
+      lev::debug_print("error on static regex matching");
+      t = object();
+    }
+    return t;
+  }
+
+  luabind::object sregex::gmatch_static(lua_State *L, const std::string &str, boost::shared_ptr<sregex> rex)
+  {
+    if (! rex) { return luabind::object(); }
+    return rex->gmatch(L, str);
+  }
+
+  luabind::object sregex::gmatch_string(lua_State *L, const std::string &str, const std::string &exp)
+  {
+    return gmatch_static(L, str, lev::sregex::compile(exp));
+  }
+
+  boost::shared_ptr<sregex> sregex::mark_tag(boost::shared_ptr<sregex> self, int tag_id)
+  {
+    boost::shared_ptr<lev::sregex> re;
+    if (! self) { return re; }
+    try {
+      boost::xpressive::mark_tag tag(tag_id);
+      re.reset(new lev::sregex);
+      if (! re) { throw -1; }
+      boost::xpressive::sregex r = (tag = *cast_regex(self->_obj));
+      re->_obj = new boost::xpressive::sregex(r);
+      if (! re->_obj) { throw -2; }
+    }
+    catch (...) {
+      re.reset();
+      lev::debug_print("error on static regex instance concatination");
+    }
+    return re;
+  }
+
+  std::string sregex::replace(const std::string &str, const std::string &format)
+  {
+    return boost::xpressive::regex_replace(str, *cast_regex(_obj), format);
+  }
+
+  std::string sregex::replace_static(const std::string &str, boost::shared_ptr<sregex> rex, const std::string &format)
+  {
+    if (! rex) { return ""; }
+    return rex->replace(str, format);
+  }
+
+  std::string sregex::replace_string(const std::string &str, const std::string &exp, const std::string &format)
+  {
+    return sregex::replace_static(str, lev::sregex::compile(exp), format);
+  }
+
+  boost::shared_ptr<sregex> sregex::plane(const std::string &str)
+  {
+    boost::shared_ptr<lev::sregex> re;
+    try {
+      re.reset(new lev::sregex);
+      if (! re) { throw -1; }
+      re->_obj = new boost::xpressive::sregex(boost::xpressive::as_xpr(str));
+      if (! re->_obj) { throw -2; }
+    }
+    catch (...) {
+      re.reset();
+      lev::debug_print("error on static regex instance creation");
+    }
+    return re;
+  }
+
+
+  static boost::xpressive::sregex_compiler* cast_cmp(void *obj)
+  {
+    return (boost::xpressive::sregex_compiler *)obj;
+  }
+
+  sregex_compiler::sregex_compiler() : _obj(NULL) { }
+
+  sregex_compiler::~sregex_compiler()
+  {
+    if (_obj)
+    {
+      delete cast_cmp(_obj);
+      _obj = NULL;
+    }
+  }
+
+  boost::shared_ptr<sregex> sregex_compiler::compile(const std::string &exp)
+  {
+    namespace xpressive = boost::xpressive;
+    boost::shared_ptr<sregex> re;
+    try {
+      re.reset(new sregex);
+      if (! re) { throw -1; }
+      xpressive::sregex r = cast_cmp(_obj)->compile(exp, xpressive::regex_constants::ignore_white_space);
+      re->_obj = new xpressive::sregex(r);
+      if (! re->_obj) { throw -2; }
+    }
+    catch (...) {
+      re.reset();
+      lev::debug_print("error on static regex compilation by compiler\n");
+    }
+    return re;
+  }
+
+  boost::shared_ptr<sregex_compiler> sregex_compiler::create()
+  {
+    boost::shared_ptr<sregex_compiler> comp;
+    try {
+      comp.reset(new sregex_compiler);
+      if (! comp) { throw -1; }
+      comp->_obj = new boost::xpressive::sregex_compiler;
+      if (! comp->_obj) { throw -2; }
+    }
+    catch (...) {
+      comp.reset();
+      lev::debug_print("error on static regex compiler instance creation\n");
+    }
+    return comp;
   }
 
 }

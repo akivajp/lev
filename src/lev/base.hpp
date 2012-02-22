@@ -47,6 +47,8 @@ namespace lev
           LEV_TSCREEN,
           LEV_TSIZE,
           LEV_TSOUND,
+          LEV_TSREGEX,
+          LEV_TSREGEX_COMPILER,
           LEV_TSTOP_WATCH,
           LEV_TSYSTEM,
           LEV_TTEMP_NAME,
@@ -55,7 +57,7 @@ namespace lev
             LEV_TCLOCK,
           LEV_TTIMER_END,
 
-          LEV_TUNICODE_STRING,
+          LEV_TUNICODE,
           LEV_TVECTOR,
 
           LEV_TWINDOW,

@@ -407,10 +407,10 @@ namespace lev
 
   boost::shared_ptr<raster> font::rasterize_utf8(const std::string &str, int spacing)
   {
-    return font::rasterize_utf16(unicode_string(str), spacing);
+    return font::rasterize_utf16(unicode(str), spacing);
   }
 
-  boost::shared_ptr<raster> font::rasterize_utf16(const unicode_string &str, int spacing)
+  boost::shared_ptr<raster> font::rasterize_utf16(const unicode &str, int spacing)
   {
     boost::shared_ptr<raster> r;
     try {

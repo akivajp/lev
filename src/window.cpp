@@ -878,7 +878,7 @@ namespace lev
     if (font_size <= 0) { return false; }
     try {
       ptr_screen->set_current();
-      boost::shared_ptr<unicode_string> str = unicode_string::from_utf8(message_utf8);
+      boost::shared_ptr<unicode> str = unicode::from_utf8(message_utf8);
       if (! str) { throw -1; }
       ptr_layout->get_font()->set_pixel_size(font_size);
       for (int i = 0; i < str->length(); i++)
@@ -905,7 +905,7 @@ namespace lev
       if (ptr_layout->get_h() > get_h() * 2)
       {
         // messages are to long, purging the oldest part
-        str = unicode_string::from_utf8(buffer);
+        str = unicode::from_utf8(buffer);
         str = str->sub_string1(str->length() / 4);
         buffer = str->to_utf8();
         ptr_layout->clear();

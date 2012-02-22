@@ -34,6 +34,7 @@ extern "C" {
 #include <boost/shared_array.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/weak_ptr.hpp>
+#include <boost/xpressive/xpressive.hpp>
 
 //#include <luabind/adopt_policy.hpp>
 //#include <luabind/copy_policy.hpp>
