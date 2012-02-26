@@ -53,7 +53,7 @@ int luaopen_lev_image(lua_State *L)
     namespace_("image"),
     namespace_("classes")
     [
-      class_<image, drawable, boost::shared_ptr<base> >("image")
+      class_<image, drawable, boost::shared_ptr<drawable> >("image")
         .def("blit", &image::blit)
         .def("blit", &image::blit1)
         .def("blit", &image::blit2)
@@ -81,8 +81,8 @@ int luaopen_lev_image(lua_State *L)
         .property("sz",  &image::get_size)
         .property("size",  &image::get_size)
 //        .def("stroke_circle", &image::stroke_circle)
-//        .def("stroke_line", &image::stroke_line)
-//        .def("stroke_line", &image::stroke_line6)
+        .def("stroke_line", &image::stroke_line)
+        .def("stroke_line", &image::stroke_line6)
 //        .def("stroke_rect", &image::stroke_rect)
 //        .def("stroke_rectangle", &image::stroke_rect)
         .scope
@@ -101,14 +101,16 @@ int luaopen_lev_image(lua_State *L)
           def("create", &texture::create),
           def("create", &texture::load)
         ],
-//      class_<animation, drawable>("animation")
-//        .def("add", &animation::add_file)
-//        .property("current", &animation::get_current)
-//        .scope
-//        [
-//          def("create", &animation::create, adopt(result)),
-//          def("create", &animation::create0, adopt(result))
-//        ],
+      class_<animation, drawable, boost::shared_ptr<drawable> >("animation")
+        .def("append", &animation::append)
+        .def("append", &animation::append_file)
+        .def("append", &animation::append_path)
+        .property("current", &animation::get_current)
+        .scope
+        [
+          def("create", &animation::create),
+          def("create", &animation::create0)
+        ],
       class_<transition, drawable, boost::shared_ptr<base> >("transition")
         .property("is_running", &transition::is_running)
         .def("rewind", &transition::rewind)
@@ -177,7 +179,7 @@ int luaopen_lev_image(lua_State *L)
   register_to(classes["transition"], "set_current", &transition::set_current_l);
   register_to(classes["transition"], "set_next", &transition::set_next_l);
 
-//  image["animation"]   = classes["animation"]["create"];
+  image["animation"]   = classes["animation"]["create"];
   image["create"]      = classes["image"]["create"];
   image["layout"]      = classes["layout"]["create"];
 //  image["levana_icon"] = classes["image"]["levana_icon"];
@@ -368,17 +370,18 @@ namespace lev
     return true;
   }
 
-  bool image::clear(const color &c)
+  bool image::clear(boost::shared_ptr<const color> c)
   {
     return clear_rect(0, 0, get_w(), get_h(), c);
   }
 
-  bool image::clear_rect(int offset_x, int offset_y, int w, int h, const color &c)
+  bool image::clear_rect(int offset_x, int offset_y, int w, int h, boost::shared_ptr<const color> c)
   {
+    if (! c) { return false; }
     int img_w = get_w();
     int img_h = get_h();
     unsigned char *pixel = cast_image(_obj)->buf;
-    unsigned char r = c.get_r(), g = c.get_g(), b = c.get_b(), a = c.get_a();
+    unsigned char r = c->get_r(), g = c->get_g(), b = c->get_b(), a = c->get_a();
     if (a > 0)
     {
       for (int y = 0; y < h; y++)
@@ -422,7 +425,7 @@ namespace lev
     return true;
   }
 
-  bool image::clear_rect2(const rect &r, const color &c)
+  bool image::clear_rect2(const rect &r, boost::shared_ptr<const color> c)
   {
     return clear_rect(r.get_x(), r.get_y(), r.get_w(), r.get_h(), c);
   }
@@ -450,7 +453,6 @@ namespace lev
     return img;
   }
 
-//  image* image::create(int width, int height)
   boost::shared_ptr<image> image::create(int width, int height)
   {
 //    image *img = NULL;
@@ -521,18 +523,19 @@ namespace lev
     return blend_pixel(pixel, c);
   }
 
-  bool image::draw_raster(const raster *r, int offset_x, int offset_y, const color *c)
+  bool image::draw_raster(const raster *r, int offset_x, int offset_y, boost::shared_ptr<const color> c)
   {
     if (! r) { return false; }
 
-    color orig = color::white();
-    if (c) { orig = *c; }
-    color copy = orig;
+    if (! c) { c = color::white(); }
+    if (! c) { return false; }
+    color copy = *c;
+
     for (int y = 0; y < r->get_h(); y++)
     {
       for (int x = 0; x < r->get_w(); x++)
       {
-        copy.set_a((unsigned short)orig.get_a() * r->get_pixel(x, y) / 255);
+        copy.set_a((unsigned short)c->get_a() * r->get_pixel(x, y) / 255);
         draw_pixel(offset_x + x, offset_y + y, copy);
       }
     }
@@ -561,33 +564,27 @@ namespace lev
       else if (t["alpha"]) { a = object_cast<int>(t["alpha"]); }
       else if (t["a"]) { a = object_cast<int>(t["a"]); }
 
-      if (t["lev.image1"])
+      if (t["lev.drawable1"])
       {
-        image *src = object_cast<image *>(t["lev.image1"]);
-
-        img->draw(src, x, y, a);
-      }
-      else if (t["lev.image.layout1"])
-      {
-        layout *src = object_cast<layout *>(t["lev.image.layout1"]);
-
-        img->draw(src, x, y, a);
+        object obj = t["lev.drawable1"];
+        boost::shared_ptr<drawable> src = object_cast<boost::shared_ptr<drawable> >(obj["cast"](obj));
+        img->draw(src.get(), x, y, a);
       }
       else if (t["lev.raster1"])
       {
-        color *c = NULL;
+        boost::shared_ptr<color> c;
         raster *r = object_cast<raster *>(t["lev.raster1"]);
 
-        if (t["color"]) { c = object_cast<color *>(t["color"]); }
-        else if (t["c"]) { c = object_cast<color *>(t["c"]); }
-        else if (t["lev.prim.color1"]) { c = object_cast<color *>(t["lev.prim.color1"]); }
+        if (t["color"]) { c = object_cast<boost::shared_ptr<color> >(t["color"]); }
+        else if (t["c"]) { c = object_cast<boost::shared_ptr<color> >(t["c"]); }
+        else if (t["lev.prim.color1"]) { c = object_cast<boost::shared_ptr<color> >(t["lev.prim.color1"]); }
 
         img->draw_raster(r, x, y, c);
       }
       else if (t["lev.font1"])
       {
         int spacing = 1;
-        color *c = NULL;
+        boost::shared_ptr<color> c;
         font *f = object_cast<font *>(t["lev.font1"]);
         const char *str = NULL;
 
@@ -596,9 +593,9 @@ namespace lev
         else if (t["s"]) { spacing = object_cast<int>(t["s"]); }
         else if (t["lua.number3"]) { spacing = object_cast<int>(t["lua.number3"]); }
 
-        if (t["color"]) { c = object_cast<color *>(t["color"]); }
-        else if (t["c"]) { c = object_cast<color *>(t["c"]); }
-        else if (t["lev.prim.color1"]) { c = object_cast<color *>(t["lev.prim.color1"]); }
+        if (t["color"]) { c = object_cast<boost::shared_ptr<color> >(t["color"]); }
+        else if (t["c"]) { c = object_cast<boost::shared_ptr<color> >(t["c"]); }
+        else if (t["lev.prim.color1"]) { c = object_cast<boost::shared_ptr<color> >(t["lev.prim.color1"]); }
 
         if (t["lua.string1"]) { str = object_cast<const char *>(t["lua.string1"]); }
 
@@ -803,19 +800,27 @@ namespace lev
   }
 
 
+//  boost::shared_ptr<image> image::string(font *f, const std::string &str,
+//                                         const color *fore,
+//                                         const color *shade,
+//                                         const color *back,
+//                                         int spacing)
   boost::shared_ptr<image> image::string(font *f, const std::string &str,
-                                         const color *fore,
-                                         const color *shade,
-                                         const color *back,
+                                         boost::shared_ptr<color> fore,
+                                         boost::shared_ptr<color> shade,
+                                         boost::shared_ptr<color> back,
                                          int spacing)
   {
     boost::shared_ptr<image> img;
     if (! f) { return img; }
 
-    color fg = color::white();
-    color bg = color::transparent();
-    if (fore) { fg = *fore; }
-    if (back) { bg = *back; }
+//    color fg = color::white();
+//    color bg = color::transparent();
+//    if (fore) { fg = *fore; }
+//    if (back) { bg = *back; }
+    if (! fore) { fore = color::white(); }
+    if (! back) { back = color::transparent(); }
+    if (! fore || ! back) { return img; }
 
     try {
       boost::shared_ptr<raster> r = f->rasterize_utf8(str, spacing);
@@ -825,16 +830,16 @@ namespace lev
       {
         img = image::create(r->get_w() + 1, r->get_h() + 1);
         if (! img) { throw -2; }
-        img->clear(bg);
+        img->clear(back);
         img->draw_raster(r.get(), 1, 1, shade);
-        img->draw_raster(r.get(), 0, 0, &fg);
+        img->draw_raster(r.get(), 0, 0, fore);
       }
       else
       {
         img = image::create(r->get_w(), r->get_h());
         if (! img) { throw -2; }
-        img->clear(bg);
-        img->draw_raster(r.get(), 0, 0, &fg);
+        img->clear(back);
+        img->draw_raster(r.get(), 0, 0, fore);
       }
     }
     catch (...) {
@@ -924,32 +929,54 @@ namespace lev
 //    }
 //    return image_draw_mask(this, &tmp, border);
 //  }
-//
+
 //  bool image::stroke_line(int x1, int y1, int x2, int y2, color *border, int width,
 //                          const std::string &style)
-//  {
-//    wxBitmap tmp(get_w(), get_h(), 32);
-//    try {
-//      wxMemoryDC mdc(tmp);
-//      if (style == "dot")
-//      {
-//        mdc.SetPen(wxPen(wxColour(255, 255, 255, 255), width, wxDOT));
-//      }
-//      else
-//      {
-//        mdc.SetPen(wxPen(wxColour(255, 255, 255, 255), width));
-//      }
-//      mdc.SetBrush(wxColour(0, 0, 0, 255));
-//      mdc.SetBackground(wxColour(0, 0, 0, 255));
-//      mdc.Clear();
-//      mdc.DrawLine(x1, y1, x2, y2);
-//    }
-//    catch (...) {
-//      return false;
-//    }
-//    return image_draw_mask(this, &tmp, border);
-//  }
-//
+  bool image::stroke_line(int x1, int y1, int x2, int y2, boost::shared_ptr<color> c, int width,
+                          const std::string &style)
+  {
+    if (! c) { return false; }
+    if (x2 < x1)
+    {
+      int tmp = x1;
+      x2 = x1;
+      x1 = tmp;
+      tmp = y1;
+      y2 = y1;
+      y1 = tmp;
+    }
+    try {
+      if (style == "dot")
+      {
+        for (int x = x1; x < x2; x+=2)
+        {
+          int y = y1;
+          if (x > x1)
+          {
+            y = (y2 - y1) * (x2 - x1) / (x - x1) + y1;
+          }
+          draw_pixel(x, y, *c);
+        }
+      }
+      else
+      {
+        for (int x = x1; x < x2; x++)
+        {
+          int y = y1;
+          if (x > x1)
+          {
+            y = (y2 - y1) * (x2 - x1) / (x - x1) + y1;
+          }
+          draw_pixel(x, y, *c);
+        }
+      }
+    }
+    catch (...) {
+      return false;
+    }
+    return true;
+  }
+
 //  bool image::stroke_rect(int x, int y, int w, int h, color *border, int width)
 //  {
 //    wxBitmap tmp(get_w(), get_h(), 32);
@@ -1198,24 +1225,39 @@ namespace lev
     }
   }
 
-  /*
   class myAnimation
   {
-    public:
+    protected:
 
-      myAnimation(bool repeating = true) : imgs(), repeating(repeating)
-      {
-        sw.Start(0);
-      }
+      myAnimation(bool repeating = true)
+        : imgs(), repeating(repeating), texturized(false) { }
+
+    public:
 
       ~myAnimation() { }
 
-      bool AddFile(const std::string &filename, int duration)
+      static myAnimation* Create(bool repeating = true)
       {
-        if (duration <= 0) { return false; }
+        myAnimation *anim = NULL;
         try {
-          boost::shared_ptr<image> img(image::load(filename));
-          if (! img) { throw -1; }
+          anim = new myAnimation(repeating);
+          if (! anim) { throw -1; }
+          anim->sw = stop_watch::create();
+          if (! anim->sw) { throw -2; }
+          return anim;
+        }
+        catch (...) {
+          delete anim;
+          return NULL;
+        }
+      }
+
+      bool Append(boost::shared_ptr<drawable> img, double duration)
+      {
+        if (! img) { return false; }
+        if (duration <= 0) { return false; }
+        texturized = false;
+        try {
           imgs.push_back(img);
           durations.push_back(duration);
           return true;
@@ -1225,46 +1267,50 @@ namespace lev
         }
       }
 
-      bool CompileAll(canvas *cv, bool force)
+      bool CompileAll(bool force)
       {
         for (int i = 0; i < imgs.size(); i++)
         {
-          cv->compile(imgs[i].get(), force);
+          if (imgs[i]) { imgs[i]->compile(force); }
         }
         return true;
       }
 
-      image* GetCurrent()
+      boost::shared_ptr<drawable> GetCurrent()
       {
-        long now = sw.Time();
-        long total = 0;
-        if (imgs.size() == 0) { return NULL; }
+        double now = sw->get_time();
+        double total = 0;
+        if (imgs.size() == 0) { return boost::shared_ptr<drawable>(); }
+
         for (int i = 0; i < durations.size(); i++)
         {
           if (total <= now && now < total + durations[i])
           {
-            return imgs[i].get();
+            return imgs[i];
           }
           total += durations[i];
         }
-        if (! repeating) { return imgs[imgs.size() - 1].get(); }
-        sw.Start(sw.Time() - total);
+        if (! repeating) { return imgs[imgs.size() - 1]; }
+        sw->start(sw->get_time() - total);
         return GetCurrent();
       }
 
-      bool TexturizeAll(canvas *cv, bool force)
+      bool TexturizeAll(bool force)
       {
+        if (texturized && ! force) { return false; }
         for (int i = 0; i < imgs.size(); i++)
         {
-          cv->texturize(imgs[i].get(), force);
+          if (imgs[i]) { imgs[i]->texturize(force); }
         }
+        texturized = true;
         return true;
       }
 
       bool repeating;
-      wxStopWatch sw;
-      std::vector<boost::shared_ptr<image> > imgs;
-      std::vector<int> durations;
+      boost::shared_ptr<stop_watch> sw;
+      std::vector<boost::shared_ptr<drawable> > imgs;
+      std::vector<double> durations;
+      bool texturized;
   };
   static myAnimation* cast_anim(void *obj) { return (myAnimation *)obj; }
 
@@ -1277,42 +1323,73 @@ namespace lev
     if (_obj) { delete cast_anim(_obj); }
   }
 
-  bool animation::add_file(const std::string &filename, int duration)
+  bool animation::append(boost::shared_ptr<drawable> img, double duration)
   {
-    return cast_anim(_obj)->AddFile(filename, duration);
+    return cast_anim(_obj)->Append(img, duration);
   }
 
-  bool animation::compile(canvas *cv, bool force)
+  bool animation::append_file(const std::string &filename, double duration)
   {
-    return cast_anim(_obj)->CompileAll(cv, force);
+    return cast_anim(_obj)->Append(image::load(filename), duration);
   }
 
-  image* animation::get_current()
+  bool animation::append_path(boost::shared_ptr<file_path> path, double duration)
+  {
+    return animation::append_file(path->get_full_path(), duration);
+  }
+
+  bool animation::compile(bool force)
+  {
+    return cast_anim(_obj)->CompileAll(force);
+  }
+
+  boost::shared_ptr<animation> animation::create(bool repeating)
+  {
+    boost::shared_ptr<animation> anim;
+    try {
+      anim.reset(new animation);
+      if (! anim) { throw -1; }
+      anim->_obj = myAnimation::Create(repeating);
+      if (! anim->_obj) { throw -2; }
+    }
+    catch (...) {
+      anim.reset();
+      lev::debug_print("error on animation instance creation\n");
+    }
+    return anim;
+  }
+
+  bool animation::draw_on_screen(screen *target, int x, int y, unsigned char alpha)
+  {
+    boost::shared_ptr<drawable> img = get_current();
+    if (! img) { return false; }
+    return img->draw_on_screen(target, x, y, alpha);
+  }
+
+  boost::shared_ptr<drawable> animation::get_current()
   {
     return cast_anim(_obj)->GetCurrent();
   }
 
-  animation* animation::create(bool repeating)
+  int animation::get_h() const
   {
-    animation* anim = NULL;
-    try {
-      anim = new animation;
-      anim->_obj = new myAnimation(repeating);
-      return anim;
-    }
-    catch (...) {
-      delete anim;
-      return NULL;
-    }
+    boost::shared_ptr<drawable> img = cast_anim(_obj)->GetCurrent();
+    if (img) { return img->get_h(); }
+    else { return 0; }
   }
 
-  bool animation::texturize(canvas *cv, bool force)
+  int animation::get_w() const
   {
-    return cast_anim(_obj)->TexturizeAll(cv, force);
+    boost::shared_ptr<drawable> img = cast_anim(_obj)->GetCurrent();
+    if (img) { return img->get_w(); }
+    else { return 0; }
   }
 
+  bool animation::texturize(bool force)
+  {
+    return cast_anim(_obj)->TexturizeAll(force);
+  }
 
-*/
 
   class myTransition
   {
@@ -1536,9 +1613,10 @@ namespace lev
       transition *tran = object_cast<transition *>(object(from_stack(L, 1)));
       object t = util::get_merged(L, 2, -1);
 
-      if (t["lev.image1"])
+      if (t["lev.drawable1"])
       {
-        boost::shared_ptr<image> img = object_cast<boost::shared_ptr<image> >(t["lev.image1"]);
+        object obj = t["lev.drawable1"];
+        boost::shared_ptr<drawable> img = object_cast<boost::shared_ptr<drawable> >(obj["cast"](obj));
         result = tran->set_current(img);
       }
       else if (t["lev.fs.file_path1"])
@@ -1661,7 +1739,7 @@ namespace lev
         font_ruby = font::load0();
         if (font_ruby) { font_ruby->set_pixel_size(font_ruby->get_pixel_size() / 2); }
         color_fg = color::white();
-        color_shade = boost::shared_ptr<color>(new color(color::black()));
+        color_shade = color::black();
         hover_bg = color::transparent();
         hover_fg = color::red();
       }
@@ -1960,10 +2038,11 @@ namespace lev
           boost::shared_ptr<image> img;
           boost::shared_ptr<image> hover_img;
 
-          img = image::string(font_text.get(), text, &color_fg, color_shade.get(), NULL, spacing);
-//          img->stroke_line(0, img->get_h() - 1,
-//                           img->get_w() - 1, img->get_h() - 1, c, 1, "dot");
-          hover_img = image::string(font_text.get(), text, &hover_fg, &hover_bg);
+          img = image::string(font_text.get(), text, color_fg, color_shade,
+                              boost::shared_ptr<color>(), spacing);
+          img->stroke_line(0, img->get_h() - 1,
+                           img->get_w() - 1, img->get_h() - 1, color_fg, 1, "dot");
+          hover_img = image::string(font_text.get(), text, hover_fg, hover_bg);
           return ReserveClickable(img, hover_img, lclick_func, hover_func);
         }
         catch (...) {
@@ -2007,15 +2086,15 @@ namespace lev
           boost::shared_ptr<image> img;
           if (ruby.empty()) {
             img = image::string(font_text.get(), word,
-                                &color_fg, color_shade.get(), NULL, spacing);
+                                color_fg, color_shade, boost::shared_ptr<color>(), spacing);
             return ReserveImage(img);
           }
           else
           {
             boost::shared_ptr<image> img_ruby;
             boost::shared_ptr<image> img_word;
-            img_ruby = image::string(font_ruby.get(), ruby, &color_fg, color_shade.get(), NULL, spacing);
-            img_word = image::string(font_text.get(), word, &color_fg, color_shade.get(), NULL, spacing);
+            img_ruby = image::string(font_ruby.get(), ruby, color_fg, color_shade, boost::shared_ptr<color>(), spacing);
+            img_word = image::string(font_text.get(), word, color_fg, color_shade, boost::shared_ptr<color>(), spacing);
             if (!img_ruby || !img_word) { throw -1; }
             int h = img_ruby->get_h() + img_word->get_h();
             int w = img_ruby->get_w();
@@ -2054,10 +2133,13 @@ namespace lev
       }
 
       // format properties
-      color color_fg;
+//      color color_fg;
+      boost::shared_ptr<color> color_fg;
       boost::shared_ptr<color> color_shade;
-      color hover_bg;
-      color hover_fg;
+//      color hover_bg;
+      boost::shared_ptr<color> hover_bg;
+//      color hover_fg;
+      boost::shared_ptr<color> hover_fg;
       boost::shared_ptr<font> font_text;
       boost::shared_ptr<font> font_ruby;
       int spacing;
@@ -2118,7 +2200,7 @@ namespace lev
     return cast_lay(_obj)->DrawOn(dst, x, y, alpha);
   }
 
-  color &layout::get_fg_color()
+  boost::shared_ptr<color> layout::get_fg_color()
   {
     return cast_lay(_obj)->color_fg;
   }
@@ -2218,8 +2300,10 @@ namespace lev
     return cast_lay(_obj)->ReserveWord(util::tostring(word));
   }
 
-  bool layout::set_fg_color(const color &fg)
+//  bool layout::set_fg_color(const color &fg)
+  bool layout::set_fg_color(boost::shared_ptr<color> fg)
   {
+    if (! fg) { return false; }
     cast_lay(_obj)->color_fg = fg;
     return true;
   }

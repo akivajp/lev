@@ -558,46 +558,33 @@ namespace lev
       else if (t["alpha"]) { a = object_cast<int>(t["alpha"]); }
       else if (t["a"]) { a = object_cast<int>(t["a"]); }
 
-      if (t["lev.image1"])
+      if (t["lev.drawable1"])
       {
-        drawable *src = object_cast<drawable *>(t["lev.image1"]);
-        s->draw(src, x, y, a);
-      }
-      else if (t["lev.image.map1"])
-      {
-        drawable *src = object_cast<drawable *>(t["lev.image.map1"]);
-        s->draw(src, x, y, a);
-      }
-      else if (t["lev.image.layout1"])
-      {
-        drawable *src = object_cast<drawable *>(t["lev.image.layout1"]);
-        s->draw(src, x, y, a);
-      }
-      else if (t["lev.image.texture1"])
-      {
-        drawable *src = object_cast<drawable *>(t["lev.image.texture1"]);
-        s->draw(src, x, y, a);
-      }
-      else if (t["lev.image.transition1"])
-      {
-        drawable *src = object_cast<drawable *>(t["lev.image.transition1"]);
-        s->draw(src, x, y, a);
+//printf("IMAGE CAST!\n");
+        object obj = t["lev.drawable1"];
+//printf("OBJECT: %s\n", object_cast<const char *>(obj["type_name"]));
+        boost::shared_ptr<drawable> src = object_cast<boost::shared_ptr<drawable> >(obj["cast"](obj));
+        s->draw(src.get(), x, y, a);
+//printf("IMAGE END!\n");
       }
       else if (t["lev.raster1"])
       {
-        color *c = NULL;
+        boost::shared_ptr<color> c;
         raster *r = object_cast<raster *>(t["lev.raster1"]);
 
-        if (t["color"]) { c = object_cast<color *>(t["color"]); }
-        else if (t["c"]) { c = object_cast<color *>(t["c"]); }
-        else if (t["lev.prim.color1"]) { c = object_cast<color *>(t["lev.prim.color1"]); }
+        if (t["color"]) { c = object_cast<boost::shared_ptr<color> >(t["color"]); }
+        else if (t["c"]) { c = object_cast<boost::shared_ptr<color> >(t["c"]); }
+        else if (t["lev.prim.color1"])
+        {
+          c = object_cast<boost::shared_ptr<color> >(t["lev.prim.color1"]);
+        }
 
         s->draw_raster(r, x, y, c);
       }
       else if (t["lev.font1"])
       {
         int spacing = 1;
-        color *c = NULL;
+        boost::shared_ptr<color> c;
         font *f = object_cast<font *>(t["lev.font1"]);
         const char *str = NULL;
 
@@ -606,9 +593,9 @@ namespace lev
         else if (t["s"]) { spacing = object_cast<int>(t["s"]); }
         else if (t["lua.number3"]) { spacing = object_cast<int>(t["lua.number3"]); }
 
-        if (t["color"]) { c = object_cast<color *>(t["color"]); }
-        else if (t["c"]) { c = object_cast<color *>(t["c"]); }
-        else if (t["lev.prim.color1"]) { c = object_cast<color *>(t["lev.prim.color1"]); }
+        if (t["color"]) { c = object_cast<boost::shared_ptr<color> >(t["color"]); }
+        else if (t["c"]) { c = object_cast<boost::shared_ptr<color> >(t["c"]); }
+        else if (t["lev.prim.color1"]) { c = object_cast<boost::shared_ptr<color> >(t["lev.prim.color1"]); }
 
         if (t["lua.string1"]) { str = object_cast<const char *>(t["lua.string1"]); }
 
@@ -629,6 +616,11 @@ namespace lev
       }
       lua_pushboolean(L, true);
     }
+    catch (std::exception &e)
+    {
+      lev::debug_print(e.what());
+      lev::debug_print("error on drawing");
+    }
     catch (...) {
       lev::debug_print("error on drawing");
     }
@@ -644,21 +636,21 @@ namespace lev
     return true;
   }
 
-  bool screen::draw_raster(const raster *r, int offset_x, int offset_y, const color *c)
+  bool screen::draw_raster(const raster *r, int offset_x, int offset_y, boost::shared_ptr<const color> c)
   {
     if (! r) { return false; }
 
-    color orig = color::white();
-    if (c) { orig = *c; }
+    if (! c) { c = color::white(); }
+    if (! c) { return false; }
     glBegin(GL_POINTS);
       for (int y = 0; y < r->get_h(); y++)
       {
         for (int x = 0; x < r->get_w(); x++)
         {
-          unsigned char a = (unsigned short)orig.get_a() * r->get_pixel(x, y) / 255;
+          unsigned char a = (unsigned short)c->get_a() * r->get_pixel(x, y) / 255;
           if (a > 0)
           {
-            glColor4ub(orig.get_r(), orig.get_g(), orig.get_b(), a);
+            glColor4ub(c->get_r(), c->get_g(), c->get_b(), a);
             glVertex2i(offset_x + x, offset_y + y);
           }
         }

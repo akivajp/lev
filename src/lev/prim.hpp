@@ -29,6 +29,7 @@ namespace lev
       color(const color &orig);
       color(unsigned char r = 0, unsigned char g = 0, unsigned char b = 0, unsigned char a = 255);
       color(unsigned long argb_code);
+      boost::shared_ptr<color> clone();
       static boost::shared_ptr<color> create(unsigned char r, unsigned char g,
                                              unsigned char b, unsigned char a);
       static int create_l(lua_State *L);
@@ -43,14 +44,13 @@ namespace lev
       bool set_g(unsigned char new_g) { g = new_g; return true; }
       bool set_r(unsigned char new_r) { r = new_r; return true; }
       virtual type_id get_type_id() const { return LEV_TCOLOR; }
-      virtual const char *get_type_name() const { return "lev.prim.color"; }
 
-      static const color black() { return color(0, 0, 0, 255); }
-      static const color blue() { return color(0, 0, 255, 255); }
-      static const color green() { return color(0, 255, 0, 255); }
-      static const color red() { return color(255, 0, 0, 255); }
-      static const color white() { return color(255, 255, 255, 255); }
-      static const color transparent() { return color(0, 0, 0, 0); }
+      static boost::shared_ptr<color> black() { return color::create(0, 0, 0, 255); }
+      static boost::shared_ptr<color> blue()  { return color::create(0, 0, 255, 255); }
+      static boost::shared_ptr<color> green() { return color::create(0, 255, 0, 255); }
+      static boost::shared_ptr<color> red()   { return color::create(255, 0, 0, 255); }
+      static boost::shared_ptr<color> white() { return color::create(255, 255, 255, 255); }
+      static boost::shared_ptr<color> transparent() { return color::create(0, 0, 0, 0); }
 
     protected:
       unsigned char r, g, b, a;
@@ -69,7 +69,6 @@ namespace lev
       int get_h() const { return h; }
       int get_w() const { return w; }
       virtual type_id get_type_id() const { return LEV_TSIZE; }
-      virtual const char *get_type_name() const { return "lev.prim.size"; }
       bool set_d(int new_d) { d = new_d; return true; }
       bool set_h(int new_h) { h = new_h; return true; }
       bool set_w(int new_w) { w = new_w; return true; }
@@ -93,7 +92,6 @@ namespace lev
       int get_y() const { return y; }
       int get_z() const { return z; }
       virtual type_id get_type_id() const { return LEV_TVECTOR; }
-      virtual const char *get_type_name() const { return "lev.prim.vector"; }
       bool set_x(int new_x) { x = new_x; }
       bool set_y(int new_y) { y = new_y; }
       bool set_z(int new_z) { z = new_z; }
@@ -118,7 +116,6 @@ namespace lev
       boost::shared_ptr<color> get_color()  { return col; }
       boost::shared_ptr<vector> get_vertex() { return vertex; }
       virtual type_id get_type_id() const { return LEV_TPOINT; }
-      virtual const char *get_type_name() const { return "lev.prim.point"; }
       bool set_color(color *c);
       bool set_vertex(vector *v);
     protected:
@@ -149,7 +146,6 @@ namespace lev
       int get_y() const { return pos.get_y(); }
       int get_w() const { return sz.get_w(); }
       virtual type_id get_type_id() const { return LEV_TRECT; }
-      virtual const char *get_type_name() const { return "lev.prim.rect"; }
       bool include(int x, int y) const;
       bool include1(const vector &p) const { return include(p.get_x(), p.get_y()); }
       bool set_bottom(int bottom) { return sz.set_h(bottom - get_y()); }

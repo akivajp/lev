@@ -76,35 +76,6 @@ int luaopen_lev(lua_State *L)
   return 0;
 }
 
-int luaopen_lev_base(lua_State *L)
-{
-  using namespace luabind;
-  using namespace lev;
-
-  open(L);
-  globals(L)["require"]("io");
-  globals(L)["require"]("math");
-  globals(L)["require"]("os");
-  globals(L)["require"]("string");
-  globals(L)["require"]("table");
-
-  // base classes
-  module(L, "lev")
-  [
-    namespace_("classes")
-    [
-      // base of all
-      class_<base, boost::shared_ptr<base> >("base")
-        .def("__tostring", &base::tostring)
-        .property("type_id", &base::get_type_id)
-        .property("type_name", &base::get_type_name)
-    ]
-  ];
-
-  globals(L)["package"]["loaded"]["lev.base"] = true;
-  return 0;
-}
-
 
 int luaopen_lev_std(lua_State *L)
 {

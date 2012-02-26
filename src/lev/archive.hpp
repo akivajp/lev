@@ -72,9 +72,7 @@ namespace lev
       static long get_uncompressed_size_direct(const std::string &archive_file,
                                                const std::string &entry_name);
       virtual type_id get_type_id() const { return LEV_TARCHIVE; }
-      virtual const char *get_type_name() const { return "lev.archive"; }
       static bool is_archive(const std::string &filename);
-//      static archive* open(const std::string &archive_path);
       static boost::shared_ptr<archive> open(const std::string &archive_path);
       bool read(const std::string &entry_name, std::string &data,
                 int read_len = 0, const char *password = NULL);

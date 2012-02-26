@@ -30,8 +30,7 @@ namespace lev
       virtual bool draw_on_image(image *dst, int x = 0, int y = 0, unsigned char alpha = 255);
       virtual bool draw_on_screen(screen *dst, int x = 0, int y = 0, unsigned char alpha = 255);
       virtual int get_h() const;
-      virtual type_id get_type_id() const { return LEV_TIMAGE; }
-      virtual const char *get_type_name() const { return "lev.image.map"; }
+      virtual type_id get_type_id() const { return LEV_TMAP; }
       virtual int get_w() const;
       bool map_image(boost::shared_ptr<drawable> img, int x, int y, unsigned char alpha = 255);
       static int map_image_l(lua_State *L);

@@ -33,7 +33,6 @@ namespace lev
       virtual ~stop_watch();
       static boost::shared_ptr<stop_watch> create();
       virtual type_id get_type_id() const { return LEV_TSTOP_WATCH; }
-      virtual const char *get_type_name() const { return "lev.stop_watch"; }
       double get_time();
       bool is_running();
       double microseconds();
@@ -59,7 +58,6 @@ namespace lev
       double get_interval() const;
       luabind::object get_notify();
       virtual type_id get_type_id() const { return LEV_TTIMER; }
-      virtual const char *get_type_name() const { return "lev.timer"; }
       bool is_one_shot();
       bool is_running();
       virtual bool probe();
@@ -83,7 +81,6 @@ namespace lev
                                              double freq = 50);
       double get_freq() const;
       virtual type_id get_type_id() const { return LEV_TCLOCK; }
-      virtual const char *get_type_name() const { return "lev.clock"; }
       virtual bool probe();
       bool set_freq(double freq);
       virtual bool start(double freq = -1);

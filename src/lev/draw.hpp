@@ -49,14 +49,21 @@ namespace lev
       virtual bool draw_on_screen3(screen *dst, int x, int y)
       { return draw_on_screen(dst, x, y); }
 
+      static boost::shared_ptr<drawable> cast_drawable_from_animation(boost::shared_ptr<class animation> d);
+      static boost::shared_ptr<drawable> cast_drawable_from_image(boost::shared_ptr<class image> d);
+      static boost::shared_ptr<drawable> cast_drawable_from_layout(boost::shared_ptr<class layout> d);
+      static boost::shared_ptr<drawable> cast_drawable_from_map(boost::shared_ptr<class map> d);
+      static boost::shared_ptr<drawable> cast_drawable_from_texture(boost::shared_ptr<class texture> d);
+      static boost::shared_ptr<drawable> cast_drawable_from_transition(boost::shared_ptr<class transition> d);
+
       virtual int get_h() const { return 0; }
       virtual type_id get_type_id() const { return LEV_TDRAWABLE; }
-      virtual const char *get_type_name() const { return "lev.drawable"; }
       virtual int get_w() const { return 0; }
       virtual bool is_compiled() { false; }
       virtual bool is_texturized() { false; }
       virtual bool texturize(bool force = false) { return false; }
       virtual bool texturize0() { return texturize(); }
+
   };
 
 }

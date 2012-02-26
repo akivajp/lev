@@ -1,6 +1,6 @@
 CC = gcc
 CXX = g++
-#CXXFLAGS = -fPIC -O2 -I/usr/include/freetype2 `/usr/local/bin/sdl-config --cflags` \
+#CXXFLAGS = -fPIC -Os -I/usr/include/freetype2 `/usr/local/bin/sdl-config --cflags` \
 	   -I./minizip
 CXXFLAGS = -fPIC -g -I/usr/include/freetype2 `/usr/local/bin/sdl-config --cflags` \
 	   -I./minizip
@@ -10,7 +10,7 @@ OUT = a.out
 PCH = prec.h.gch
 AR = ar
 RANLIB = ranlib
-SRC  = archive.cpp debug.cpp draw.cpp entry.cpp font.cpp fs.cpp image.cpp map.cpp \
+SRC  = archive.cpp base.cpp debug.cpp draw.cpp entry.cpp font.cpp fs.cpp image.cpp map.cpp \
        package.cpp prim.cpp sound.cpp string.cpp system.cpp timer.cpp util.cpp window.cpp
 OBJS = $(SRC:%.cpp=%.o)
 DLIB = lev.so
@@ -66,6 +66,7 @@ $(DLIB): $(OBJS)
 	$(CXX) $(SHARED) -o $(DLIB) $(OBJS) $(LIBS)
 
 archive.o: archive.cpp lev/archive.hpp
+base.o: base.cpp lev/base.hpp
 debug.o: debug.cpp lev/debug.hpp
 draw.o: draw.cpp lev/draw.hpp
 entry.o: entry.cpp lev/entry.hpp

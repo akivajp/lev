@@ -45,7 +45,6 @@ namespace lev
       boost::shared_ptr<unicode> index_str(size_t pos) const { return sub_string(pos, 1); }
       bool is_valid() { return _obj != NULL; }
       virtual type_id get_type_id() const { return LEV_TUNICODE; }
-      virtual const char *get_type_name() const { return "lev.string.unicode"; }
       size_t length() const;
       boost::shared_ptr<unicode> sub_string(size_t from, size_t to = -1) const;
       boost::shared_ptr<unicode> sub_string1(size_t from) const { return sub_string(from); }
@@ -68,7 +67,6 @@ namespace lev
       static boost::shared_ptr<sregex> create();
       static int find_l(lua_State *L);
       virtual type_id get_type_id() const { return LEV_TSREGEX; }
-      virtual const char *get_type_name() const { return "lev.string.sregex"; }
       luabind::object gmatch(lua_State *L, const std::string &str);
       static luabind::object gmatch_static(lua_State *L, const std::string &str, boost::shared_ptr<sregex> rex);
       static luabind::object gmatch_string(lua_State *L, const std::string &str, const std::string &exp);
@@ -92,7 +90,6 @@ namespace lev
       boost::shared_ptr<sregex> compile(const std::string &exp);
       static boost::shared_ptr<sregex_compiler> create();
       virtual type_id get_type_id() const { return LEV_TSREGEX_COMPILER; }
-      virtual const char *get_type_name() const { return "lev.string.sregex_compiler"; }
     protected:
       void *_obj;
   };

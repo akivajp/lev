@@ -171,6 +171,20 @@ namespace lev
     b = (argb_code & 0x000000FF) >>  0;
   }
 
+  boost::shared_ptr<color> color::clone()
+  {
+    boost::shared_ptr<color> c;
+    try {
+      c.reset(new color(*this));
+      if (! c) { throw -1; }
+    }
+    catch (...) {
+      c.reset();
+      lev::debug_print("error on color instance cloning\n");
+    }
+    return c;
+  }
+
   boost::shared_ptr<color> color::create(unsigned char r, unsigned char g,
                                          unsigned char b, unsigned char a)
   {

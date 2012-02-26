@@ -1,4 +1,4 @@
-CXXFLAGS = `/usr/mingw32/usr/bin/sdl-config --cflags` -I/usr/mingw32/usr/include/freetype2 \
+CXXFLAGS = -Os `/usr/mingw32/usr/bin/sdl-config --cflags` -I/usr/mingw32/usr/include/freetype2 \
 	   -I./minizip
 #LIBS = -L/usr/mingw32/usr/lib `/usr/mingw32/usr/bin/wx-config --libs std gl` -lglu32 -llua -lluabind -static
 LIBS = -llua -lluabind -lvorbisfile -lvorbis -logg -lfreetype -lopengl32 -lz \

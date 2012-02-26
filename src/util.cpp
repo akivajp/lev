@@ -319,22 +319,46 @@ namespace lev
           }
           break;
         case LUA_TUSERDATA:
-          base *base_obj;
-          base_obj = object_cast<base *>(arg);
-          if (base_obj)
           {
-            const char *name = base_obj->get_type_name();
-            target[name] = arg;
-            for (int j = 1; ; ++j)
+            object obj_id = arg["type_id"];
+            if (obj_id.is_valid() && type(obj_id) == LUA_TNUMBER)
             {
-              std::string key = (boost::format("%1%%2%") % name % j).str();
-              if (!target[key.c_str()])
+              base::type_id id = (base::type_id)object_cast<int>(obj_id);
+              while (id != base::LEV_TNONE)
               {
-                target[key.c_str()] = arg;
-                break;
+                const char *name = base::get_type_name_by_id(id);
+                target[name] = arg;
+                for (int j = 1; ; ++j)
+                {
+                  std::string key = (boost::format("%1%%2%") % name % j).str();
+                  if (! target[key])
+                  {
+                    target[key] = arg;
+                    break;
+                  }
+                }
+                id = base::get_base_id(id);
               }
             }
           }
+
+//          base *base_obj;
+//          base_obj = object_cast<base *>(arg);
+
+//          if (base_obj)
+//          {
+//            const char *name = base_obj->get_type_name();
+//            target[name] = arg;
+//            for (int j = 1; ; ++j)
+//            {
+//              std::string key = (boost::format("%1%%2%") % name % j).str();
+//              if (!target[key.c_str()])
+//              {
+//                target[key.c_str()] = arg;
+//                break;
+//              }
+//            }
+//          }
           target["lua.userdata1"] = arg;
           for (int j = 1; ; ++j)
           {

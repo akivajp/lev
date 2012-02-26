@@ -81,8 +81,6 @@ int luaopen_lev_sound(lua_State *L)
         .def("slot", &mixer::get_slot0)
         .def("start", &mixer::start)
         .def("stop", &mixer::stop)
-        .property("type_id", &mixer::get_type_id)
-        .property("type_name", &mixer::get_type_name)
         .scope
         [
           def("get", &mixer::get),

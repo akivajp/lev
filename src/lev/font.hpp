@@ -32,7 +32,6 @@ namespace lev
       int get_h() const { return h; }
       unsigned char get_pixel(int x, int y) const;
       virtual type_id get_type_id() const { return LEV_TRASTER; }
-      virtual const char *get_type_name() const { return "lev.raster"; }
       int get_w() const { return w; }
       bool set_pixel(int x, int y, unsigned char gray = 255);
     protected:
@@ -54,7 +53,6 @@ namespace lev
       std::string get_style();
       void *get_rawobj() { return _obj; }
       virtual type_id get_type_id() const { return LEV_TFONT; }
-      virtual const char *get_type_name() const { return "lev.font"; }
       static boost::shared_ptr<font> load(const std::string &file = "default.ttf", int index = 0);
       static boost::shared_ptr<font> load0();
       static boost::shared_ptr<font> load1(const std::string &file) { return load(file); }

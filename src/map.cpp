@@ -323,14 +323,10 @@ namespace lev
       else if (t["a"]) { alpha = object_cast<unsigned char>(t["a"]); }
       else if (t["lua.number3"]) { alpha = object_cast<unsigned char>(t["lua.number3"]); }
 
-      if (t["lev.image1"])
+      if (t["lev.drawable1"])
       {
-        boost::shared_ptr<image> img = object_cast<boost::shared_ptr<image> >(t["lev.image1"]);
-        result = m->map_image(img, x, y, alpha);
-      }
-      else if (t["lev.image.layout1"])
-      {
-        boost::shared_ptr<layout> img = object_cast<boost::shared_ptr<layout> >(t["lev.image.layout1"]);
+        object obj = t["lev.drawable1"];
+        boost::shared_ptr<drawable> img = object_cast<boost::shared_ptr<drawable> >(obj["cast"](obj));
         result = m->map_image(img, x, y, alpha);
       }
       lua_pushboolean(L, result);
@@ -355,7 +351,7 @@ namespace lev
     try {
       int x = 0, y = 0;
       object lclick_func, hover_func;
-      boost::shared_ptr<image> img1, img2;
+      boost::shared_ptr<drawable> img1, img2;
       unsigned char alpha = 255;
       bool result = false;
 
@@ -383,13 +379,15 @@ namespace lev
       if (t["on_hover"]) { hover_func = t["on_hover"]; }
       else if (t["lua.function2"]) { hover_func = t["lua.function2"]; }
 
-      if (t["lev.image1"])
+      if (t["lev.drawable1"])
       {
-        img1 = object_cast<boost::shared_ptr<image> >(t["lev.image1"]);
+        object obj = t["lev.drawable1"];
+        img1 = object_cast<boost::shared_ptr<drawable> >(obj["cast"](obj));
       }
-      if (t["lev.image2"])
+      if (t["lev.drawable2"])
       {
-        img2 = object_cast<boost::shared_ptr<image> >(t["lev.image2"]);
+        object obj = t["lev.drawable2"];
+        img2 = object_cast<boost::shared_ptr<drawable> >(obj["cast"](obj));
       }
       result = m->map_link(img1, img2, x, y, lclick_func, hover_func, alpha);
       lua_pushboolean(L, result);

@@ -32,7 +32,6 @@ namespace lev
       static int create_l(lua_State *L);
       const std::string& get_name() { return path_str; }
       virtual type_id get_type_id() const { return LEV_TTEMP_NAME; }
-      virtual const char *get_type_name() const { return "lev.fs.temp_name"; }
     protected:
       std::string path_str;
   };
@@ -59,7 +58,6 @@ namespace lev
 //      long get_size();
 //      std::string get_url();
       virtual type_id get_type_id() const { return LEV_TFILE_PATH; }
-      virtual const char *get_type_name() const { return "lev.fs.file_path"; }
 //      bool is_dir();
 //      bool is_dir_readable();
 //      bool is_dir_writable();
@@ -95,7 +93,6 @@ namespace lev
       static long get_size(const std::string &file_path);
       static std::string get_temp_dir();
 //      virtual type_id get_type_id() const { return LEV_TFILE_SYSTEM; }
-//      virtual const char *get_type_name() const { return "lev.fs.file_system"; }
       static bool mkdir(const std::string &path, bool force = false);
       static bool mkdir1(const std::string &path) { return file_system::mkdir(path); }
 //      static file_system* open(const std::string &path);

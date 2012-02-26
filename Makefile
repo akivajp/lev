@@ -1,6 +1,6 @@
 CXX = g++
 PREFIX=/tmp
-VERSION=0.3.2
+VERSION=0.4.0
 OUT = a.out
 BIN = lev
 DLIB = lev.so

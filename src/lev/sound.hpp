@@ -40,7 +40,6 @@ namespace lev
       double get_position();
       void* get_rawobj() { return _obj; }
       virtual type_id get_type_id() const { return LEV_TSOUND; }
-      virtual const char *get_type_name() const { return "lev.sound"; }
       bool is_playing();
       bool load(const std::string &filename);
       bool load_path(boost::shared_ptr<file_path> path);
@@ -84,8 +83,6 @@ namespace lev
 //      static int get_field(lua_State *L);
       bool get_playing();
       virtual type_id get_type_id() const { return LEV_TMIXER; }
-      virtual const char *get_type_name() const { return "lev.sound.mixer"; }
-//      static mixer* init();
       static boost::shared_ptr<mixer> init(boost::shared_ptr<system> sys);
       bool is_active();
       bool start() { return activate(true); }

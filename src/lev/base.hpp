@@ -7,13 +7,16 @@
 // Author:      Akiva Miura <akiva.miura@gmail.com>
 // Modified by:
 // Created:     12/12/2010
-// Copyright:   (C) 2011 Akiva Miura
+// Copyright:   (C) 2010-2012 Akiva Miura
 // Licence:     MIT License
 /////////////////////////////////////////////////////////////////////////////
 
-#include <boost/format.hpp>
 #include <luabind/luabind.hpp>
 #include <string>
+
+extern "C" {
+  int luaopen_lev_base(lua_State *L);
+}
 
 namespace lev
 {
@@ -30,6 +33,7 @@ namespace lev
           LEV_TCOLOR,
 
           LEV_TDRAWABLE,
+            LEV_TANIMATION,
             LEV_TIMAGE,
             LEV_TLAYOUT,
             LEV_TMAP,
@@ -71,29 +75,16 @@ namespace lev
       virtual ~base() { }
     public:
       virtual type_id get_type_id() const { return LEV_TBASE; }
-      virtual const char *get_type_name() const { return "lev.base"; }
-
-      static std::string tostring(const base *b)
+      virtual const char *get_type_name() const
       {
-        return (boost::format("%1%: %2%") % b->get_type_name() % b).str();
+        return get_type_name_by_id(get_type_id());
       }
 
+      static type_id get_base_id(type_id id);
+      static const char *get_type_name_by_id(type_id id);
       static bool is_type_of(const luabind::object &obj, type_id id,
-                             type_id id_stop = LEV_TNONE)
-      {
-        if (id_stop == LEV_TNONE) { id_stop = id; }
-        if (! obj) { return false; }
-        if (luabind::type(obj) != LUA_TUSERDATA) { return false; }
-
-        luabind::object obj_id = obj["type_id"];
-        if (! obj_id) { return false; }
-        if (luabind::type(obj_id) != LUA_TNUMBER) { return false; }
-
-        int id_of_obj = luabind::object_cast<int>(obj_id);
-        if (id <= id_of_obj && id_of_obj <= id_stop) { return true; }
-        return false;
-      }
-
+                             type_id id_stop = LEV_TNONE);
+      static std::string tostring(const base *b);
   };
 
 }

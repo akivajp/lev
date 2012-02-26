@@ -52,7 +52,6 @@ namespace lev
       void* get_rawobj() { return _obj; }
       int get_w();
       virtual type_id get_type_id() const { return LEV_TWINDOW; }
-      virtual const char *get_type_name() const { return "lev.window"; }
       bool hide();
       bool is_fullscreen();
       bool set_fullscreen(bool enable = true);
@@ -109,7 +108,8 @@ namespace lev
 //      static int draw_points(lua_State *L);
 //      void draw_line(int x1, int y1, int x2, int y2);
       bool draw_pixel(int x, int y, const color &c);
-      bool draw_raster(const raster *r, int x = 0, int y = 0, const color *c = NULL);
+      bool draw_raster(const raster *r, int x = 0, int y = 0,
+                       boost::shared_ptr<const color> c = boost::shared_ptr<const color>());
       bool enable_alpha_blending(bool enable = true);
       bool enable_alpha_blending0() { return enable_alpha_blending(); }
 //      bool fill_rect(int x, int y, int w, int h, color *filling);
@@ -120,7 +120,6 @@ namespace lev
 //      bool redraw();
       boost::shared_ptr<image> get_screenshot();
       virtual type_id get_type_id() const { return LEV_TSCREEN; }
-      virtual const char *get_type_name() const { return "lev.screen"; }
       bool map2d_auto();
       bool map2d(int left, int right, int top, int bottom);
       bool set_current();
@@ -141,7 +140,6 @@ namespace lev
       static boost::shared_ptr<debug_window> get();
       std::string get_log() { return log; }
       virtual type_id get_type_id() const { return LEV_TDEBUG_WINDOW; }
-      virtual const char *get_type_name() const { return "lev.debug_window"; }
       static boost::shared_ptr<debug_window> init();
       bool print(const std::string &message_utf8, int font_size = 18);
       bool print1(const std::string &message_utf8) { return print(message_utf8); }

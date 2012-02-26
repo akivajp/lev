@@ -922,7 +922,7 @@ printf("DETACHING TIMER!\n");
       else if (sdl_evt.type == SDL_QUIT)
       {
         f = sys->funcs[SDL_QUIT];
-//        if (! f.is_valid()) { set_running(false); }
+        if (! f.is_valid()) { set_running(false); }
       }
       else
       {
