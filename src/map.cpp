@@ -139,6 +139,7 @@ namespace lev
                    unsigned char alpha = 255)
       {
         if (! img) { return false; }
+        if (! hover_img) { hover_img = img; }
         boost::shared_ptr<rect> r = rect::create(x, y, img->get_w(), img->get_h());
         if (! r) { return false; }
         imgs.push_back(img);
@@ -155,6 +156,7 @@ namespace lev
 
       bool OnHover(int x, int y)
       {
+        bool hovered_any = false;
         try {
           for (int i = 0; i < rects.size(); i++)
           {
@@ -167,6 +169,7 @@ namespace lev
                   funcs_hover[i](x, y);
                 }
                 hovered[i] = true;
+                hovered_any = true;
               }
             }
             else
@@ -179,7 +182,7 @@ namespace lev
           lev::debug_print("error on hovering process on image map");
           return false;
         }
-        return true;
+        return hovered_any;
       }
 
       bool OnLeftClick(int x, int y)
@@ -194,6 +197,7 @@ namespace lev
               {
                 L = funcs_lclick[i].interpreter();
                 funcs_lclick[i](x, y);
+                return true;
               }
             }
           }
@@ -203,7 +207,7 @@ namespace lev
           if (L) { lev::debug_print(lua_tostring(L, -1)); }
           return false;
         }
-        return true;
+        return false;
       }
 
       bool TexturizeAll(bool force)

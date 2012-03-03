@@ -102,9 +102,6 @@ int luaopen_lev_image(lua_State *L)
           def("create", &texture::load)
         ],
       class_<animation, drawable, boost::shared_ptr<drawable> >("animation")
-        .def("append", &animation::append)
-        .def("append", &animation::append_file)
-        .def("append", &animation::append_path)
         .property("current", &animation::get_current)
         .scope
         [
@@ -174,6 +171,7 @@ int luaopen_lev_image(lua_State *L)
   register_to(classes["image"], "string", &image::string_l);
   register_to(classes["image"], "sub", &image::sub_image_l);
   register_to(classes["image"], "sub_image", &image::sub_image_l);
+  register_to(classes["animation"], "append", &animation::append_l);
   register_to(classes["map"], "map_image", &map::map_image_l);
   register_to(classes["map"], "map_link", &map::map_link_l);
   register_to(classes["transition"], "set_current", &transition::set_current_l);
@@ -370,12 +368,12 @@ namespace lev
     return true;
   }
 
-  bool image::clear(boost::shared_ptr<const color> c)
+  bool image::clear(boost::shared_ptr<color> c)
   {
     return clear_rect(0, 0, get_w(), get_h(), c);
   }
 
-  bool image::clear_rect(int offset_x, int offset_y, int w, int h, boost::shared_ptr<const color> c)
+  bool image::clear_rect(int offset_x, int offset_y, int w, int h, boost::shared_ptr<color> c)
   {
     if (! c) { return false; }
     int img_w = get_w();
@@ -425,7 +423,7 @@ namespace lev
     return true;
   }
 
-  bool image::clear_rect2(const rect &r, boost::shared_ptr<const color> c)
+  bool image::clear_rect2(const rect &r, boost::shared_ptr<color> c)
   {
     return clear_rect(r.get_x(), r.get_y(), r.get_w(), r.get_h(), c);
   }
@@ -800,12 +798,7 @@ namespace lev
   }
 
 
-//  boost::shared_ptr<image> image::string(font *f, const std::string &str,
-//                                         const color *fore,
-//                                         const color *shade,
-//                                         const color *back,
-//                                         int spacing)
-  boost::shared_ptr<image> image::string(font *f, const std::string &str,
+  boost::shared_ptr<image> image::string(boost::shared_ptr<font> f, const std::string &str,
                                          boost::shared_ptr<color> fore,
                                          boost::shared_ptr<color> shade,
                                          boost::shared_ptr<color> back,
@@ -814,10 +807,6 @@ namespace lev
     boost::shared_ptr<image> img;
     if (! f) { return img; }
 
-//    color fg = color::white();
-//    color bg = color::transparent();
-//    if (fore) { fg = *fore; }
-//    if (back) { bg = *back; }
     if (! fore) { fore = color::white(); }
     if (! back) { back = color::transparent(); }
     if (! fore || ! back) { return img; }
@@ -855,59 +844,68 @@ namespace lev
 
     try {
       const char *str = NULL;
-      object font, fore, back, shade;
+      boost::shared_ptr<font> f;
+      boost::shared_ptr<color> fore = color::white();
+      boost::shared_ptr<color> back = color::transparent();
+      boost::shared_ptr<color> shade = color::black();
       int spacing = 1;
 
       object t = util::get_merged(L, 1, -1);
       if (t["lua.string1"]) { str = object_cast<const char *>(t["lua.string1"]); }
-      else if (t["lev.unistr1"]) { str = object_cast<const char *>(t["lev.unistr1"]["str"]); }
+      else if (t["lev.unicode1"]) { str = object_cast<const char *>(t["lev.unicode1"]["str"]); }
       else if (t["text"]) { str = object_cast<const char *>(t["text"]); }
       else if (t["t"]) { str = object_cast<const char *>(t["t"]); }
       else if (t["string"]) { str = object_cast<const char *>(t["string"]); }
       else if (t["str"]) { str = object_cast<const char *>(t["str"]); }
-      if (not str)
+      if (! str)
       {
-        luaL_error(L, "text (string) is not specified!\n");
+        luaL_error(L, "text (string) is not specified");
         return 0;
       }
 
-      if (t["lev.font"]) { font = t["lev.font"]; }
-      else if (t["font"]) { font = t["font"]; }
-      else if (t["f"]) { font = t["f"]; }
+      if (t["lev.font1"]) { f = object_cast<boost::shared_ptr<font> >(t["lev.font1"]); }
+      else if (t["font"]) { f = object_cast<boost::shared_ptr<font> >(t["font"]); }
+      else if (t["f"]) { f = object_cast<boost::shared_ptr<font> >(t["f"]); }
       else
       {
-        font = globals(L)["lev"]["font"]["load"]();
+        f = font::load();
+      }
+      if (! f)
+      {
+        luaL_error(L, "no fonts are found\n");
+        return 0;
       }
 
-      if (t["lev.prim.color1"]) { fore = t["lev.prim.color1"]; }
-      else if (t["fg_color"]) { fore = t["fg_color"]; }
-      else if (t["fg"]) { fore = t["fg"]; }
-      else if (t["fore"]) { fore = t["fore"]; }
-      else if (t["f"]) { fore = t["f"]; }
-      else if (t["color"]) { fore = t["color"]; }
-      else if (t["c"]) { fore = t["c"]; }
+      if (t["lev.prim.color1"]) { fore = object_cast<boost::shared_ptr<color> >(t["lev.prim.color1"]); }
+      else if (t["fg_color"]) { fore = object_cast<boost::shared_ptr<color> >(t["fg_color"]); }
+      else if (t["fg"]) { fore = object_cast<boost::shared_ptr<color> >(t["fg"]); }
+      else if (t["fore"]) { fore = object_cast<boost::shared_ptr<color> >(t["fore"]); }
+      else if (t["f"]) { fore = object_cast<boost::shared_ptr<color> >(t["f"]); }
+      else if (t["color"]) { fore = object_cast<boost::shared_ptr<color> >(t["color"]); }
+      else if (t["c"]) { fore = object_cast<boost::shared_ptr<color> >(t["c"]); }
 
-      if (t["lev.prim.color2"]) { shade = t["lev.prim.color2"]; }
-      else if (t["shade_color"]) { shade = t["shade_color"]; }
-      else if (t["shade"]) { shade = t["shade"]; }
-      else if (t["sh"]) { shade = t["sh"]; }
-      else if (t["s"]) { shade = t["s"]; }
+      if (t["lev.prim.color2"]) { shade = object_cast<boost::shared_ptr<color> >(t["lev.prim.color2"]); }
+      else if (t["shade_color"]) { shade = object_cast<boost::shared_ptr<color> >(t["shade_color"]); }
+      else if (t["shade"]) { shade = object_cast<boost::shared_ptr<color> >(t["shade"]); }
+      else if (t["sh"]) { shade = object_cast<boost::shared_ptr<color> >(t["sh"]); }
+      else if (t["s"]) { shade = object_cast<boost::shared_ptr<color> >(t["s"]); }
 
-      if (t["lev.prim.color3"]) { back = t["lev.prim.color3"]; }
-      else if (t["bg_color"]) { back = t["bg_color"]; }
-      else if (t["bg"]) { back = t["bg"]; }
-      else if (t["back"]) { back = t["back"]; }
-      else if (t["b"]) { back = t["b"]; }
+      if (t["lev.prim.color3"]) { back = object_cast<boost::shared_ptr<color> >(t["lev.prim.color3"]); }
+      else if (t["bg_color"]) { back = object_cast<boost::shared_ptr<color> >(t["bg_color"]); }
+      else if (t["bg"]) { back = object_cast<boost::shared_ptr<color> >(t["bg"]); }
+      else if (t["back"]) { back = object_cast<boost::shared_ptr<color> >(t["back"]); }
+      else if (t["b"]) { back = object_cast<boost::shared_ptr<color> >(t["b"]); }
 
       if (t["lua.number1"]) { spacing = object_cast<int>(t["lua.number1"]); }
       else if (t["spacing"]) { spacing = object_cast<int>(t["spacing"]); }
       else if (t["space"]) { spacing = object_cast<int>(t["space"]); }
 
-      object o = globals(L)["lev"]["classes"]["image"]["string_c"](font, str, fore, shade, back, spacing);
+      object o = globals(L)["lev"]["classes"]["image"]["string_c"](f, str, fore, shade, back, spacing);
       o.push(L);
       return 1;
     }
     catch (...) {
+      lev::debug_print("error on string image creating lua code");
       lua_pushnil(L);
       return 1;
     }
@@ -1333,9 +1331,57 @@ namespace lev
     return cast_anim(_obj)->Append(image::load(filename), duration);
   }
 
-  bool animation::append_path(boost::shared_ptr<file_path> path, double duration)
+  bool animation::append_path(const file_path *path, double duration)
   {
     return animation::append_file(path->get_full_path(), duration);
+  }
+
+  int animation::append_l(lua_State *L)
+  {
+    using namespace luabind;
+
+    try {
+      int x = 0, y = 0;
+      double duration = 1;
+
+      luaL_checktype(L, 1, LUA_TUSERDATA);
+      animation* anim = object_cast<animation *>(object(from_stack(L, 1)));
+      object t = util::get_merged(L, 2, -1);
+
+      if (t["duration"]) { duration = object_cast<double>(t["duration"]); }
+      else if (t["d"]) { duration = object_cast<double>(t["d"]); }
+      else if (t["interval"]) { duration = object_cast<double>(t["interval"]); }
+      else if (t["i"]) { duration = object_cast<double>(t["i"]); }
+      else if (t["lua.number1"]) { duration = object_cast<double>(t["lua.number1"]); }
+
+      if (t["lev.drawable1"])
+      {
+        object obj = t["lev.drawable1"];
+        boost::shared_ptr<drawable> img;
+        img = object_cast<boost::shared_ptr<drawable> >(obj["cast"](obj));
+        lua_pushboolean(L, anim->append(img, duration));
+      }
+      else if (t["lua.string1"])
+      {
+        const char *path = object_cast<const char *>(t["lua.string1"]);
+        lua_pushboolean(L, anim->append_file(path, duration));
+      }
+      else if (t["lua.fs.file_path1"])
+      {
+        const file_path *path = object_cast<const file_path *>(t["lua.fs.file_path1"]);
+        lua_pushboolean(L, anim->append_path(path, duration));
+      }
+      else
+      {
+        lua_pushboolean(L, false);
+      }
+    }
+    catch (...) {
+      lev::debug_print(lua_tostring(L, -1));
+      lev::debug_print("error on animation item appending");
+      lua_pushboolean(L, false);
+    }
+    return 1;
   }
 
   bool animation::compile(bool force)
@@ -1444,10 +1490,16 @@ namespace lev
         if (imgs.size() == 0) { return false; }
         if (imgs[0])
         {
-          if (modes.size() >= 1 && modes[0] == LEV_TRAN_FADE_OUT)
+          if (modes.size() >= 1)
           {
-//printf("FADE: alpha: %d, glad: %lf\n", (int)alpha, grad);
-            imgs[0]->draw_on_screen(cv, x, y, (1 - grad) * alpha);
+            if (modes[0] == LEV_TRAN_FADE_OUT)
+            {
+              imgs[0]->draw_on_screen(cv, x, y, (1 - grad) * alpha);
+            }
+            else if (modes[0] == LEV_TRAN_CROSS_FADE)
+            {
+              imgs[0]->draw_on_screen(cv, x, y, (1 - grad) * alpha);
+            }
           }
           else { imgs[0]->draw_on_screen(cv, x, y, alpha); }
         }
@@ -1720,7 +1772,9 @@ namespace lev
       struct myItem
       {
         public:
-          myItem() : x(-1), y(-1), fixed(false) { }
+          myItem() : x(-1), y(-1), fixed(false),
+            img(), img_hover(), img_showing(),
+            func_hover(), func_lclick() { }
           boost::shared_ptr<drawable> img;
           boost::shared_ptr<drawable> img_hover;
           boost::shared_ptr<drawable> img_showing;
@@ -2038,11 +2092,11 @@ namespace lev
           boost::shared_ptr<image> img;
           boost::shared_ptr<image> hover_img;
 
-          img = image::string(font_text.get(), text, color_fg, color_shade,
+          img = image::string(font_text, text, color_fg, color_shade,
                               boost::shared_ptr<color>(), spacing);
           img->stroke_line(0, img->get_h() - 1,
                            img->get_w() - 1, img->get_h() - 1, color_fg, 1, "dot");
-          hover_img = image::string(font_text.get(), text, hover_fg, hover_bg);
+          hover_img = image::string(font_text, text, hover_fg, hover_bg);
           return ReserveClickable(img, hover_img, lclick_func, hover_func);
         }
         catch (...) {
@@ -2085,7 +2139,7 @@ namespace lev
         try {
           boost::shared_ptr<image> img;
           if (ruby.empty()) {
-            img = image::string(font_text.get(), word,
+            img = image::string(font_text, word,
                                 color_fg, color_shade, boost::shared_ptr<color>(), spacing);
             return ReserveImage(img);
           }
@@ -2093,8 +2147,8 @@ namespace lev
           {
             boost::shared_ptr<image> img_ruby;
             boost::shared_ptr<image> img_word;
-            img_ruby = image::string(font_ruby.get(), ruby, color_fg, color_shade, boost::shared_ptr<color>(), spacing);
-            img_word = image::string(font_text.get(), word, color_fg, color_shade, boost::shared_ptr<color>(), spacing);
+            img_ruby = image::string(font_ruby, ruby, color_fg, color_shade, boost::shared_ptr<color>(), spacing);
+            img_word = image::string(font_text, word, color_fg, color_shade, boost::shared_ptr<color>(), spacing);
             if (!img_ruby || !img_word) { throw -1; }
             int h = img_ruby->get_h() + img_word->get_h();
             int w = img_ruby->get_w();
@@ -2185,7 +2239,6 @@ namespace lev
     catch (...) {
       lay.reset();
       lev::debug_print("error on image layout instance creation");
-
     }
     return lay;
   }
@@ -2215,9 +2268,9 @@ namespace lev
     return cast_lay(_obj)->CalcTotalHeight();
   }
 
-  font *layout::get_ruby_font()
+  boost::shared_ptr<font> layout::get_ruby_font()
   {
-    return cast_lay(_obj)->font_ruby.get();
+    return cast_lay(_obj)->font_ruby;
   }
 
   boost::shared_ptr<color> layout::get_shade_color()
@@ -2308,17 +2361,17 @@ namespace lev
     return true;
   }
 
-  bool layout::set_font(font *f)
+  bool layout::set_font(boost::shared_ptr<font> f)
   {
     if (! f) { return false; }
-    cast_lay(_obj)->font_text.reset(f);
+    cast_lay(_obj)->font_text = f;
     return true;
   }
 
-  bool layout::set_ruby_font(font *f)
+  bool layout::set_ruby_font(boost::shared_ptr<font> f)
   {
     if (! f) { return false; }
-    cast_lay(_obj)->font_ruby.reset(f);
+    cast_lay(_obj)->font_ruby = f;
     return true;
   }
 

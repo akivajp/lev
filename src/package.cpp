@@ -177,7 +177,7 @@ namespace lev
     boost::shared_ptr<font> f;
     try {
       globals(L)["require"]("lev.font");
-      object dirs = globals(L)["lev"]["package"]["get_font_dirs"]();
+      object dirs = package::get_font_dirs(L);
 
       for (iterator i(dirs), end; i != end; i++)
       {
@@ -202,7 +202,7 @@ namespace lev
     boost::shared_ptr<font> f;
     try {
       globals(L)["require"]("lev.font");
-      object fonts = globals(L)["lev"]["package"]["get_font_list"]();
+      object fonts = package::get_font_list(L);
 
       for (iterator i(fonts), end; i != end; i++)
       {
@@ -230,7 +230,9 @@ namespace lev
     {
       object t = newtable(L);
       globals(L)["lev"]["package"]["font_dirs"] = t;
-      globals(L)["table"]["insert"](t, 1, "./");
+      globals(L)["table"]["insert"](t, "./");
+      globals(L)["table"]["insert"](t, "/usr/share/fonts/corefonts");
+      globals(L)["table"]["insert"](t, "C:/system/fonts");
       return t;
     }
     return globals(L)["lev"]["package"]["font_dirs"];
@@ -242,7 +244,9 @@ namespace lev
     globals(L)["require"]("lev.package");
     if (! globals(L)["lev"]["package"]["font_list"])
     {
-      globals(L)["lev"]["package"]["font_list"] = newtable(L);
+      object t = newtable(L);
+      globals(L)["lev"]["package"]["font_list"] = t;
+      globals(L)["table"]["insert"](t, "arial.ttf");
     }
     return globals(L)["lev"]["package"]["font_list"];
   }

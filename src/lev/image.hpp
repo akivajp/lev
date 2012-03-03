@@ -44,11 +44,11 @@ namespace lev
       bool blit3(int x, int y, image *src) { return blit(x, y, src); }
       bool blit4(int x, int y, image *src, unsigned char alpha) { return blit(x, y, src, 0, 0, -1, -1, alpha); }
 
-      virtual bool clear(boost::shared_ptr<const color> c = color::transparent());
+      virtual bool clear(boost::shared_ptr<color> c = color::transparent());
       virtual bool clear0() { return clear(); }
-      bool clear_rect(int x, int y, int w, int h, boost::shared_ptr<const color> c = color::transparent());
+      bool clear_rect(int x, int y, int w, int h, boost::shared_ptr<color> c = color::transparent());
       bool clear_rect1(const rect &r) { return clear_rect2(r); }
-      bool clear_rect2(const rect &r, boost::shared_ptr<const color> c = color::transparent());
+      bool clear_rect2(const rect &r, boost::shared_ptr<color> c = color::transparent());
       bool clear_rect4(int x, int y, int w, int h) { return clear_rect(x, y, w, h); }
       boost::shared_ptr<image> clone();
       static boost::shared_ptr<image> create(int width, int height);
@@ -77,7 +77,7 @@ namespace lev
       boost::shared_ptr<image> resize(int width, int height);
       bool save(const std::string &filename) const;
       bool set_pixel(int x, int y, const color &c);
-      static boost::shared_ptr<image> string(font *f, const std::string &str,
+      static boost::shared_ptr<image> string(boost::shared_ptr<font> f, const std::string &str,
                                              boost::shared_ptr<color> fore  = boost::shared_ptr<color>(),
                                              boost::shared_ptr<color> shade = boost::shared_ptr<color>(),
                                              boost::shared_ptr<color> back  = boost::shared_ptr<color>(),
@@ -127,7 +127,8 @@ namespace lev
       virtual ~animation();
       bool append(boost::shared_ptr<drawable> img, double duration);
       bool append_file(const std::string &filename, double duration);
-      bool append_path(boost::shared_ptr<file_path> path, double duration);
+      bool append_path(const file_path *path, double duration);
+      static int append_l(lua_State *L);
       virtual bool compile(bool force = false);
       static boost::shared_ptr<animation> create(bool repeating = true);
       static boost::shared_ptr<animation> create0() { return create(); }
@@ -182,7 +183,7 @@ namespace lev
       boost::shared_ptr<color> get_fg_color();
       boost::shared_ptr<font> get_font();
       virtual int get_h() const;
-      font *get_ruby_font();
+      boost::shared_ptr<font> get_ruby_font();
       int get_spacing();
       boost::shared_ptr<color> get_shade_color();
       virtual type_id get_type_id() const { return LEV_TLAYOUT; }
@@ -201,9 +202,9 @@ namespace lev
       bool reserve_word_lua(luabind::object word, luabind::object ruby);
       bool reserve_word_lua1(luabind::object word);
       bool set_fg_color(boost::shared_ptr<color> fg);
-      bool set_font(font *f);
+      bool set_font(boost::shared_ptr<font> f);
       bool set_shade_color(const color *c);
-      bool set_ruby_font(font *f);
+      bool set_ruby_font(boost::shared_ptr<font> f);
       bool set_spacing(int space = 1);
       bool show_next();
       virtual bool texturize(bool force = false);

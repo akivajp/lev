@@ -18,64 +18,18 @@
 #include <sstream>
 #include <luabind/adopt_policy.hpp>
 
-namespace lev
-{
-
-//  int lua_entry(lua_State *L)
-//  {
-//    using namespace luabind;
-//    object table = globals(L)["arg"];
-//    int argc = 0;
-//    char **argv = NULL;
-//
-//    if (luabind::type(table) == LUA_TTABLE)
-//    {
-//      try {
-//        int j = 0;
-//        for (luabind::iterator i(table), end; i != end; i++) { argc++; }
-//        argv = new char*[argc];
-//        for (luabind::iterator i(table), end; i != end; i++)
-//        {
-//          std::stringstream ss;
-//          int len;
-//          ss << *i;
-//          len = ss.str().length();
-//          argv[j] = new char[len + 1];
-//          strcpy(argv[j++], ss.str().c_str());
-//        }
-//        application::entry(L, argc, argv);
-//        for (int i = 0; i < argc; i++) { delete argv[i]; }
-//        delete argv;
-//      }
-//      catch(...) {
-//        printf("Initialization failed\n");
-//        exit(-1);
-//      }
-//    }
-//    else
-//    {
-//      application::entry(L, 0, NULL);
-//    }
-//    return 0;
-//  }
-
-}
-
-
 int luaopen_lev(lua_State *L)
 {
   using namespace lev;
   using namespace luabind;
 
   open(L);
-//  lua_entry(L);
 
   globals(L)["require"]("lev.base");
   globals(L)["package"]["loaded"]["lev"] = globals(L)["lev"];
   set_preloaders(L);
   return 0;
 }
-
 
 int luaopen_lev_std(lua_State *L)
 {
@@ -123,7 +77,6 @@ int luaopen_lev_std(lua_State *L)
   }
   return 0;
 }
-
 
 namespace lev
 {

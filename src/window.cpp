@@ -867,6 +867,7 @@ namespace lev
   bool debug_window::print(const std::string &message_utf8, int font_size)
   {
     if (! _obj) { return false; }
+    if (! ptr_layout || ! ptr_layout->get_font()) { return false; }
     if (font_size <= 0) { return false; }
     try {
       ptr_screen->set_current();

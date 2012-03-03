@@ -241,138 +241,130 @@ namespace lev
     for (int i = 2; i <= n; i++)
     {
       object arg(from_stack(L, i));
-      switch (type(arg))
+      int num_type = type(arg);
+      if (num_type == LUA_TBOOLEAN)
       {
-        case LUA_TBOOLEAN:
-          target["lua.boolean"] = arg;
-          for (int j = 1; ; ++j)
+        target["lua.boolean"] = arg;
+        for (int j = 1; ; ++j)
+        {
+          std::string key = boost::io::str(boost::format("lua.boolean%1%") % j);
+          if (! target[key])
           {
-            std::string key = boost::io::str(boost::format("lua.boolean%1%") % j);
-            if (!target[key.c_str()])
-            {
-              target[key.c_str()] = arg;
-              break;
-            }
+            target[key] = arg;
+            break;
           }
-          break;
-        case LUA_TFUNCTION:
-          target["lua.function"] = arg;
-          for (int j = 1; ; ++j)
+        }
+      }
+      else if (num_type == LUA_TFUNCTION)
+      {
+        target["lua.function"] = arg;
+        for (int j = 1; ; ++j)
+        {
+          std::string key = boost::io::str(boost::format("lua.function%1%") % j);
+          if (! target[key])
           {
-            std::string key = boost::io::str(boost::format("lua.function%1%") % j);
-            if (!target[key.c_str()])
-            {
-              target[key.c_str()] = arg;
-              break;
-            }
+            target[key] = arg;
+            break;
           }
-          break;
-        case LUA_TNUMBER:
-          target["lua.number"] = arg;
-          for (int j = 1; ; ++j)
+        }
+      }
+      else if (num_type == LUA_TNUMBER)
+      {
+        target["lua.number"] = arg;
+        for (int j = 1; ; ++j)
+        {
+          std::string key = boost::io::str(boost::format("lua.number%1%") % j);
+          if (! target[key])
           {
-            std::string key = boost::io::str(boost::format("lua.number%1%") % j);
-            if (!target[key.c_str()])
-            {
-              target[key.c_str()] = arg;
-              break;
-            }
+            target[key] = arg;
+            break;
           }
-          break;
-        case LUA_TSTRING:
-          target["lua.string"] = arg;
-          for (int j = 1; ; ++j)
+        }
+      }
+      else if (num_type == LUA_TSTRING)
+      {
+        target["lua.string"] = arg;
+        for (int j = 1; ; ++j)
+        {
+          std::string key = boost::io::str(boost::format("lua.string%1%") % j);
+          if (! target[key])
           {
-            std::string key = boost::io::str(boost::format("lua.string%1%") % j);
-            if (!target[key.c_str()])
-            {
-              target[key.c_str()] = arg;
-              break;
-            }
+            target[key] = arg;
+            break;
           }
-          break;
-        case LUA_TTABLE:
-          for (iterator i(arg), end; i != end; ++i)
+        }
+      }
+      else if (num_type == LUA_TTABLE)
+      {
+        for (iterator i(arg), end; i != end; ++i)
+        {
+          if (type(i.key()) == LUA_TNUMBER)
           {
-            if (type(i.key()) == LUA_TNUMBER)
-            {
-              object tmp = *i;
-              lua_pushcfunction(L, &util::merge);
-              target.push(L);
-              tmp.push(L);
-              lua_call(L, 2, 0);
-            }
-//            else if (type(i.key()) == LUA_TSTRING)
-//            {
-//              target[i.key()] = *i;
-//              for (int j = 1; ; ++j)
-//              {
-//                std::string key = (boost::format("%1%%2%") % i.key() % j).str();
-//                if (!target[key.c_str()])
-//                {
-//                  target[key.c_str()] = *i;
-//                  break;
-//                }
-//              }
-//            }
-            else { target[i.key()] = *i; }
+            object tmp = *i;
+            lua_pushcfunction(L, &util::merge);
+            target.push(L);
+            tmp.push(L);
+            lua_call(L, 2, 0);
           }
-          break;
-        case LUA_TUSERDATA:
+          else if (type(i.key()) == LUA_TSTRING)
           {
-            object obj_id = arg["type_id"];
-            if (obj_id.is_valid() && type(obj_id) == LUA_TNUMBER)
+            target[i.key()] = *i;
+            for (int j = 1; ; ++j)
             {
-              base::type_id id = (base::type_id)object_cast<int>(obj_id);
-              while (id != base::LEV_TNONE)
+              std::string key = (boost::format("%1%%2%") % i.key() % j).str();
+              if (!target[key])
               {
-                const char *name = base::get_type_name_by_id(id);
-                target[name] = arg;
-                for (int j = 1; ; ++j)
-                {
-                  std::string key = (boost::format("%1%%2%") % name % j).str();
-                  if (! target[key])
-                  {
-                    target[key] = arg;
-                    break;
-                  }
-                }
-                id = base::get_base_id(id);
+                target[key] = *i;
+                break;
               }
             }
           }
-
-//          base *base_obj;
-//          base_obj = object_cast<base *>(arg);
-
-//          if (base_obj)
-//          {
-//            const char *name = base_obj->get_type_name();
-//            target[name] = arg;
-//            for (int j = 1; ; ++j)
-//            {
-//              std::string key = (boost::format("%1%%2%") % name % j).str();
-//              if (!target[key.c_str()])
-//              {
-//                target[key.c_str()] = arg;
-//                break;
-//              }
-//            }
-//          }
-          target["lua.userdata1"] = arg;
-          for (int j = 1; ; ++j)
+          else { target[i.key()] = *i; }
+        }
+      }
+      else if (num_type == LUA_TUSERDATA)
+      {
+        object obj_id;
+        try {
+          obj_id = arg["type_id"];
+        }
+        catch (...) {
+          // error on index access, continue to next iteration
+          continue;
+        }
+        if (obj_id.is_valid() && type(obj_id) == LUA_TNUMBER)
+        {
+          base::type_id id = (base::type_id)object_cast<int>(obj_id);
+          while (id != base::LEV_TNONE)
           {
-            std::string key = boost::io::str(boost::format("lua.userdata1%1%") % j);
-            if (!target[key.c_str()])
+            const char *name = base::get_type_name_by_id(id);
+            target[name] = arg;
+            for (int j = 1; ; ++j)
             {
-              target[key.c_str()] = arg;
-              break;
+              std::string key = (boost::format("%1%%2%") % name % j).str();
+              if (! target[key])
+              {
+                target[key] = arg;
+                break;
+              }
             }
+            id = base::get_base_id(id);
           }
-          break;
-        case LUA_TNIL:
-        default:
-          break;
+        }
+        target["lua.userdata"] = arg;
+        for (int j = 1; ; ++j)
+        {
+          std::string key = boost::io::str(boost::format("lua.userdata%1%") % j);
+          if (! target[key])
+          {
+            target[key] = arg;
+            break;
+          }
+        }
+      }
+      else if (num_type == LUA_TNIL)
+      {
+        // nothing to do
       }
     }
 
@@ -457,7 +449,8 @@ namespace lev
         return 1;
       }
     }
-    return 0;
+    lua_pushnil(L);
+    return 1;
   }
 
   // return new order-reversed table of "t"

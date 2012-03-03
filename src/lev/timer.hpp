@@ -53,6 +53,7 @@ namespace lev
       timer();
     public:
       virtual ~timer();
+      bool close();
       static boost::shared_ptr<timer> create(boost::shared_ptr<system> sys,
                                              double interval = 1000);
       double get_interval() const;

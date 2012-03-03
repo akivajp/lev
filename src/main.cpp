@@ -31,13 +31,47 @@ const char *entry_dir[] = {"entry"};
 const char *entry_files[] = {"entry.lc", "entry.lua", "entry.txt"};
 const int entry_files_len = 3;
 
+static int traceback (lua_State *L) {
+  if (!lua_isstring(L, 1))  /* 'message' not a string? */
+    return 1;  /* keep it intact */
+  lua_getfield(L, LUA_GLOBALSINDEX, "debug");
+  if (!lua_istable(L, -1)) {
+    lua_pop(L, 1);
+    return 1;
+  }
+  lua_getfield(L, -1, "traceback");
+  if (!lua_isfunction(L, -1)) {
+    lua_pop(L, 2);
+    return 1;
+  }
+  lua_pushvalue(L, 1);  /* pass error message */
+  lua_pushinteger(L, 2);  /* skip this function and traceback */
+  lua_call(L, 2, 1);  /* call debug.traceback */
+  return 1;
+}
+
+static int print_file_and_line(lua_State *L)
+{
+   lua_Debug d;
+   lua_getstack(L, 2, &d);
+   lua_getinfo(L, "Sln", &d);
+   std::string error_message =
+     (boost::format("error on lua script execution at %1%:%2%") % d.short_src % d.currentline).str();
+   lev::debug_print(error_message);
+   return 1;
+}
+
 static bool do_file(lua_State *L, const std::string &filename)
 {
-  if (luaL_dofile(L, filename.c_str()))
+//    if (luaL_dofile(L, filename.c_str()))
+//    lua_pushcfunction(L, print_file_and_line);
+  lua_pushcfunction(L, traceback);
+  if (luaL_loadfile(L, filename.c_str()) || lua_pcall(L, 0, LUA_MULTRET, 1))
   {
     lev::debug_print(lua_tostring(L, -1));
     return false;
   }
+  lua_pop(L, 1);
   return true;
 }
 
@@ -127,11 +161,11 @@ static bool execute_path(lua_State *L, const std::string &path)
   else
   {
     // given path is a regular file
-    if (! file_system::file_exists(path)) { return false; }
     do_file(L, path);
     return true;
   }
-  return false;
+//  lev::debug_print((boost::format("Target %1% is not found.") % path).str());
+//  return false;
 }
 
 
@@ -174,32 +208,57 @@ int main(int argc, char **argv)
         break;
       default:
         set_args(L, argc, argv, i);
-        done_something = execute_path(L, argv[i]);
+        execute_path(L, argv[i]);
+        done_something = true;
     }
   }
 
   // nothing was done
   // run entry program
-  if (file_system::dir_exists(entry_dir[0]))
-  {
-    done_something = execute_path(L, entry_dir[0]);
-  }
-  for (int i = 0; i < entry_files_len; i++)
-  {
-    if (done_something) { break; }
-    if (! file_system::file_exists(entry_files[i])) { continue; }
-    if (! do_file(L, entry_files[i])) { return -1; }
-    done_something = true;
-  }
   if (! done_something)
   {
+    if (file_system::dir_exists(entry_dir[0]))
+    {
+      execute_path(L, entry_dir[0]);
+      done_something = true;
+    }
+  }
+
+  if (! done_something)
+  {
+    for (int i = 0; i < entry_files_len; i++)
+    {
+      if (done_something) { break; }
+      if (! file_system::file_exists(entry_files[i])) { continue; }
+      if (! do_file(L, entry_files[i])) { return -1; }
+      done_something = true;
+    }
+  }
+
+  if (! done_something)
+  {
+    luaL_dostring(L, "");
+    if (system::init(L))
+    {
+      system::get()->start_debug();
+    }
     lev::debug_print("Usage: create \"entry.txt\" file and put in the same directory with the program");
-    return -1;
   }
 
   if (system::get())
   {
-    system::get()->done();
+    boost::shared_ptr<lev::system> sys = system::get();
+    sys->detach_timers();
+    while (sys && sys->is_debugging())
+    {
+      try {
+        sys->do_event();
+      }
+      catch (std::exception &e) {
+        lev::debug_print(e.what());
+      }
+    }
+    sys->done();
   }
   lua_gc(L, LUA_GCCOLLECT, 0);
   lua_close(L);

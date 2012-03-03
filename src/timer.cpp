@@ -57,6 +57,7 @@ int luaopen_lev_timer(lua_State *L)
           def("create", &stop_watch::create)
         ],
       class_<timer, base, boost::shared_ptr<base> >("timer")
+        .def("close", &timer::close)
         .property("is_one_shot", &timer::is_one_shot)
         .property("is_running", &timer::is_running)
         .property("interval", &timer::get_interval, &timer::set_interval)
@@ -325,12 +326,18 @@ namespace lev
   {
     if (_obj)
     {
-      if (boost::shared_ptr<system> s = cast_timer(_obj)->sys.lock())
-      {
-        s->detach_timer(this);
-      }
       delete cast_timer(_obj);
     }
+  }
+
+  bool timer::close()
+  {
+    if (boost::shared_ptr<system> s = cast_timer(_obj)->sys.lock())
+    {
+      s->detach_timer(this);
+      return true;
+    }
+    return false;
   }
 
   boost::shared_ptr<timer> timer::create(boost::shared_ptr<system> sys, double interval)

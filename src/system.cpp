@@ -57,6 +57,7 @@ int luaopen_lev_system(lua_State *L)
   globals(L)["package"]["loaded"]["lev.system"] = true;
   // pre-requirement
   globals(L)["require"]("lev.base");
+  globals(L)["require"]("lev.debug");
   globals(L)["require"]("lev.image");
   globals(L)["require"]("lev.timer");
 
@@ -824,6 +825,13 @@ printf("DETACHING TIMER!\n");
     return false;
   }
 
+  bool system::detach_timers()
+  {
+    if (! _obj) { return NULL; }
+    cast_sys(_obj)->timers.clear();
+    return true;
+  }
+
   bool system::do_event()
   {
     SDL_Event sdl_evt;
@@ -940,6 +948,7 @@ printf("DETACHING TIMER!\n");
         }
         catch (...) {
           lev::debug_print(lua_tostring(cast_sys(_obj)->L, -1));
+          lev::debug_print("error on event processing\n");
         }
       }
       return true;

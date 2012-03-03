@@ -64,7 +64,9 @@ int luaopen_lev_sound(lua_State *L)
         .def("play", &sound::play)
         .def("play", &sound::play0)
         .property("pos", &sound::get_position, &sound::set_position)
-        .property("position", &sound::get_position, &sound::set_position),
+        .property("position", &sound::get_position, &sound::set_position)
+        .property("vol", &sound::get_volume, &sound::set_volume)
+        .property("volume", &sound::get_volume, &sound::set_volume),
 //        .scope
 //        [
 //          def("create", &sound::create)
@@ -279,7 +281,7 @@ namespace lev
 
       mySound()
         : buf(NULL), pos(0), len(0), loader(NULL), loop(false),
-          spec(), mx(NULL), playing(false)
+          spec(), mx(NULL), playing(false), volume(1)
       { }
 
     public:
@@ -359,6 +361,11 @@ namespace lev
           default:
             return pos / (double)(spec.freq * spec.channels * 2);
         }
+      }
+
+      double GetVolume()
+      {
+        return volume;
       }
 
       bool LoadSample(const std::string &filename)
@@ -513,12 +520,20 @@ namespace lev
         return false;
       }
 
+      bool SetVolume(double vol)
+      {
+        if (vol < 0 || vol > 1) { return false; }
+        audio_locker locker(mx);
+        volume = vol;
+      }
+
       SDL_AudioSpec spec;
       Uint8* buf;
       Uint32 len, pos;
       bool loop;
       bool playing;
       class myMixer *mx;
+      double volume;
       mySoundLoader *loader;
   };
 
@@ -551,6 +566,7 @@ namespace lev
   double sound::get_length() { return ((mySound *)_obj)->GetLength(); }
   float sound::get_pan() { return ((mySound *)_obj)->GetPan(); }
   double sound::get_position() { return cast_snd(_obj)->GetPosition(); }
+  double sound::get_volume() { return cast_snd(_obj)->GetVolume(); }
   bool sound::is_playing() { return ((mySound *)_obj)->GetPlaying(); }
 
   bool sound::load(const std::string &filename)
@@ -584,7 +600,8 @@ namespace lev
     return ((mySound *)_obj)->SetPlaying(play, repeat);
   }
 
-  bool sound::set_position(double pos) { return ((mySound *)_obj)->SetPosition(pos); }
+  bool sound::set_position(double pos) { return cast_snd(_obj)->SetPosition(pos); }
+  bool sound::set_volume(double vol) { return cast_snd(_obj)->SetVolume(vol); }
 
 
 
@@ -756,13 +773,13 @@ namespace lev
         {
           if (snd->buf)
           {
-            SDL_MixAudio(stream, &snd->buf[snd->pos], seek_len, SDL_MIX_MAXVOLUME);
+            SDL_MixAudio(stream, &snd->buf[snd->pos], seek_len, SDL_MIX_MAXVOLUME * snd->volume);
           }
           else if (snd->loader)
           {
             boost::shared_array<Uint8> buf(new Uint8[seek_len]);
             snd->loader->Decode(&mx->spec, buf.get(), seek_len);
-            SDL_MixAudio(stream, buf.get(), seek_len, SDL_MIX_MAXVOLUME);
+            SDL_MixAudio(stream, buf.get(), seek_len, SDL_MIX_MAXVOLUME * snd->volume);
           }
           snd->pos += seek_len;
         }

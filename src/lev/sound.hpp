@@ -38,6 +38,7 @@ namespace lev
       double get_length();
       float get_pan();
       double get_position();
+      double get_volume();
       void* get_rawobj() { return _obj; }
       virtual type_id get_type_id() const { return LEV_TSOUND; }
       bool is_playing();
@@ -60,6 +61,7 @@ namespace lev
       bool set_playing(bool play, bool repeat = false);
       bool set_playing1(bool play) { return set_playing(play); }
       bool set_position(double pos);
+      bool set_volume(double vol);
     protected:
       void *_obj;
   };

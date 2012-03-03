@@ -52,7 +52,7 @@ namespace lev
 //      bool dir_exists();
 //      bool file_exists();
 //      std::string get_dir_path();
-      std::string get_full_path();
+      std::string get_full_path() const;
 //      std::string get_ext();
 //      std::string get_name();
 //      long get_size();

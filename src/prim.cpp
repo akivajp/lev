@@ -169,6 +169,7 @@ namespace lev
     r = (argb_code & 0x00FF0000) >> 16;
     g = (argb_code & 0x0000FF00) >>  8;
     b = (argb_code & 0x000000FF) >>  0;
+    if (a == 0) { a = 255; }
   }
 
   boost::shared_ptr<color> color::clone()

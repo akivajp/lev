@@ -361,7 +361,7 @@ namespace lev
   }
 
   */
-  std::string file_path::get_full_path()
+  std::string file_path::get_full_path() const
   {
     return boost::filesystem::absolute(cast_path(_obj)->p).generic_string();
   }

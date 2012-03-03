@@ -81,6 +81,7 @@ namespace lev
 
       bool delay(unsigned long msec = 1000);
       bool detach_timer(timer *t);
+      bool detach_timers();
       bool do_event();
       bool do_events();
       bool done();

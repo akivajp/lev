@@ -33,6 +33,7 @@ int luaopen_lev_debug(lua_State *L)
   globals(L)["package"]["loaded"]["lev.debug"] = true;
   // pre-requirement
   globals(L)["require"]("lev.system");
+  globals(L)["require"]("lev.window");
 
   module(L, "lev")
   [
