@@ -12,7 +12,6 @@
 /////////////////////////////////////////////////////////////////////////////
 
 extern "C" {
-#include <SDL/SDL.h>
 #include <lua.h>
 #include <lualib.h>
 #include <lauxlib.h>
@@ -22,16 +21,23 @@ extern "C" {
 }
 
 #include <map>
-#include <sstream>
+//#include <sstream>
 #include <string>
 #include <vector>
 
-#include <boost/date_time/posix_time/posix_time.hpp>
-#include <boost/filesystem.hpp>
+#include <allegro5/allegro.h>
+#include <allegro5/allegro_acodec.h>
+#include <allegro5/allegro_audio.h>
+#include <allegro5/allegro_font.h>
+#include <allegro5/allegro_image.h>
+#include <allegro5/allegro_physfs.h>
+#include <allegro5/allegro_primitives.h>
+#include <allegro5/allegro_ttf.h>
+
 #include <boost/format.hpp>
-#include <boost/scoped_array.hpp>
-#include <boost/scoped_ptr.hpp>
-#include <boost/shared_array.hpp>
+//#include <boost/scoped_array.hpp>
+//#include <boost/scoped_ptr.hpp>
+//#include <boost/shared_array.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/weak_ptr.hpp>
 #include <boost/xpressive/xpressive.hpp>
@@ -41,8 +47,7 @@ extern "C" {
 #include <luabind/raw_policy.hpp>
 #include <luabind/luabind.hpp>
 
-#include <GL/glu.h>
-
+//#include <GL/glu.h>
 
 #endif // _PREC_H
 

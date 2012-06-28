@@ -53,39 +53,26 @@ namespace lev
       timer();
     public:
       virtual ~timer();
-      bool close();
-      static boost::shared_ptr<timer> create(boost::shared_ptr<system> sys,
-                                             double interval = 1000);
+      static boost::shared_ptr<timer>
+        create(double interval_seconds = 1, bool one_shot = false);
+      double get_freq() const;
       double get_interval() const;
-      luabind::object get_notify();
+      long get_count() const;
+      long get_id() const;
+      luabind::object get_on_tick();
       virtual type_id get_type_id() const { return LEV_TTIMER; }
-      bool is_one_shot();
-      bool is_running();
-      virtual bool probe();
+      bool is_one_shot() const;
+      bool is_running() const;
+      bool set_count(long count);
+      bool set_freq(double freq);
       bool set_interval(double new_interval);
-      bool set_notify(luabind::object func);
-      virtual bool start(int milliseconds = -1, bool one_shot = false);
+      bool set_on_tick(luabind::object func);
+      virtual bool start(double interval_seconds = -1, bool one_shot = false);
       virtual bool start0() { return start(); }
-      virtual bool start1(double milliseconds) { return start(milliseconds); }
+      virtual bool start1(double interval) { return start(interval); }
       bool stop();
     protected:
       void *_obj;
-  };
-
-  class clock : public timer
-  {
-    protected:
-      clock();
-    public:
-      virtual ~clock();
-      static boost::shared_ptr<clock> create(boost::shared_ptr<system> sys,
-                                             double freq = 50);
-      double get_freq() const;
-      virtual type_id get_type_id() const { return LEV_TCLOCK; }
-      virtual bool probe();
-      bool set_freq(double freq);
-      virtual bool start(double freq = -1);
-      virtual bool start0() { return start(); }
   };
 
 }

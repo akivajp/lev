@@ -1,13 +1,13 @@
-Levanaをダウンロード頂き、ありがとうございます。
+Levをダウンロード頂き、ありがとうございます。
 当ソフトウェアを使うことによって、とても簡潔な記述で高度なメディア操作が可能になります。
 
 
 【ソフトウェア関連情報】
-・ソフトウェア正式名称：Levana
-・ソフトウェア読み仮名：レヴァナ
+・ソフトウェア正式名称：Lev
+・ソフトウェア読み仮名：レヴ
 ・ソフトウェア開発者名：Akiva Miura
 ・開発者連絡先：akiva.miura@gmail.com
-・公式プロジェクトWiki ： http://levana.sourceforge.jp/
+・公式プロジェクトWiki ： https://code.google.com/p/lev/
 ・開発 Blog ： http://d.hatena.ne.jp/Akiva/
 
 
@@ -19,14 +19,14 @@ for Windows
 - README.ja.txt
 - MANUAL.ja.txt
 - entry.txt
-- levana.exe
+- lev.exe
 - lev (フォルダ)
 -----------------
 
 これらのうち、起動に必須なファイルはlevana.exeのみですが、
 事実上エントリーポイントとして、
 entry.lc, entry.lua, entry.txt
-のうち１つを要求するので、どれか１つをlevana.exeファイルに設置（必要な場合は新規作成）して下さい。
+のうち１つを要求するので、どれか１つをlev.exeファイルに設置（必要な場合は新規作成）して下さい。
 該当ファイルが複数ある場合は、上記３ファイルのうち最も左で該当するファイルが実行対象となります。
 
 levディレクトリ以下のファイルは実行に必須ではありませんが、

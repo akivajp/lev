@@ -1,14 +1,14 @@
 require 'lev.std'
+require 'debug'
 
-lay = lev.image.layout(600)
-local f = lev.font.load('default.ttf')
+lay = lev.layout(600)
+local f = lev.font('fonts/default.ttf')
 if f then
   lay.font = f
   lay.font.size = 30
   lay.ruby = f:clone()
   lay.ruby.size = 15
 end
-lay.spacing = 3
 
 lay:reserve_word('日本語', 'にほんご')
 lay.color = lev.prim.red
@@ -17,24 +17,17 @@ lay:reserve_new_line()
 lay:reserve_word('newline!')
 lay:complete()
 
-window = system:window('Layout Test', 640, 480)
-screen = window:screen()
+screen = system:screen('Layout Test', 640, 480)
 
-img1 = lev.image.create(320, 240)
-img1:clear(lev.prim.color(255, 0, 0))
-img1:texturize()
+img1 = lev.bitmap(320, 240)
+img1:clear(lev.color(255, 0, 0))
 img2 = img1:clone()
-img2:clear(lev.prim.color(0, 255, 0))
-img2:texturize()
+img2:clear(lev.color(0, 255, 0))
 img3 = img1:clone()
-img3:clear(lev.prim.color(0, 0, 255))
-img3:texturize()
+img3:clear(lev.color(0, 0, 255))
 
-local start = system.ticks
-local count = 1
 system.on_tick = function()
   screen:clear();
-  screen:draw(0, 0, tex, 128)
   screen:draw(lay, 10, 10, 200)
   screen:draw(img1, 100, 100, 128)
   screen:draw(img2, 150, 150, 128)
@@ -42,5 +35,5 @@ system.on_tick = function()
   screen:swap()
 end
 
-system:run()
+system:run(screen)
 

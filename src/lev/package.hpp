@@ -29,20 +29,30 @@ namespace lev
     public:
       static bool add_font(lua_State *L, const std::string &filename);
       static bool add_font_dir(lua_State *L, const std::string &dir_path);
-      static bool add_path(lua_State *L, const std::string &path);
-      static int add_path_l(lua_State *L);
-      static bool add_search(lua_State *L, const std::string &search);
+
+      static bool add_path(lua_State *L, const std::string &path, bool append = true);
+      static bool add_path1(lua_State *L, const std::string &path)
+      { return add_path(L, path); }
+//      static int add_path_l(lua_State *L);
+
+      static bool add_search(lua_State *L, const std::string &search, bool append = true);
+//      static bool add_search1(lua_State *L, const std::string &search)
+//      { return add_search(L, search); }
       static int add_search_l(lua_State *L);
+
+      static bool clear_path_list(lua_State *L);
       static int clear_search_l(lua_State *L);
+      static bool dofile(lua_State *L, const std::string &filename);
       static int dofile_l(lua_State *L);
       static boost::shared_ptr<font> find_font(lua_State *L, const std::string &filename);
       static boost::shared_ptr<font> find_font0(lua_State *L);
+      static luabind::object get_archive_list(lua_State *L);
       static luabind::object get_font_dirs(lua_State *L);
       static luabind::object get_font_list(lua_State *L);
       static luabind::object get_path_list(lua_State *L);
       static luabind::object get_search_list(lua_State *L);
       static int require_l(lua_State *L);
-      static boost::shared_ptr<file_path> resolve(lua_State *L, const std::string &file);
+      static boost::shared_ptr<path> resolve(lua_State *L, const std::string &file);
       static bool set_default_font_dirs(lua_State *L);
   };
 

@@ -45,6 +45,7 @@ namespace lev
       bool set_r(unsigned char new_r) { r = new_r; return true; }
       virtual type_id get_type_id() const { return LEV_TCOLOR; }
 
+      static boost::shared_ptr<color> empty() { return boost::shared_ptr<color>(); }
       static boost::shared_ptr<color> black() { return color::create(0, 0, 0, 255); }
       static boost::shared_ptr<color> blue()  { return color::create(0, 0, 255, 255); }
       static boost::shared_ptr<color> green() { return color::create(0, 255, 0, 255); }
@@ -145,7 +146,7 @@ namespace lev
       int get_x() const { return pos.get_x(); }
       int get_y() const { return pos.get_y(); }
       int get_w() const { return sz.get_w(); }
-      virtual type_id get_type_id() const { return LEV_TRECT; }
+      virtual type_id get_type_id() const { return LEV_TRECTANGLE; }
       bool include(int x, int y) const;
       bool include1(const vector &p) const { return include(p.get_x(), p.get_y()); }
       bool set_bottom(int bottom) { return sz.set_h(bottom - get_y()); }

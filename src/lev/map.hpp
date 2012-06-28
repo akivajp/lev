@@ -27,8 +27,7 @@ namespace lev
       virtual ~map();
       bool clear();
       static boost::shared_ptr<map> create();
-      virtual bool draw_on_image(image *dst, int x = 0, int y = 0, unsigned char alpha = 255);
-      virtual bool draw_on_screen(screen *dst, int x = 0, int y = 0, unsigned char alpha = 255);
+      virtual bool draw_on(bitmap *dst, int x = 0, int y = 0, unsigned char alpha = 255);
       virtual int get_h() const;
       virtual type_id get_type_id() const { return LEV_TMAP; }
       virtual int get_w() const;
@@ -41,7 +40,6 @@ namespace lev
       bool on_hover(int x, int y);
       bool on_left_click(int x, int y);
       bool pop_back();
-      virtual bool texturize(bool force = false);
     protected:
       void *_obj;
   };

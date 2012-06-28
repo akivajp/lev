@@ -23,7 +23,8 @@ extern "C" { int luaopen_lev_sound(lua_State *L); }
 
 namespace lev
 {
-  class file_path;
+
+  class path;
   class system;
   class mixer;
 
@@ -35,25 +36,22 @@ namespace lev
       ~sound();
       bool clear();
       static boost::shared_ptr<sound> create();
+      int get_id() const;
       double get_length();
       float get_pan();
       double get_position();
-      double get_volume();
+      float get_volume();
       void* get_rawobj() { return _obj; }
       virtual type_id get_type_id() const { return LEV_TSOUND; }
       bool is_playing();
       bool load(const std::string &filename);
-      bool load_path(boost::shared_ptr<file_path> path);
+      bool load_path(boost::shared_ptr<path> p);
       bool load_and_play(const std::string &filename, bool repeat = false);
       bool load_and_play1(const std::string &filename) { return load_and_play(filename); }
-      bool load_and_play_path(boost::shared_ptr<file_path> path, bool repeat = false);
-      bool load_and_play_path1(boost::shared_ptr<file_path> path)
-      {
-        return load_and_play_path(path);
-      }
+      bool load_and_play_path(boost::shared_ptr<path> p);
 
       bool open(const std::string &filename);
-      bool open_path(boost::shared_ptr<file_path> path);
+      bool open_path(boost::shared_ptr<path> p);
       bool pause() { return set_playing(false); }
       bool play(bool repeat = false) { return set_playing(true, repeat); }
       bool play0() { return play(); }
@@ -75,8 +73,7 @@ namespace lev
       bool activate(bool active = true);
       bool activate0() { return activate(); }
       bool clear_slot(int slot_num);
-//      static mixer* get() { return init(); }
-      static boost::shared_ptr<mixer> get() { return singleton; }
+      static boost::shared_ptr<mixer> create();
       int get_channels();
       int get_freq();
       void *get_rawobj() { return _obj; }
@@ -91,7 +88,6 @@ namespace lev
       bool stop() { return activate(false); }
     protected:
       void *_obj;
-      static boost::shared_ptr<mixer> singleton;
   };
 
 }

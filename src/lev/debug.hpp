@@ -12,9 +12,9 @@
 /////////////////////////////////////////////////////////////////////////////
 
 #include "base.hpp"
-#include "draw.hpp"
-#include "image.hpp"
-#include "window.hpp"
+//#include "draw.hpp"
+//#include "image.hpp"
+//#include "window.hpp"
 
 #include <boost/shared_ptr.hpp>
 #include <luabind/luabind.hpp>

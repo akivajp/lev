@@ -12,6 +12,7 @@
 /////////////////////////////////////////////////////////////////////////////
 
 #include "base.hpp"
+#include "input.hpp"
 #include <luabind/luabind.hpp>
 #include <boost/shared_ptr.hpp>
 
@@ -23,33 +24,30 @@ namespace lev
 {
 
   // class dependencies
-  class clock;
-  class debug_window;
-  class window;
+  class mixer;
+  class screen;
   class timer;
-
-  class input
-  {
-    public:
-      static const char *to_keyname(long code);
-  };
 
   class event : public base
   {
     public:
       event();
       virtual ~event();
-      std::string get_button() const;
+      int get_button() const;
+      long get_count() const;
+      int get_dw() const;
       int get_dx() const;
       int get_dy() const;
-      int get_id() const;
+      int get_dz() const;
+      long get_id() const;
       std::string get_key() const;
       long get_key_code() const;
       void *get_rawobj() { return _obj; }
-      long get_scan_code() const;
       virtual type_id get_type_id() const { return LEV_TEVENT; }
+      int get_w() const;
       int get_x() const;
       int get_y() const;
+      int get_z() const;
       bool is_pressed() const;
       bool is_released() const;
       bool left_is_down() const;
@@ -65,71 +63,49 @@ namespace lev
       system();
     public:
       virtual ~system();
-      static boost::shared_ptr<clock> create_clock(boost::shared_ptr<system> sys,
-                                                   double freq = 50);
-      static boost::shared_ptr<clock> create_clock1(boost::shared_ptr<system> sys)
-      { return create_clock(sys); }
 
-      boost::shared_ptr<window>
-        create_window(const char *title, int x, int y, int w, int h, unsigned long flags);
-      static int create_window_l(lua_State *L);
+      boost::shared_ptr<mixer> create_mixer();
 
-      static boost::shared_ptr<timer> create_timer(boost::shared_ptr<system> sys,
-                                                   double interval = 1000);
-      static boost::shared_ptr<timer> create_timer1(boost::shared_ptr<system> sys)
-      { return create_timer(sys); }
+      boost::shared_ptr<timer>
+        create_timer(double interval_seconds = 1, bool one_shot = false);
+      boost::shared_ptr<timer> create_timer0() { return create_timer(); }
+      boost::shared_ptr<timer>
+        create_timer1(double interval) { return create_timer(interval); }
+
+      boost::shared_ptr<screen>
+        create_screen(const char *title, int w, int h, int x, int y);
+      static int create_screen_l(lua_State *L);
 
       bool delay(unsigned long msec = 1000);
-      bool detach_timer(timer *t);
-      bool detach_timers();
       bool do_event();
       bool do_events();
       bool done();
-      static boost::shared_ptr<system> get() { return singleton; }
-      lua_State *get_interpreter();
+//      static boost::shared_ptr<system> get();
+      double get_elapsed_time() const;
+      boost::shared_ptr<input> get_input() { return input::get(); }
+      static lua_State *get_interpreter();
       std::string get_name();
-      luabind::object get_on_button_down();
-      luabind::object get_on_button_up();
-      luabind::object get_on_key_down();
-      luabind::object get_on_key_up();
-      luabind::object get_on_left_down();
-      luabind::object get_on_left_up();
-      luabind::object get_on_middle_down();
-      luabind::object get_on_middle_up();
-      luabind::object get_on_motion();
       luabind::object get_on_quit();
-      luabind::object get_on_right_down();
-      luabind::object get_on_right_up();
       luabind::object get_on_tick();
-      unsigned long get_ticks();
       virtual type_id get_type_id() const { return LEV_TSYSTEM; }
       static boost::shared_ptr<system> init(lua_State *L);
-      static luabind::object init_in_lua(lua_State *L);
+//      static luabind::object init_in_lua(lua_State *L);
       bool is_debugging();
       bool is_running();
       bool quit(bool force = false);
       bool quit0() { return quit(); }
-      bool run();
+
+      bool run(boost::shared_ptr<screen> main);
+      bool run0();
+
       bool set_name(const std::string &name);
-      bool set_on_button_down(luabind::object func);
-      bool set_on_button_up(luabind::object func);
-      bool set_on_key_down(luabind::object func);
-      bool set_on_key_up(luabind::object func);
-      bool set_on_left_down(luabind::object func);
-      bool set_on_left_up(luabind::object func);
-      bool set_on_middle_down(luabind::object func);
-      bool set_on_middle_up(luabind::object func);
-      bool set_on_motion(luabind::object func);
       bool set_on_quit(luabind::object func);
-      bool set_on_right_down(luabind::object func);
-      bool set_on_right_up(luabind::object func);
       bool set_on_tick(luabind::object func);
       bool set_running(bool run = true);
-      boost::shared_ptr<debug_window> start_debug();
+      bool start_debug();
       bool stop_debug();
     protected:
-      void *_obj;
-      static boost::shared_ptr<system> singleton;
+      bool valid;
   };
 
 };

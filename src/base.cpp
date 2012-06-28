@@ -10,12 +10,16 @@
 
 // pre-compiled header
 #include "prec.h"
+
 // declarations
 #include "lev/base.hpp"
+
 // dependencies
 #include "lev/debug.hpp"
+
 // libraries
 #include <boost/format.hpp>
+#include <boost/shared_ptr.hpp>
 #include <map>
 
 int luaopen_lev_base(lua_State *L)
@@ -68,21 +72,25 @@ namespace lev
           (*base_id_map)[LEV_TDRAWABLE] = LEV_TBASE;
           {
             (*base_id_map)[LEV_TANIMATION]  = LEV_TDRAWABLE;
-            (*base_id_map)[LEV_TIMAGE]      = LEV_TDRAWABLE;
+            (*base_id_map)[LEV_TBITMAP]      = LEV_TDRAWABLE;
+            {
+              (*base_id_map)[LEV_TSCREEN]     = LEV_TBITMAP;
+            }
             (*base_id_map)[LEV_TLAYOUT]     = LEV_TDRAWABLE;
             (*base_id_map)[LEV_TMAP]        = LEV_TDRAWABLE;
+            (*base_id_map)[LEV_TSPACER]     = LEV_TDRAWABLE;
             (*base_id_map)[LEV_TTEXTURE]    = LEV_TDRAWABLE;
             (*base_id_map)[LEV_TTRANSITION] = LEV_TDRAWABLE;
           }
 
           (*base_id_map)[LEV_TEVENT]           = LEV_TBASE;
-          (*base_id_map)[LEV_TFILE_PATH]       = LEV_TBASE;
+          (*base_id_map)[LEV_TFILE]           = LEV_TBASE;
           (*base_id_map)[LEV_TFONT]            = LEV_TBASE;
           (*base_id_map)[LEV_TMIXER]           = LEV_TBASE;
+          (*base_id_map)[LEV_TPATH]            = LEV_TBASE;
           (*base_id_map)[LEV_TPOINT]           = LEV_TBASE;
           (*base_id_map)[LEV_TRASTER]          = LEV_TBASE;
-          (*base_id_map)[LEV_TRECT]            = LEV_TBASE;
-          (*base_id_map)[LEV_TSCREEN]          = LEV_TBASE;
+          (*base_id_map)[LEV_TRECTANGLE]       = LEV_TBASE;
           (*base_id_map)[LEV_TSIZE]            = LEV_TBASE;
           (*base_id_map)[LEV_TSOUND]           = LEV_TBASE;
           (*base_id_map)[LEV_TSREGEX]          = LEV_TBASE;
@@ -96,7 +104,7 @@ namespace lev
             (*base_id_map)[LEV_TCLOCK] = LEV_TTIMER;
           }
 
-          (*base_id_map)[LEV_TUNICODE]         = LEV_TBASE;
+          (*base_id_map)[LEV_TUSTRING]         = LEV_TBASE;
           (*base_id_map)[LEV_TVECTOR]          = LEV_TBASE;
 
           (*base_id_map)[LEV_TWINDOW]          = LEV_TBASE;
@@ -126,37 +134,40 @@ namespace lev
     {
       try {
         type_name_map = new std::map<type_id, const char *>;
-        (*type_name_map)[LEV_TNONE]       = "(none)";
-        (*type_name_map)[LEV_TBASE]       = "lev.base";
-        (*type_name_map)[LEV_TARCHIVE]    = "lev.archive";
-        (*type_name_map)[LEV_TCOLOR]      = "lev.prim.color";
-        (*type_name_map)[LEV_TDRAWABLE]   = "lev.drawable";
-        (*type_name_map)[LEV_TANIMATION]  = "lev.image.animation";
-        (*type_name_map)[LEV_TIMAGE]      = "lev.image";
-        (*type_name_map)[LEV_TLAYOUT]     = "lev.image.layout";
-        (*type_name_map)[LEV_TMAP]        = "lev.image.map";
-        (*type_name_map)[LEV_TTEXTURE]    = "lev.image.texture";
-        (*type_name_map)[LEV_TTRANSITION] = "lev.image.transition";
-        (*type_name_map)[LEV_TEVENT]      = "lev.event";
-        (*type_name_map)[LEV_TFILE_PATH]  = "lev.fs.file_path";
-        (*type_name_map)[LEV_TFONT]       = "lev.font";
-        (*type_name_map)[LEV_TMIXER]      = "lev.sound.mixer";
-        (*type_name_map)[LEV_TPOINT]      = "lev.prim.point";
-        (*type_name_map)[LEV_TRASTER]     = "lev.raster";
-        (*type_name_map)[LEV_TRECT]       = "lev.prim.rect";
-        (*type_name_map)[LEV_TSCREEN]     = "lev.screen";
-        (*type_name_map)[LEV_TSIZE]       = "lev.prim.size";
-        (*type_name_map)[LEV_TSOUND]      = "lev.sound";
-        (*type_name_map)[LEV_TSREGEX]     = "lev.string.sregex";
-        (*type_name_map)[LEV_TSREGEX_COMPILER] = "lev.string.sregex_compiler";
-        (*type_name_map)[LEV_TSTOP_WATCH] = "lev.stop_watch";
-        (*type_name_map)[LEV_TSYSTEM]     = "lev.system";
-        (*type_name_map)[LEV_TTEMP_NAME]  = "lev.fs.temp_name";
-        (*type_name_map)[LEV_TTIMER]      = "lev.timer";
-        (*type_name_map)[LEV_TCLOCK]      = "lev.clock";
-        (*type_name_map)[LEV_TUNICODE]    = "lev.string.unicode";
-        (*type_name_map)[LEV_TVECTOR]     = "lev.prim.vector";
-        (*type_name_map)[LEV_TWINDOW]     = "lev.window";
+        (*type_name_map)[LEV_TNONE]        = "(none)";
+        (*type_name_map)[LEV_TBASE]        = "lev.base";
+        (*type_name_map)[LEV_TBITMAP]      = "lev.bitmap";
+        (*type_name_map)[LEV_TANIMATION]   = "lev.animation";
+        (*type_name_map)[LEV_TARCHIVE]     = "lev.archive";
+        (*type_name_map)[LEV_TCLOCK]       = "lev.clock";
+        (*type_name_map)[LEV_TCOLOR]       = "lev.color";
+        (*type_name_map)[LEV_TDRAWABLE]    = "lev.drawable";
+        (*type_name_map)[LEV_TFONT]        = "lev.font";
+        (*type_name_map)[LEV_TFILE]        = "lev.file";
+        (*type_name_map)[LEV_TEVENT]       = "lev.event";
+        (*type_name_map)[LEV_TINPUT]       = "lev.input";
+        (*type_name_map)[LEV_TLAYOUT]      = "lev.layout";
+        (*type_name_map)[LEV_TMAP]         = "lev.map";
+        (*type_name_map)[LEV_TMIXER]       = "lev.mixer";
+        (*type_name_map)[LEV_TMOUSE]       = "lev.mouse";
+        (*type_name_map)[LEV_TPATH]        = "lev.path";
+        (*type_name_map)[LEV_TPOINT]       = "lev.point";
+        (*type_name_map)[LEV_TRASTER]      = "lev.raster";
+        (*type_name_map)[LEV_TSPACER]      = "lev.spacer";
+        (*type_name_map)[LEV_TTEXTURE]     = "lev.texture";
+        (*type_name_map)[LEV_TTRANSITION]  = "lev.transition";
+        (*type_name_map)[LEV_TRECTANGLE]   = "lev.rectangle";
+        (*type_name_map)[LEV_TSCREEN]      = "lev.screen";
+        (*type_name_map)[LEV_TSIZE]        = "lev.size";
+        (*type_name_map)[LEV_TSOUND]       = "lev.sound";
+        (*type_name_map)[LEV_TSREGEX]      = "lev.sregex";
+        (*type_name_map)[LEV_TSREGEX_COMPILER] = "lev.sregex_compiler";
+        (*type_name_map)[LEV_TSTOP_WATCH]  = "lev.stop_watch";
+        (*type_name_map)[LEV_TSYSTEM]      = "lev.system";
+        (*type_name_map)[LEV_TTEMP_NAME]   = "lev.temp_name";
+        (*type_name_map)[LEV_TTIMER]       = "lev.timer";
+        (*type_name_map)[LEV_TUSTRING]     = "lev.ustring";
+        (*type_name_map)[LEV_TVECTOR]      = "lev.vector";
         (*type_name_map)[LEV_TDEBUG_WINDOW] = "lev.debug_window";
       }
       catch (...) {

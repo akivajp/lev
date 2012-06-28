@@ -28,6 +28,7 @@ namespace lev
       static bool execute(const std::string &target);
       static int execute_code_l(lua_State *L);
       static luabind::object get_merged(lua_State *L, int start, int end);
+      static bool is_boolean(luabind::object var);
       static int merge(lua_State *L);
       static bool open(const std::string &path, const std::string &type = "");
       static bool open1(const std::string &path) { return open(path); }

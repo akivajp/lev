@@ -86,7 +86,6 @@ int luaopen_lev_window(lua_State *L)
         .def("draw_raster", &screen::draw_raster)
         .def("enable_alpha_blending", &screen::enable_alpha_blending0)
         .def("enable_alpha_blending", &screen::enable_alpha_blending)
-        .def("flip", &screen::flip)
         .def("get_screen_shot", &screen::get_screenshot)
         .def("get_screenshot", &screen::get_screenshot)
         .def("map2d", &screen::map2d)
@@ -185,7 +184,9 @@ namespace lev
     try {
       win.reset(new window);
       if (! win) { throw -1; }
+printf("%s %d %d %d %d %x\n", title, x, y, w, h, flags);
       win->_obj = myWindow::Create(title, x, y, w, h, flags);
+printf("W: %p\n", win->_obj);
       if (! win->_obj) { throw -2; }
     }
     catch (...) {
@@ -672,15 +673,6 @@ namespace lev
       glDisable(GL_BLEND);
     }
     return true;
-  }
-
-  bool screen::flip()
-  {
-    SDL_GL_SwapBuffers();
-    return true;
-//    SDL_Surface *screen = SDL_GetVideoSurface();
-//    if (SDL_Flip(screen) == 0) { return true; }
-//    else { return false; }
   }
 
   boost::shared_ptr<image> screen::get_screenshot()

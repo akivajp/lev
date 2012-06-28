@@ -10,9 +10,9 @@
 #include "prec.h"
 
 #include "lev/debug.hpp"
+#include "lev/entry.hpp"
 #include "lev/prim.hpp"
 #include "lev/util.hpp"
-#include "register.hpp"
 
 #include <boost/format.hpp>
 
@@ -133,14 +133,14 @@ int luaopen_lev_prim(lua_State *L)
   register_to(classes["size"],   "create", &size::create_l);
   register_to(classes["vector"], "create", &vector::create_l);
 
-  prim["color"]    = classes["color"]["create"];
-  prim["colour"]   = classes["color"]["create"];
-  prim["point"]    = classes["point"]["create"];
-  prim["position"] = classes["vector"]["create"];
-  prim["rect"]     = classes["rect"]["create"];
-  prim["size"]     = classes["size"]["create"];
-  prim["vertex"]   = classes["vector"]["create"];
-  prim["vector"]   = classes["vector"]["create"];
+  lev["color"]    = classes["color"]["create"];
+  lev["colour"]   = classes["color"]["create"];
+  lev["point"]    = classes["point"]["create"];
+  lev["position"] = classes["vector"]["create"];
+  lev["rect"]     = classes["rect"]["create"];
+  lev["size"]     = classes["size"]["create"];
+  lev["vertex"]   = classes["vector"]["create"];
+  lev["vector"]   = classes["vector"]["create"];
 
   prim["black"] = classes["color"]["create"](  0,   0,   0);
   prim["blue"]  = classes["color"]["create"](  0,   0, 255);

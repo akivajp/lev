@@ -21,33 +21,33 @@ extern "C" {
 namespace lev
 {
 
-  class unicode : public base
+  class ustring : public base
   {
     protected:
-      unicode();
+      ustring();
     public:
-      unicode(const std::string &str);
-      unicode(const unicode &str);
-      virtual ~unicode();
+      ustring(const std::string &str);
+      ustring(const ustring &str);
+      virtual ~ustring();
 
-      unicode &append(const unicode &str);
-      unicode &append_utf8(const std::string &str) { return append(unicode(str)); }
+      ustring &append(const ustring &str);
+      ustring &append_utf8(const std::string &str) { return append(ustring(str)); }
       bool assign_utf8(const std::string &src);
       static bool compare(luabind::object op1, luabind::object op2);
       bool compare_with(luabind::object rhs);
-      static boost::shared_ptr<unicode> concat(lua_State *L, luabind::object op1, luabind::object op2);
-      static boost::shared_ptr<unicode> create() { return from_utf8(""); }
+      static boost::shared_ptr<ustring> concat(lua_State *L, luabind::object op1, luabind::object op2);
+      static boost::shared_ptr<ustring> create() { return from_utf8(""); }
       bool empty() const;
-      int find(const unicode &str);
+      int find(const ustring &str);
       int find_utf8(const std::string &str) { return find(str); }
-      static boost::shared_ptr<unicode> from_utf8(const std::string &src);
+      static boost::shared_ptr<ustring> from_utf8(const std::string &src);
       long index(size_t pos) const;
-      boost::shared_ptr<unicode> index_str(size_t pos) const { return sub_string(pos, 1); }
+      boost::shared_ptr<ustring> index_str(size_t pos) const { return sub_string(pos, 1); }
       bool is_valid() { return _obj != NULL; }
-      virtual type_id get_type_id() const { return LEV_TUNICODE; }
+      virtual type_id get_type_id() const { return LEV_TUSTRING; }
       size_t length() const;
-      boost::shared_ptr<unicode> sub_string(size_t from, size_t to = -1) const;
-      boost::shared_ptr<unicode> sub_string1(size_t from) const { return sub_string(from); }
+      boost::shared_ptr<ustring> sub_string(size_t from, size_t to = -1) const;
+      boost::shared_ptr<ustring> sub_string1(size_t from) const { return sub_string(from); }
       std::string to_utf8() const;
     protected:
       void *_obj;

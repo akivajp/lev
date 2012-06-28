@@ -18,6 +18,8 @@
 #include "lev/debug.hpp"
 #include "lev/image.hpp"
 #include "lev/prim.hpp"
+#include "lev/system.hpp"
+#include "lev/timer.hpp"
 #include "lev/util.hpp"
 
 // libraries
@@ -29,7 +31,7 @@ namespace lev
   class myMap
   {
     protected:
-      myMap() : rects(), imgs(), texturized(false) { }
+      myMap() : rects(), imgs() { }
     public:
       ~myMap() { }
 
@@ -56,39 +58,21 @@ namespace lev
         alphas.clear();
         funcs_hover.clear();
         funcs_lclick.clear();
-        texturized = false;
         return true;
       }
 
-      bool DrawOnImage(image *img, int x, int y, unsigned char alpha)
+      bool DrawOn(bitmap *dst, int x, int y, unsigned char alpha)
       {
         for (int i = 0; i < imgs.size(); i++)
         {
           unsigned char a = (short(alpha) * alphas[i]) / 255;
           if (hovered[i])
           {
-            hover_imgs[i]->draw_on_image(img, rects[i]->get_x() + x, rects[i]->get_y() + y, a);
+            hover_imgs[i]->draw_on(dst, rects[i]->get_x() + x, rects[i]->get_y() + y, a);
           }
           else
           {
-            imgs[i]->draw_on_image(img, rects[i]->get_x() + x, rects[i]->get_y() + y, a);
-          }
-        }
-        return true;
-      }
-
-      bool DrawOnScreen(screen *s, int x, int y, unsigned char alpha)
-      {
-        for (int i = 0; i < imgs.size(); i++)
-        {
-          unsigned char a = (short(alpha) * alphas[i]) / 255;
-          if (hovered[i])
-          {
-            hover_imgs[i]->draw_on_screen(s, rects[i]->get_x() + x, rects[i]->get_y() + y, a);
-          }
-          else
-          {
-            imgs[i]->draw_on_screen(s, rects[i]->get_x() + x, rects[i]->get_y() + y, a);
+            imgs[i]->draw_on(dst, rects[i]->get_x() + x, rects[i]->get_y() + y, a);
           }
         }
         return true;
@@ -130,7 +114,6 @@ namespace lev
 
         funcs_hover.push_back(luabind::object());
         funcs_lclick.push_back(luabind::object());
-        texturized = false;
         return true;
       }
 
@@ -150,7 +133,6 @@ namespace lev
 
         funcs_hover.push_back(on_hover);
         funcs_lclick.push_back(on_lclick);
-        texturized = false;
         return true;
       }
 
@@ -180,6 +162,7 @@ namespace lev
         }
         catch (...) {
           lev::debug_print("error on hovering process on image map");
+          lev::debug_print(lua_tostring(system::get_interpreter(), -1));
           return false;
         }
         return hovered_any;
@@ -189,7 +172,8 @@ namespace lev
       {
         lua_State *L = NULL;
         try {
-          for (int i = 0; i < rects.size(); i++)
+//          for (int i = 0; i < rects.size(); i++)
+          for (int i = rects.size() - 1; i >= 0; i--)
           {
             if (rects[i]->include(x, y))
             {
@@ -210,18 +194,6 @@ namespace lev
         return false;
       }
 
-      bool TexturizeAll(bool force)
-      {
-        if (texturized && !force) { return false; }
-        for (int i = 0; i < imgs.size(); i++)
-        {
-          imgs[i]->texturize(force);
-          hover_imgs[i]->texturize(force);
-        }
-        texturized = true;
-        return true;
-      }
-
       bool PopBack()
       {
         if (imgs.size() == 0) { return false; }
@@ -232,7 +204,6 @@ namespace lev
         funcs_hover.pop_back();
         funcs_lclick.pop_back();
         alphas.pop_back();
-        texturized = false;
         return true;
       }
 
@@ -243,7 +214,6 @@ namespace lev
       std::vector<luabind::object> funcs_hover;
       std::vector<luabind::object> funcs_lclick;
       std::vector<unsigned char> alphas;
-      bool texturized;
   };
   static myMap* cast_map(void *obj) { return (myMap *)obj; }
 
@@ -279,14 +249,9 @@ namespace lev
     return m;
   }
 
-  bool map::draw_on_image(image *dst, int x, int y, unsigned char alpha)
+  bool map::draw_on(bitmap *dst, int x, int y, unsigned char alpha)
   {
-    return cast_map(_obj)->DrawOnImage(dst, x, y, alpha);
-  }
-
-  bool map::draw_on_screen(screen *dst, int x, int y, unsigned char alpha)
-  {
-    return cast_map(_obj)->DrawOnScreen(dst, x, y, alpha);
+    return cast_map(_obj)->DrawOn(dst, x, y, alpha);
   }
 
   int map::get_h() const
@@ -330,12 +295,13 @@ namespace lev
       if (t["lev.drawable1"])
       {
         object obj = t["lev.drawable1"];
-        boost::shared_ptr<drawable> img = object_cast<boost::shared_ptr<drawable> >(obj["cast"](obj));
+        boost::shared_ptr<drawable> img = object_cast<boost::shared_ptr<drawable> >(obj["as_drawable"](obj));
         result = m->map_image(img, x, y, alpha);
       }
       lua_pushboolean(L, result);
     }
     catch (...) {
+      lev::debug_print("error on mapping");
       lua_pushboolean(L, false);
     }
     return 1;
@@ -386,12 +352,12 @@ namespace lev
       if (t["lev.drawable1"])
       {
         object obj = t["lev.drawable1"];
-        img1 = object_cast<boost::shared_ptr<drawable> >(obj["cast"](obj));
+        img1 = object_cast<boost::shared_ptr<drawable> >(obj["as_drawable"](obj));
       }
       if (t["lev.drawable2"])
       {
         object obj = t["lev.drawable2"];
-        img2 = object_cast<boost::shared_ptr<drawable> >(obj["cast"](obj));
+        img2 = object_cast<boost::shared_ptr<drawable> >(obj["as_drawable"](obj));
       }
       result = m->map_link(img1, img2, x, y, lclick_func, hover_func, alpha);
       lua_pushboolean(L, result);
@@ -416,11 +382,6 @@ namespace lev
   bool map::pop_back()
   {
     return cast_map(_obj)->PopBack();
-  }
-
-  bool map::texturize(bool force)
-  {
-    return cast_map(_obj)->TexturizeAll(force);
   }
 
 }

@@ -5,6 +5,7 @@ syntax: glob
 .*.swp
 bin/
 entry/
+fonts/
 lib/
 kanaf/
 savedata/
@@ -30,6 +31,8 @@ lyla/levana
 ./*.wav
 ./*.xpm
 ./*.zip
+./core
 ./lev.so
 ./tags
+*~
 

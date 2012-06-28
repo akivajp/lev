@@ -1,6 +1,6 @@
 CXX = g++
 PREFIX=/tmp
-VERSION=0.5.0
+VERSION=0.6.0
 OUT = a.out
 BIN = lev
 DLIB = lev.so
@@ -8,6 +8,7 @@ SLIB = liblev.a
 LUA_VERSION = 5.1
 
 all: linux tags
+#all: linux
 
 none:
 	@echo "Please do"
