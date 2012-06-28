@@ -16,8 +16,9 @@ extern "C" {
 #include <lualib.h>
 #include <lauxlib.h>
 
-#include <ft2build.h>
-#include FT_FREETYPE_H
+//#include <ft2build.h>
+//#include FT_FREETYPE_H
+
 }
 
 #include <map>
@@ -25,6 +26,7 @@ extern "C" {
 #include <string>
 #include <vector>
 
+//#define ALLEGRO_STATICLINK
 #include <allegro5/allegro.h>
 #include <allegro5/allegro_acodec.h>
 #include <allegro5/allegro_audio.h>

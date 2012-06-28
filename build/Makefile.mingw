@@ -1,13 +1,26 @@
-CXXFLAGS = -Os `/usr/mingw32/usr/bin/sdl-config --cflags` -I/usr/mingw32/usr/include/freetype2 \
-	   -I./minizip
-#LIBS = -L/usr/mingw32/usr/lib `/usr/mingw32/usr/bin/wx-config --libs std gl` -lglu32 -llua -lluabind -static
-LIBS = -llua -lluabind -lvorbisfile -lvorbis -logg -lfreetype -lopengl32 -lz \
-	`/usr/mingw32/usr/bin/sdl-config --libs` -lboost_system -lboost_filesystem \
-	-L./minizip -lminizip -lz -static
-#CORE_LIBS =-L/usr/mingw32/usr/lib -lsqlite3 -larchive -llzma \
-#	-lluabind -llua -lws2_32 \
-#	`/usr/mingw32/usr/bin/wx-config --libs std,gl,media,stc` -lgdiplus -lglu32 -lpsapi \
-#	-static
+CXXFLAGS = -Os
+
+LIBS = -llua -lluabind \
+       -lallegro-static \
+       -lallegro_acodec-static \
+       -lallegro_audio-static \
+       -lallegro_font-static \
+       -lallegro_ttf-static \
+       -lallegro_main-static \
+       -lallegro_primitives-static \
+       -lallegro_dialog-static \
+       -lallegro_physfs-static \
+       -lallegro_image-static \
+       -lallegro_color-static \
+       -lallegro-static \
+       -lphysfs \
+       -lfreetype \
+       -lz \
+       -lvorbisfile -lvorbis -logg \
+       -lopengl32 \
+       -luuid -lgdiplus -lgdi32 -lcomdlg32 -lole32 -lshlwapi -lpsapi -lwinmm \
+       -static
+
 CC = mingw32-gcc
 CXX=mingw32-g++
 WINDRES=mingw32-windres
@@ -17,8 +30,6 @@ RANLIB = mingw32-ranlib
 AR = mingw32-ar
 PACK_DIR=lev-win32-$(VERSION)
 
-MINIZIP_CFLAGS =
-
 all: build-all
 
 build-all:
@@ -27,8 +38,7 @@ build-all:
 	cd src && make pch slib win-bin \
 		CC=$(CC) CXX=$(CXX) CXXFLAGS="$(CXXFLAGS)" LIBS="$(LIBS)" \
 		WINDRES=$(WINDRES) RANLIB=$(RANLIB) \
-		WIN_OUT=$(WIN_OUT) DLIB=$(DLIB) MINIZIP_CFLAGS="$(MINIZIP_CFLAGS)" \
-		AR=$(AR)
+		WIN_OUT=$(WIN_OUT) DLIB=$(DLIB) AR=$(AR)
 	install -d $(PACK_DIR)
 	install -d $(PACK_DIR)/doc
 	install -d $(PACK_DIR)/test

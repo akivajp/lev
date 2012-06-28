@@ -1,7 +1,7 @@
 CC = gcc
 CXX = g++
-CXXFLAGS = -fPIC -Os -I/usr/include/freetype2
-#CXXFLAGS = -fPIC -g -I/usr/include/freetype2
+CXXFLAGS = -fPIC -Os
+CXXFLAGS = -fPIC -g
 #CXXFLAGS = -fPIC -Os `/usr/local/bin/sdl2-config --cflags`
 #CXXFLAGS = -fPIC -Os -I/usr/include/freetype2 `sdl2-config --cflags`
 SHARED= -shared
