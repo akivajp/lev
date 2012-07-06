@@ -18,8 +18,6 @@
 #include "lev/debug.hpp"
 #include "lev/image.hpp"
 #include "lev/prim.hpp"
-#include "lev/system.hpp"
-#include "lev/timer.hpp"
 #include "lev/util.hpp"
 
 // libraries
@@ -31,7 +29,7 @@ namespace lev
   class myMap
   {
     protected:
-      myMap() : rects(), imgs() { }
+      myMap() : rects(), imgs(), texturized(false) { }
     public:
       ~myMap() { }
 
@@ -58,10 +56,11 @@ namespace lev
         alphas.clear();
         funcs_hover.clear();
         funcs_lclick.clear();
+        texturized = false;
         return true;
       }
 
-      bool DrawOn(bitmap *dst, int x, int y, unsigned char alpha)
+      bool DrawOn(canvas::ptr dst, int x, int y, unsigned char alpha)
       {
         for (int i = 0; i < imgs.size(); i++)
         {
@@ -114,6 +113,7 @@ namespace lev
 
         funcs_hover.push_back(luabind::object());
         funcs_lclick.push_back(luabind::object());
+        texturized = false;
         return true;
       }
 
@@ -133,6 +133,7 @@ namespace lev
 
         funcs_hover.push_back(on_hover);
         funcs_lclick.push_back(on_lclick);
+        texturized = false;
         return true;
       }
 
@@ -162,7 +163,6 @@ namespace lev
         }
         catch (...) {
           lev::debug_print("error on hovering process on image map");
-          lev::debug_print(lua_tostring(system::get_interpreter(), -1));
           return false;
         }
         return hovered_any;
@@ -172,8 +172,7 @@ namespace lev
       {
         lua_State *L = NULL;
         try {
-//          for (int i = 0; i < rects.size(); i++)
-          for (int i = rects.size() - 1; i >= 0; i--)
+          for (int i = 0; i < rects.size(); i++)
           {
             if (rects[i]->include(x, y))
             {
@@ -194,6 +193,18 @@ namespace lev
         return false;
       }
 
+      bool TexturizeAll(bool force)
+      {
+        if (texturized && !force) { return false; }
+        for (int i = 0; i < imgs.size(); i++)
+        {
+          imgs[i]->texturize(force);
+          hover_imgs[i]->texturize(force);
+        }
+        texturized = true;
+        return true;
+      }
+
       bool PopBack()
       {
         if (imgs.size() == 0) { return false; }
@@ -204,6 +215,7 @@ namespace lev
         funcs_hover.pop_back();
         funcs_lclick.pop_back();
         alphas.pop_back();
+        texturized = false;
         return true;
       }
 
@@ -214,6 +226,7 @@ namespace lev
       std::vector<luabind::object> funcs_hover;
       std::vector<luabind::object> funcs_lclick;
       std::vector<unsigned char> alphas;
+      bool texturized;
   };
   static myMap* cast_map(void *obj) { return (myMap *)obj; }
 
@@ -249,7 +262,7 @@ namespace lev
     return m;
   }
 
-  bool map::draw_on(bitmap *dst, int x, int y, unsigned char alpha)
+  bool map::draw_on(canvas::ptr dst, int x, int y, unsigned char alpha)
   {
     return cast_map(_obj)->DrawOn(dst, x, y, alpha);
   }
@@ -295,13 +308,12 @@ namespace lev
       if (t["lev.drawable1"])
       {
         object obj = t["lev.drawable1"];
-        boost::shared_ptr<drawable> img = object_cast<boost::shared_ptr<drawable> >(obj["as_drawable"](obj));
+        boost::shared_ptr<drawable> img = object_cast<boost::shared_ptr<drawable> >(obj["cast"](obj));
         result = m->map_image(img, x, y, alpha);
       }
       lua_pushboolean(L, result);
     }
     catch (...) {
-      lev::debug_print("error on mapping");
       lua_pushboolean(L, false);
     }
     return 1;
@@ -352,12 +364,12 @@ namespace lev
       if (t["lev.drawable1"])
       {
         object obj = t["lev.drawable1"];
-        img1 = object_cast<boost::shared_ptr<drawable> >(obj["as_drawable"](obj));
+        img1 = object_cast<boost::shared_ptr<drawable> >(obj["cast"](obj));
       }
       if (t["lev.drawable2"])
       {
         object obj = t["lev.drawable2"];
-        img2 = object_cast<boost::shared_ptr<drawable> >(obj["as_drawable"](obj));
+        img2 = object_cast<boost::shared_ptr<drawable> >(obj["cast"](obj));
       }
       result = m->map_link(img1, img2, x, y, lclick_func, hover_func, alpha);
       lua_pushboolean(L, result);
@@ -382,6 +394,11 @@ namespace lev
   bool map::pop_back()
   {
     return cast_map(_obj)->PopBack();
+  }
+
+  bool map::texturize(bool force)
+  {
+    return cast_map(_obj)->TexturizeAll(force);
   }
 
 }

@@ -26,6 +26,9 @@ namespace lev
   class color : public base
   {
     public:
+      typedef boost::shared_ptr<color> ptr;
+      typedef boost::shared_ptr<const color> cptr;
+
       color(const color &orig);
       color(unsigned char r = 0, unsigned char g = 0, unsigned char b = 0, unsigned char a = 255);
       color(unsigned long argb_code);
@@ -45,13 +48,12 @@ namespace lev
       bool set_r(unsigned char new_r) { r = new_r; return true; }
       virtual type_id get_type_id() const { return LEV_TCOLOR; }
 
-      static boost::shared_ptr<color> empty() { return boost::shared_ptr<color>(); }
-      static boost::shared_ptr<color> black() { return color::create(0, 0, 0, 255); }
-      static boost::shared_ptr<color> blue()  { return color::create(0, 0, 255, 255); }
-      static boost::shared_ptr<color> green() { return color::create(0, 255, 0, 255); }
-      static boost::shared_ptr<color> red()   { return color::create(255, 0, 0, 255); }
-      static boost::shared_ptr<color> white() { return color::create(255, 255, 255, 255); }
-      static boost::shared_ptr<color> transparent() { return color::create(0, 0, 0, 0); }
+      static color::ptr black() { return color::create(0, 0, 0, 255); }
+      static color::ptr blue()  { return color::create(0, 0, 255, 255); }
+      static color::ptr green() { return color::create(0, 255, 0, 255); }
+      static color::ptr red()   { return color::create(255, 0, 0, 255); }
+      static color::ptr white() { return color::create(255, 255, 255, 255); }
+      static color::ptr transparent() { return color::create(0, 0, 0, 0); }
 
     protected:
       unsigned char r, g, b, a;
@@ -61,6 +63,9 @@ namespace lev
   class size : public base
   {
     public:
+      typedef boost::shared_ptr<size> ptr;
+      typedef boost::shared_ptr<const size> cptr;
+
       size(int w, int h, int d = 0) : w(w), h(h), d(d), base() {}
       bool assign(int w, int h, int d = 0);
       bool assign_size(const size &sz) { return assign(sz.w, sz.h, sz.d); }
@@ -127,6 +132,9 @@ namespace lev
   class rect : public base
   {
     public:
+      typedef boost::shared_ptr<rect> ptr;
+      typedef boost::shared_ptr<const rect> cptr;
+
       rect(int x = 0, int y = 0, int w = 0, int h = 0);
       rect(const vector &pos, const size &sz);
       rect(const rect &r);
@@ -146,7 +154,7 @@ namespace lev
       int get_x() const { return pos.get_x(); }
       int get_y() const { return pos.get_y(); }
       int get_w() const { return sz.get_w(); }
-      virtual type_id get_type_id() const { return LEV_TRECTANGLE; }
+      virtual type_id get_type_id() const { return LEV_TRECT; }
       bool include(int x, int y) const;
       bool include1(const vector &p) const { return include(p.get_x(), p.get_y()); }
       bool set_bottom(int bottom) { return sz.set_h(bottom - get_y()); }

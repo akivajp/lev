@@ -15,15 +15,14 @@
 #include "lev/package.hpp"
 
 // dependencies
-//#include "lev/archive.hpp"
+#include "lev/archive.hpp"
 #include "lev/debug.hpp"
-#include "lev/entry.hpp"
 #include "lev/fs.hpp"
 #include "lev/util.hpp"
 #include "lev/system.hpp"
+#include "register.hpp"
 
 // libraries
-#include <physfs.h>
 #include <luabind/raw_policy.hpp>
 #include <luabind/luabind.hpp>
 
@@ -42,15 +41,10 @@ int luaopen_lev_package(lua_State *L)
       def("add_font", &package::add_font, raw(_1)),
       def("add_font_dir", &package::add_font_dir, raw(_1)),
       def("add_path", &package::add_path, raw(_1)),
-      def("add_path", &package::add_path1, raw(_1)),
-      def("clear_path_list", &package::clear_path_list, raw(_1)),
       def("find_font", &package::find_font, raw(_1)),
       def("find_font", &package::find_font0, raw(_1)),
-      def("get_archive_list", &package::get_archive_list, raw(_1)),
       def("get_font_dirs", &package::get_font_dirs, raw(_1)),
       def("get_font_list", &package::get_font_list, raw(_1)),
-      def("get_path_list", &package::get_path_list, raw(_1)),
-      def("get_search_list", &package::get_search_list, raw(_1)),
       def("resolve", &package::resolve, raw(_1))
     ]
   ];
@@ -62,7 +56,6 @@ int luaopen_lev_package(lua_State *L)
   register_to(package, "dofile", &package::dofile_l);
   register_to(package, "require", &package::require_l);
 
-  lev["dofile"]  = package["dofile"];
   lev["require"] = package["require"];
 
   globals(L)["package"]["loaded"]["lev.package"] = package;
@@ -73,35 +66,6 @@ int luaopen_lev_package(lua_State *L)
 namespace lev
 {
 
-  static int traceback (lua_State *L) {
-    if (!lua_isstring(L, 1))  /* 'message' not a string? */
-      return 1;  /* keep it intact */
-    lua_getfield(L, LUA_GLOBALSINDEX, "debug");
-    if (!lua_istable(L, -1)) {
-      lua_pop(L, 1);
-      return 1;
-    }
-    lua_getfield(L, -1, "traceback");
-    if (!lua_isfunction(L, -1)) {
-      lua_pop(L, 2);
-      return 1;
-    }
-    lua_pushvalue(L, 1);  /* pass error message */
-    lua_pushinteger(L, 2);  /* skip this function and traceback */
-    lua_call(L, 2, 1);  /* call debug.traceback */
-    return 1;
-  }
-
-  static int dobuffer(lua_State *L, const std::string &name, const std::string &data)
-  {
-    lua_pushcfunction(L, traceback);
-    int trace_pos = lua_gettop(L);
-    int result = luaL_loadbuffer(L, data.c_str(), data.length(), name.c_str())
-               || lua_pcall(L, 0, LUA_MULTRET, trace_pos);
-    lua_remove(L, trace_pos);
-    return result;
-  }
-
   static bool purge_path(std::string &path)
   {
     long double_slash = path.find("//", 1);
@@ -110,14 +74,12 @@ namespace lev
       path.replace(double_slash, 2, "/");
       double_slash = path.find("//", 1);
     }
-    if (path[0] == '/') { path.replace(0, 1, ""); }
     return true;
   }
 
 
   bool package::add_font(lua_State *L, const std::string &filename)
   {
-    using namespace luabind;
     open(L);
     globals(L)["require"]("lev.package");
     object t = globals(L)["lev"]["package"]["get_font_list"]();
@@ -127,36 +89,26 @@ namespace lev
 
   bool package::add_font_dir(lua_State *L, const std::string &dir)
   {
-    using namespace luabind;
     open(L);
     globals(L)["require"]("lev.package");
     object t = globals(L)["lev"]["package"]["get_font_dirs"]();
     globals(L)["table"]["insert"](t, 1, dir);
   }
 
-  bool package::add_path(lua_State *L, const std::string &path, bool append)
+  bool package::add_path(lua_State *L, const std::string &path)
   {
-    using namespace luabind;
-
-    if (! PHYSFS_isInit()) { return false; }
-    if (! PHYSFS_addToSearchPath(path.c_str(), append)) { return false; }
-//    if (file_system::file_exists(path, false))
-//    {
-//      // archive was added
-//      std::string arc_name = file_system::to_stem(path);
-//      if (file_system::dir_exists(arc_name, true))
-//      {
-//        // directory with archive name exists
-//        // adding this archive name directory to search prefix
-//        add_search(L, arc_name + "/", append);
-//      }
-//    }
+    open(L);
+    globals(L)["require"]("lev.package");
+    if (! globals(L)["lev"]["package"]["path_list"])
+    {
+      globals(L)["lev"]["package"]["path_list"] = newtable(L);
+    }
+    globals(L)["table"]["insert"](globals(L)["lev"]["package"]["path_list"], 1, path);
     return true;
   }
 
-  bool package::add_search(lua_State *L, const std::string &search, bool append)
+  bool package::add_search(lua_State *L, const std::string &search)
   {
-    using namespace luabind;
     open(L);
     globals(L)["require"]("table");
     module(L, "lev")
@@ -167,15 +119,7 @@ namespace lev
     {
       globals(L)["lev"]["package"]["search_list"] = newtable(L);
     }
-
-    if (append)
-    {
-      globals(L)["table"]["insert"](globals(L)["lev"]["package"]["search_list"], search);
-    }
-    else
-    {
-      globals(L)["table"]["insert"](globals(L)["lev"]["package"]["search_list"], 1, search);
-    }
+    globals(L)["table"]["insert"](globals(L)["lev"]["package"]["search_list"], 1, search);
     return true;
   }
 
@@ -183,7 +127,6 @@ namespace lev
   {
     using namespace luabind;
     const char *search = NULL;
-    bool append = true;
 
     object t = util::get_merged(L, 1, -1);
     if (t["search_path"]) { search = object_cast<const char *>(t["search_path"]); }
@@ -192,58 +135,16 @@ namespace lev
     else if (t["lua.string1"]) { search = object_cast<const char *>(t["lua.string1"]); }
     if (search == NULL) { luaL_error(L, "path (string) is not given"); }
 
-    if (util::is_boolean(t["appending"])) { append = object_cast<bool>(t["appending"]); }
-    else if (util::is_boolean(t["append"])) { append = object_cast<bool>(t["append"]); }
-    else if (util::is_boolean(t["a"])) { append = object_cast<bool>(t["a"]); }
-    else if (util::is_boolean(t["lua.boolean1"])) { append = object_cast<bool>(t["lua.boolean1"]); }
-
-    lua_pushboolean(L, package::add_search(L, search, append));
+    lua_pushboolean(L, package::add_search(L, search));
     return 1;
-  }
-
-  bool package::clear_path_list(lua_State *L)
-  {
-    if (! PHYSFS_isInit()) { return false; }
-    char **list = PHYSFS_getSearchPath();
-    for (char **i = list; *i != NULL; i++)
-    {
-      PHYSFS_removeFromSearchPath(*i);
-    }
-    PHYSFS_freeList(list);
-    return true;
   }
 
   int package::clear_search_l(lua_State *L)
   {
-    using namespace luabind;
     luabind::module(L, "lev") [ namespace_("package") ];
     luabind::globals(L)["lev"]["package"]["search_path"] = luabind::nil;
     lua_pushboolean(L, true);
     return 1;
-  }
-
-  bool package::dofile(lua_State *L, const std::string &filename)
-  {
-    using namespace luabind;
-
-    boost::shared_ptr<path> fpath = package::resolve(L, filename);
-    if (fpath)
-    {
-      std::string data;
-      if (! fpath->read_all(data))
-      {
-        return false;
-      }
-      if (dobuffer(L, fpath->to_str(), data) != 0)
-      {
-        lev::debug_print(lua_tostring(L, -1));
-        return false;
-      }
-      return true;
-    }
-
-    lev::debug_print("cannnot open " + filename + ": No such file or directory");
-    return true;
   }
 
   int package::dofile_l(lua_State *L)
@@ -253,16 +154,11 @@ namespace lev
     luaL_checkstring(L, 1);
     std::string filename = object_cast<const char *>(object(from_stack(L, 1)));
 
-    boost::shared_ptr<path> fpath = package::resolve(L, filename);
+    object path_list = package::get_path_list(L);
+    boost::shared_ptr<file_path> fpath = package::resolve(L, filename);
     if (fpath)
     {
-      std::string data;
-      if (! fpath->read_all(data))
-      {
-        lua_pushnil(L);
-        return 1;
-      }
-      if (dobuffer(L, fpath->to_str(), data) != 0)
+      if (luaL_dofile(L, fpath->get_full_path().c_str()) != 0)
       {
         lev::debug_print(lua_tostring(L, -1));
         lua_pushnil(L);
@@ -278,24 +174,18 @@ namespace lev
 
   boost::shared_ptr<font> package::find_font(lua_State *L, const std::string &filename)
   {
-    using namespace luabind;
     boost::shared_ptr<font> f;
     try {
       globals(L)["require"]("lev.font");
       object dirs = package::get_font_dirs(L);
 
-//printf("FIND FONT: %s\n", filename.c_str());
       for (iterator i(dirs), end; i != end; i++)
       {
         std::string path = object_cast<const char *>(*i);
-//printf("FIND FONT DIR: %s\n", path.c_str());
         if (file_system::file_exists(path + "/" + filename))
         {
           f = font::load(path + "/" + filename);
-          if (f) {
-//printf("FIND EXISTS: %s\n", (path + "/" + filename).c_str());
-            return f;
-          }
+          if (f) { break; }
         }
       }
     }
@@ -309,7 +199,6 @@ namespace lev
 
   boost::shared_ptr<font> package::find_font0(lua_State *L)
   {
-    using namespace luabind;
     boost::shared_ptr<font> f;
     try {
       globals(L)["require"]("lev.font");
@@ -330,27 +219,8 @@ namespace lev
     return f;
   }
 
-  luabind::object package::get_archive_list(lua_State *L)
-  {
-    using namespace luabind;
-
-    object archives = newtable(L);
-    if (! PHYSFS_isInit()) { return archives; }
-    char **list = PHYSFS_getSearchPath();
-    for (char **i = list; *i != NULL; i++)
-    {
-      if (file_system::file_exists(*i, false))
-      {
-        globals(L)["table"]["insert"](archives, *i);
-      }
-    }
-    return archives;
-  }
-
   luabind::object package::get_font_dirs(lua_State *L)
   {
-    using namespace luabind;
-
     open(L);
     module(L, "lev")
     [
@@ -360,10 +230,10 @@ namespace lev
     {
       object t = newtable(L);
       globals(L)["lev"]["package"]["font_dirs"] = t;
-//      globals(L)["table"]["insert"](t, "./");
-      globals(L)["table"]["insert"](t, "fonts");
-//      globals(L)["table"]["insert"](t, "/usr/share/fonts/corefonts");
-//      globals(L)["table"]["insert"](t, "C:/system/fonts");
+      globals(L)["table"]["insert"](t, "./");
+      globals(L)["table"]["insert"](t, "./fonts");
+      globals(L)["table"]["insert"](t, "/usr/share/fonts/corefonts");
+      globals(L)["table"]["insert"](t, "C:/system/fonts");
       return t;
     }
     return globals(L)["lev"]["package"]["font_dirs"];
@@ -371,45 +241,36 @@ namespace lev
 
   luabind::object package::get_font_list(lua_State *L)
   {
-    using namespace luabind;
-
     open(L);
     globals(L)["require"]("lev.package");
     if (! globals(L)["lev"]["package"]["font_list"])
     {
       object t = newtable(L);
       globals(L)["lev"]["package"]["font_list"] = t;
-//      globals(L)["table"]["insert"](t, "arial.ttf");
       globals(L)["table"]["insert"](t, "default.ttf");
+      globals(L)["table"]["insert"](t, "arial.ttf");
     }
     return globals(L)["lev"]["package"]["font_list"];
   }
 
   luabind::object package::get_path_list(lua_State *L)
   {
-    using namespace luabind;
-
-    object path_list = newtable(L);
-    if (! PHYSFS_isInit())
+    open(L);
+    module(L, "lev")
+    [
+      namespace_("package")
+    ];
+    if (! globals(L)["lev"]["package"]["path_list"])
     {
-      globals(L)["table"]["insert"](path_list, ".");
+      object path_list = newtable(L);
+      path_list[1] = "./";
+      globals(L)["lev"]["package"]["path_list"] = path_list;
     }
-    else
-    {
-      char **list = PHYSFS_getSearchPath();
-      for (char **i = list; *i != NULL; i++)
-      {
-        globals(L)["table"]["insert"](path_list, *i);
-      }
-      PHYSFS_freeList(list);
-    }
-    return path_list;
+    return globals(L)["lev"]["package"]["path_list"];
   }
 
   luabind::object package::get_search_list(lua_State *L)
   {
-    using namespace luabind;
-
     open(L);
     module(L, "lev")
     [
@@ -439,18 +300,11 @@ namespace lev
     }
 
     object path_list = package::get_path_list(L);
-    boost::shared_ptr<path> fpath = package::resolve(L, module);
-    if (! fpath) { fpath = package::resolve(L, module + ".lc"); }
+    boost::shared_ptr<file_path> fpath = package::resolve(L, module);
     if (! fpath) { fpath = package::resolve(L, module + ".lua"); }
     if (fpath)
     {
-      std::string data;
-      if (! fpath->read_all(data))
-      {
-        lua_pushnil(L);
-        return 1;
-      }
-      if (dobuffer(L, fpath->to_str(), data) != 0)
+      if (luaL_dofile(L, fpath->get_full_path().c_str()))
       {
         lev::debug_print(lua_tostring(L, -1));
         lua_pushnil(L);
@@ -463,78 +317,169 @@ namespace lev
       globals(L)["package"]["loaded"][module].push(L);
       return 1;
     }
-    else
-    {
+
+    try {
+      object result = globals(L)["require"](module);
+      result.push(L);
+      return 1;
+    }
+    catch (...) {
       luaL_error(L, ("module '" + module + "' not found").c_str());
       return 0;
     }
-
-    object result = globals(L)["require"](module);
-    result.push(L);
-    return 1;
   }
 
-  boost::shared_ptr<path> package::resolve(lua_State *L,
-                                           const std::string &file)
+  boost::shared_ptr<file_path> package::resolve(lua_State *L,
+                                                const std::string &file)
   {
     using namespace luabind;
 
     try {
-      object archive_list = package::get_archive_list(L);
+      object path_list   = package::get_path_list(L);
       object search_list = package::get_search_list(L);
 
-      for (iterator s(search_list), end; s != end; s++)
+      for (iterator p(path_list), end; p != end; p++)
       {
-        std::string search = object_cast<const char *>(*s);
-        std::string real_path = search + "/" + file;
-        purge_path(real_path);
-//printf("SEARCH: %s\n", search.c_str());
+        std::string path = object_cast<const char *>(*p);
 
-        // search for "search/file"
-        if (file_system::file_exists(real_path))
+        for (iterator s(search_list); s != end; s++)
         {
-          return path::create(real_path);
-        }
-        // search for "arc_name/search/file"
-        for (iterator a(archive_list); a != end; a++)
-        {
-          std::string archive = object_cast<const char *>(*a);
-          std::string arc_name = file_system::to_stem(archive);
-          real_path = arc_name + "/" + search + "/" + file;
-//printf("ARCHIVE: %s\n", arc_name.c_str());
+          std::string search = object_cast<const char *>(*s);
+
+          std::string real_path = path + "/" + search + "/" + file;
           purge_path(real_path);
+
           if (file_system::file_exists(real_path))
           {
-            return path::create(real_path);
+            return file_path::create(real_path);
+          }
+        }
+
+        if (lev::archive::is_archive(path))
+        {
+          for (iterator s(search_list); s != end; s++)
+          {
+            std::string entry = object_cast<const char *>(*s);
+            if (entry.empty()) { entry = file; }
+            else { entry = entry + "/" + file; }
+            if (archive::entry_exists_direct(path, entry))
+            {
+              std::string sys_name = ".";
+              if (system::get()) { sys_name = system::get()->get_name(); }
+              std::string ext = file_system::get_ext(file);
+
+              boost::shared_ptr<file_path> fpath(file_path::create_temp(sys_name + "/", ext));
+              if (! fpath) { return fpath; }
+              lev::archive::extract_direct_to(path, entry, fpath->get_full_path());
+              return fpath;
+            }
+          }
+
+          std::string arc_name = file_system::to_stem(path);
+          for (iterator s(search_list); s != end; s++)
+          {
+            std::string entry = object_cast<const char *>(*s);
+            if (entry.empty()) { entry = arc_name + "/" + file; }
+            else { entry = arc_name + "/" + entry + "/" + file; }
+            if (archive::entry_exists_direct(path, entry))
+            {
+              std::string sys_name = ".";
+              if (system::get()) { sys_name = system::get()->get_name(); }
+              std::string ext = file_system::get_ext(file);
+
+              boost::shared_ptr<file_path> fpath(file_path::create_temp(sys_name + "/", ext));
+              if (! fpath) { return fpath; }
+              lev::archive::extract_direct_to(path, entry, fpath->get_full_path());
+              return fpath;
+            }
           }
         }
       }
-
-      // search for "file"
-      if (file_system::file_exists(file)) { return path::create(file); }
-      // search for "arc_name/file"
-      for (iterator a(archive_list), end; a != end; a++)
-      {
-        std::string archive = object_cast<const char *>(*a);
-        std::string arc_name = file_system::to_stem(archive);
-        std::string real_path = arc_name + "/" + file;
-        purge_path(real_path);
-        if (file_system::file_exists(real_path))
-        {
-          return path::create(real_path);
-        }
-      }
-      return boost::shared_ptr<path>();
     }
     catch (...) {
       lev::debug_print("error on file path resolving");
     }
-    return boost::shared_ptr<path>();
+    return boost::shared_ptr<file_path>();
   }
+
+//  file_path *package::resolve(lua_State *L, const std::string &file)
+//  {
+//    using namespace luabind;
+//
+//    try {
+//      object path_list   = package::get_path_list(L);
+//      object search_list = package::get_search_list(L);
+//
+//      for (iterator p(path_list), end; p != end; p++)
+//      {
+//        const char *path = object_cast<const char *>(*p);
+//        if (path == NULL) { throw -1; }
+//        std::string full = file_system::to_full_path(path);
+//
+//        if (file_system::dir_exists(full))
+//        {
+//          for (iterator s(search_list); s != end; s++)
+//          {
+//            const char *search = object_cast<const char *>(*s);
+//            if (search == NULL) { throw -2; }
+//
+//            std::string real_path = std::string(full) + "/" + search + "/" + file;
+//            if (file_system::file_exists(real_path.c_str()))
+//            {
+//              return file_path::create(real_path);
+//            }
+//          }
+//        }
+//        else if (lev::archive::is_archive(full))
+//        {
+//          for (iterator s(search_list); s != end; s++)
+//          {
+//            std::string entry = object_cast<const char *>(*s);
+//            if (entry.empty()) { entry = file; }
+//            else { entry = entry + "/" + file; }
+//            if (archive::entry_exists_direct(full, entry))
+//            {
+//              std::string app_name = application::get_app()->get_name();
+//              std::string ext = file_system::get_ext(file);
+//              if (! ext.empty()) { ext = "." + ext; }
+//
+//              file_path *fpath = file_path::create_temp(app_name + "/", ext);
+//              if (fpath == NULL) { return NULL; }
+//              lev::archive::extract_direct_to(full, entry, fpath->get_full_path());
+//              return fpath;
+//            }
+//          }
+//
+//          std::string arc_name = file_system::to_name(path);
+//          for (iterator s(search_list); s != end; s++)
+//          {
+//            std::string entry = object_cast<const char *>(*s);
+//            if (entry.empty()) { entry = arc_name + "/" + file; }
+//            else { entry = arc_name + "/" + entry + "/" + file; }
+//            if (archive::entry_exists_direct(full, entry))
+//            {
+//              std::string app_name = application::get_app()->get_name();
+//              std::string ext = file_system::get_ext(file);
+//              if (! ext.empty()) { ext = "." + ext; }
+//
+//              file_path *fpath = file_path::create_temp(app_name + "/", ext);
+//              if (fpath == NULL) { return NULL; }
+//              lev::archive::extract_direct_to(full, entry, fpath->get_full_path());
+//              return fpath;
+//            }
+//          }
+//        }
+//      }
+//    }
+//    catch (...) {
+//      return NULL;
+//    }
+//
+//    return NULL;
+//  }
 
   bool package::set_default_font_dirs(lua_State *L)
   {
-    using namespace luabind;
     open(L);
     globals(L)["require"]("table");
     module(L, "lev")

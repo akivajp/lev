@@ -12,9 +12,9 @@
 /////////////////////////////////////////////////////////////////////////////
 
 #include "base.hpp"
+#include "prim.hpp"
 
 #include <boost/shared_ptr.hpp>
-#include <boost/weak_ptr.hpp>
 #include <lua.h>
 
 extern "C" {
@@ -24,48 +24,122 @@ extern "C" {
 namespace lev
 {
 
-  class bitmap;
+  // type dependencies
+  typedef boost::shared_ptr<class canvas> canvas_ptr;
+  typedef boost::shared_ptr<class bitmap> bitmap_ptr;
+  typedef boost::shared_ptr<class texture> texture_ptr;
 
   class drawable : public base
   {
+    public:
+      typedef boost::shared_ptr<drawable> ptr;
     protected:
-      drawable() : base(), descent(0) { }
+      drawable() : base() { }
     public:
       virtual ~drawable() { }
 
-      virtual bool draw_on(bitmap *dst, int x = 0, int y = 0, unsigned char alpha = 255)
+      virtual bool compile(bool force = false) { return false; }
+      virtual bool compile0() { return compile(); }
+
+      // draw on method
+      virtual bool draw_on(canvas_ptr dst, int x = 0, int y = 0, unsigned char alpha = 255)
       { return false; }
-      virtual bool draw_on1(bitmap *dst) { return draw_on(dst); }
-      virtual bool draw_on3(bitmap *dst, int x, int y) { return draw_on(dst, x, y); }
+      virtual bool draw_on1(canvas_ptr dst) { return draw_on(dst); }
+      virtual bool draw_on3(canvas_ptr dst, int x, int y) { return draw_on(dst, x, y); }
 
-      static boost::shared_ptr<drawable> as_drawable_from_animation(boost::shared_ptr<class animation> d);
-      static boost::shared_ptr<drawable> as_drawable_from_bitmap(boost::shared_ptr<class bitmap> d);
-      static boost::shared_ptr<drawable> as_drawable_from_layout(boost::shared_ptr<class layout> d);
-      static boost::shared_ptr<drawable> as_drawable_from_map(boost::shared_ptr<class map> d);
-      static boost::shared_ptr<drawable> as_drawable_from_screen(boost::shared_ptr<class screen> d);
-      static boost::shared_ptr<drawable> as_drawable_from_transition(boost::shared_ptr<class transition> d);
-
-      int get_ascent() const { return get_h() - descent; }
-      int get_descent() const { return descent; }
+      int get_ascent() const { return get_h() - get_descent(); }
+      virtual int get_descent() const { return 0; }
       virtual int get_h() const { return 0; }
       virtual type_id get_type_id() const { return LEV_TDRAWABLE; }
       virtual int get_w() const { return 0; }
-      bool set_descent(int descent);
-    protected:
-      int descent;
+      virtual bool is_compiled() const { return false; }
+      virtual bool is_texturized() const { return false; }
+      virtual bool set_descent(int d) { return false; }
+      virtual bool texturize(bool force = false) { return false; }
+      virtual bool texturize0() { return texturize(); }
+
+      virtual drawable::ptr to_drawable() { drawable::ptr(); }
   };
 
   class spacer : public drawable
   {
-    protected:
-      spacer(int w, int h) : drawable(), w(w), h(h) { }
     public:
-      static boost::shared_ptr<spacer> create(int w, int h);
+      typedef boost::shared_ptr<spacer> ptr;
+    protected:
+      spacer(int w, int h, int descent = 0) :
+        drawable(), w(w), h(h), descent(descent)
+      { }
+    public:
+      virtual ~spacer() { }
+
+      static spacer::ptr create(int w, int h, int descent = 0);
+
+      virtual int get_descent() const { return descent; }
       virtual int get_h() const { return h; }
       virtual type_id get_type_id() const { return LEV_TSPACER; }
       virtual int get_w() const { return w; }
+      int w, h, descent;
+  };
+
+  class canvas : public drawable
+  {
+    public:
+      typedef boost::shared_ptr<canvas> ptr;
     protected:
-      int h, w;
+      canvas() : drawable() { }
+    public:
+      virtual ~canvas() { }
+
+      // blit method
+      virtual bool blit(int x, int y, bitmap_ptr src,
+                        int src_x = 0, int src_y = 0, int w = -1, int h = -1,
+                        unsigned char alpha = 255) = 0;
+      bool blit1(bitmap_ptr src) { return blit(0, 0, src); }
+      bool blit2(bitmap_ptr src, unsigned char alpha)
+      { return blit(0, 0, src, 0, 0, -1, -1, alpha); }
+      bool blit3(int x, int y, bitmap_ptr src)
+      { return blit(x, y, src); }
+      bool blit4(int x, int y, bitmap_ptr src, unsigned char alpha)
+      { return blit(x, y, src, 0, 0, -1, -1, alpha); }
+
+      // clear methods
+      virtual bool clear(unsigned char r = 0, unsigned char g = 0,
+                         unsigned char b = 0, unsigned char a = 0) = 0;
+      bool clear0() { return clear(); }
+      bool clear3(unsigned char r, unsigned char g, unsigned char b)
+      { return clear(r, g, b); }
+      bool clear_color(color::ptr c = color::transparent());
+
+      // draw methods
+      virtual bool draw(drawable::ptr src, int x = 0, int y = 0, unsigned char alpha = 255) = 0;
+      virtual bool draw_bitmap(bitmap_ptr src, int x = 0, int y = 0, unsigned char alpha = 255) { return false; }
+      virtual bool draw_pixel(int x, int y, const color &c) = 0;
+//      virtual bool draw_raster(const class raster *r, int x = 0, int y = 0,
+//                               color::ptr c = color::transparent()) { return false; }
+      virtual bool draw_texture(texture_ptr src, int x = 0, int y = 0, unsigned char alpha = 255) { return false; }
+      static int draw_l(lua_State *L);
+
+      // fill methods
+      virtual bool fill_circle(int x, int y, int radius, color::ptr filling) { return false; }
+      virtual bool fill_rect(int x, int y, int w, int h, color::ptr filling);
+
+      // get methods
+      virtual color::ptr get_pixel(int x, int y) const { return color::ptr(); }
+      virtual type_id get_type_id() const { return LEV_TCANVAS; }
+
+      // stroke methods
+      virtual bool stroke_circle(int x, int y, int radius, color *border, int width) { return false; }
+//      bool stroke_line(int x1, int y1, int x2, int y2, color *border, int width,
+//                       const std::string &style = "");
+      virtual bool stroke_line(int x1, int y1, int x2, int y2, boost::shared_ptr<color> c, int width,
+                       const std::string &style = "");
+//      bool stroke_line6(int x1, int y1, int x2, int y2, color *border, int width)
+      virtual bool stroke_line6(int x1, int y1, int x2, int y2, boost::shared_ptr<color> c, int width)
+      { return stroke_line(x1, y1, x2, y2, c, width); }
+
+      virtual bool stroke_rect(int x, int y, int w, int h, color *border, int width) { return false; }
+
+      virtual canvas::ptr to_canvas() = 0;
   };
 
 }

@@ -96,9 +96,6 @@ int luaopen_lev_string(lua_State *L)
   object classes = lev["classes"];
   object string = lev["string"];
 
-  lev["unicode"] = classes["ustring"]["create"];
-  lev["ustring"] = classes["ustring"]["create"];
-
   string["compiler"] = classes["sregex_compiler"]["create"];
   string["concat"] = classes["ustring"]["concat"];
   string["create"] = classes["ustring"]["create"];
@@ -112,7 +109,6 @@ int luaopen_lev_string(lua_State *L)
   string["regex_plane"] = classes["sregex"]["plane"];
   string["replace"] = classes["sregex"]["replace"];
   string["sregex"] = classes["sregex"]["compile"];
-  string["ustring"] = classes["ustring"]["create"];
   string["unicode"] = classes["ustring"]["create"];
   string["unistr"] = classes["ustring"]["create"];
   string["utf16"] = classes["ustring"]["create"];

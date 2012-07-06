@@ -16,20 +16,20 @@
 
 // dependencies
 #include "lev/debug.hpp"
-#include "lev/entry.hpp"
 #include "lev/fs.hpp"
 #include "lev/system.hpp"
+#include "register.hpp"
 
 // libraries
-#include <allegro5/allegro_audio.h>
 #include <boost/shared_array.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/weak_ptr.hpp>
 #include <luabind/luabind.hpp>
 #include <map>
+#include <vorbis/vorbisfile.h>
 
 // static member variable initialization
-//boost::shared_ptr<lev::mixer> lev::mixer::singleton;
+boost::shared_ptr<lev::mixer> lev::mixer::singleton;
 
 int luaopen_lev_sound(lua_State *L)
 {
@@ -48,8 +48,6 @@ int luaopen_lev_sound(lua_State *L)
     [
       class_<sound, base, boost::shared_ptr<base> >("sound")
         .def("clear", &sound::clear)
-        .property("gain", &sound::get_volume, &sound::set_volume)
-        .property("id", &sound::get_id)
         .property("is_playing", &sound::is_playing, &sound::set_playing)
         .property("len", &sound::get_length)
         .property("length", &sound::get_length)
@@ -62,12 +60,17 @@ int luaopen_lev_sound(lua_State *L)
         .def("play", &sound::load_and_play)
         .def("play", &sound::load_and_play1)
         .def("play", &sound::load_and_play_path)
+        .def("play", &sound::load_and_play_path1)
         .def("play", &sound::play)
         .def("play", &sound::play0)
         .property("pos", &sound::get_position, &sound::set_position)
         .property("position", &sound::get_position, &sound::set_position)
         .property("vol", &sound::get_volume, &sound::set_volume)
         .property("volume", &sound::get_volume, &sound::set_volume),
+//        .scope
+//        [
+//          def("create", &sound::create)
+//        ],
       class_<mixer, base, boost::shared_ptr<base> >("mixer")
         .def("activate", &mixer::activate)
         .def("activate", &mixer::activate0)
@@ -80,10 +83,17 @@ int luaopen_lev_sound(lua_State *L)
         .def("slot", &mixer::get_slot0)
         .def("start", &mixer::start)
         .def("stop", &mixer::stop)
+        .scope
+        [
+          def("get", &mixer::get),
+          def("init", &mixer::init)
+        ]
     ]
   ];
 //  object classes = globals(L)["lev"]["classes"];
 //  object sound = globals(L)["lev"]["sound"];
+//  sound["create"] = classes["sound"]["create"];
+//  sound["mixer"] = classes["mixer"]["get"];
 
   globals(L)["package"]["loaded"]["lev.sound"] = true;
   return 0;
@@ -92,18 +102,186 @@ int luaopen_lev_sound(lua_State *L)
 namespace lev
 {
 
+//static void test(const char *str, SDL_AudioSpec &t)
+//{
+//  printf("%s\n", str);
+//  printf("freq: %d\n", t.freq);
+//  printf("format: %d\n", t.format);
+//  printf("channels: %d\n", t.channels);
+//  printf("samples: %d\n", t.samples);
+//}
+
+  static SDL_AudioSpec& get_spec(class myMixer *mx);
+
+  class audio_locker
+  {
+    public:
+      audio_locker(class myMixer *mx) : mx(mx)
+      {
+        if (mx)
+        {
+//printf("LOCKING!\n");
+          SDL_LockAudio();
+        }
+      }
+
+      ~audio_locker()
+      {
+        if (mx)
+        {
+//printf("UNLOCKING!\n");
+          SDL_UnlockAudio();
+        }
+      }
+
+      class myMixer *mx;
+  };
+
+  class mySoundLoader
+  {
+    public:
+      mySoundLoader() { }
+      virtual ~mySoundLoader() { }
+      virtual int Decode(const SDL_AudioSpec *spec, Uint8 *buf, Uint32 len) { }
+      virtual unsigned long GetLength() { }
+      virtual bool LoadAll(const SDL_AudioSpec *spec, Uint8 **buf, Uint32 *len) { }
+      virtual bool Seek(double s = 0) { }
+  };
+
+  class myVorbisLoader : public mySoundLoader
+  {
+    protected:
+      myVorbisLoader() { }
+
+    public:
+      virtual ~myVorbisLoader()
+      {
+        if (vf)
+        {
+          ov_clear(vf);
+          free(vf);
+          vf = NULL;
+        }
+      }
+
+      virtual int Decode(const SDL_AudioSpec *spec, Uint8 *buf, Uint32 len)
+      {
+        if (! spec) { return -1; }
+
+        int count;
+        int endian = 0;
+        int sign = 0;
+        int word = 1;
+        int pos = 0;
+
+        switch (spec->format)
+        {
+          case AUDIO_S8:
+            sign = 1;
+            // word = 1;
+            break;
+          case AUDIO_U8:
+            // sign = 0;
+            // word = 1;
+            break;
+          case AUDIO_S16:
+            sign = 1;
+            word = 2;
+            // endian = 0;
+            break;
+          case AUDIO_S16MSB:
+            sign = 1;
+            word = 2;
+            endian = 1;
+            break;
+          case AUDIO_U16:
+            sign = 0;
+            word = 2;
+            // endian = 0;
+            break;
+          case AUDIO_U16MSB:
+            sign = 0;
+            word = 2;
+            endian = 1;
+            break;
+          default:
+            return -1;
+        }
+
+        do {
+          int current;
+          count = ov_read(vf, (char *)buf + pos, len - pos,
+                          endian, word, sign, &current);
+          pos += count;
+        } while (count > 0);
+
+        return pos;
+      }
+
+      virtual unsigned long GetLength()
+      {
+        return vf->vi->channels * 2 * ov_pcm_total(vf, -1);
+      }
+
+      virtual bool LoadAll(const SDL_AudioSpec *spec, Uint8 **buf, Uint32 *len)
+      {
+//        vorbis_info *vi = NULL;
+        int count, pos = 0;
+
+        if (!buf && !len) { return NULL; }
+        try {
+          *len = GetLength();
+          *buf = (Uint8 *)malloc(*len);
+          if (! *buf) { throw -1; }
+
+//          spec->channels = vi->channels;
+//          spec->format = AUDIO_S16;
+//          spec->freq = vi->rate;
+//          spec->samples = 4096;
+//          spec->size = *len;
+
+          if (! Decode(spec, *buf, *len)) { throw -2; }
+          return true;
+        }
+        catch (...) {
+          free(*buf);
+          return false;
+        }
+      }
+
+      static myVorbisLoader *Open(const std::string &file)
+      {
+        myVorbisLoader *l = NULL;
+        try {
+          l = new myVorbisLoader;
+          l->vf = (OggVorbis_File *)malloc(sizeof(OggVorbis_File));
+          if (! l->vf) { throw -1; }
+          // opening ogg file, checking validity
+          if (ov_fopen((char *)file.c_str(), l->vf) != 0) { throw -2; }
+          return l;
+        }
+        catch (...) {
+          delete l;
+          return NULL;
+        }
+      }
+
+      virtual bool Seek(double s = 0)
+      {
+        if (ov_time_seek(vf, s) == 0) { return true; }
+        return false;
+      }
+
+      OggVorbis_File *vf;
+  };
+
   class mySound
   {
     private:
 
       mySound()
-        : loop(false),
-          id(0),
-          gain(0),
-          mx(NULL),
-          sample(NULL),
-          instance(NULL),
-          stream(NULL)
+        : buf(NULL), pos(0), len(0), loader(NULL), loop(false),
+          spec(), mx(NULL), playing(false), volume(1)
       { }
 
     public:
@@ -115,25 +293,21 @@ namespace lev
 
       bool Clear()
       {
-        if (system::get_interpreter())
+        audio_locker lock(mx);
+        if (buf)
         {
-          if (instance)
-          {
-            al_destroy_sample_instance(instance);
-            instance = NULL;
-          }
-          if (sample)
-          {
-            al_destroy_sample(sample);
-            sample = NULL;
-          }
-          if (stream)
-          {
-            al_destroy_audio_stream(stream);
-            stream = NULL;
-          }
+          free(buf);
+          buf = NULL;
         }
-        gain = 0;
+        if (loader)
+        {
+          delete loader;
+          loader = NULL;
+        }
+        pos = 0;
+        len = 0;
+        loop = false;
+        playing = false;
         return true;
       }
 
@@ -153,78 +327,142 @@ namespace lev
 
       double GetLength()
       {
-        if (instance) { return al_get_sample_instance_time(instance); }
-        if (stream) { return al_get_audio_stream_length_secs(stream); }
-        return 0;
+        if (len == 0) { return 0; }
+        switch (spec.format)
+        {
+          case AUDIO_S8:
+          case AUDIO_U8:
+            return len / (double)(spec.freq * spec.channels);
+          default:
+            return len / (double)(spec.freq * spec.channels * 2);
+        }
       }
 
       float GetPan()
       {
-        if (instance) { return al_get_sample_instance_pan(instance); }
-        if (stream) { return al_get_audio_stream_pan(stream); }
         return 0;
+//        if (this->buf == NULL) { return 0; }
+//        return playback->get_pan();
       }
 
       bool GetPlaying()
       {
-        if (instance) { return al_get_sample_instance_playing(instance); }
-        if (stream) { return al_get_audio_stream_playing(stream); }
-        return false;
+        return playing;
       }
 
       double GetPosition()
       {
-        if (instance)
+        if (pos == 0) { return 0; }
+        switch (spec.format)
         {
-          unsigned int len = al_get_sample_instance_length(instance);
-          unsigned int pos = al_get_sample_instance_position(instance);
-          float time = al_get_sample_instance_time(instance);
-          return time * pos / len;
+          case AUDIO_S8:
+          case AUDIO_U8:
+            return pos / (double)(spec.freq * spec.channels);
+          default:
+            return pos / (double)(spec.freq * spec.channels * 2);
         }
-        if (stream) { return al_get_audio_stream_position_secs(stream); }
-        return 0;
       }
 
-      float GetVolume()
+      double GetVolume()
       {
-        return gain;
-//        if (instance) { al_get_sample_instance_gain(instance); }
-//        if (stream) { al_get_audio_stream_gain(stream); }
-//        return 0;
+        return volume;
       }
 
       bool LoadSample(const std::string &filename)
       {
         Clear();
-        try {
-          sample = al_load_sample(filename.c_str());
-          if (! sample) { throw -1; }
-          instance = al_create_sample_instance(sample);
-          if (! instance) { throw -2; }
-          if (! al_attach_sample_instance_to_mixer(instance, mx)) { throw -3; }
-          gain = 1;
-          return true;
+        Uint8 *wav_buf;
+        Uint32 wav_len;
+
+        // trying to load WAV
+        if (SDL_LoadWAV(filename.c_str(), &spec, &wav_buf, &wav_len) != NULL)
+        {
+          // success to load WAV
+          if (mx)
+          {
+            SDL_AudioCVT cvt;
+            SDL_AudioSpec &audio = get_spec(mx);
+            SDL_BuildAudioCVT(&cvt, spec.format,  spec.channels,  spec.freq,
+                                    audio.format, audio.channels, audio.freq);
+            cvt.buf = (Uint8 *)malloc(wav_len * cvt.len_mult);
+            memcpy(cvt.buf, wav_buf, wav_len);
+            cvt.len = wav_len;
+            if (SDL_ConvertAudio(&cvt) < 0)
+            {
+              free(wav_buf);
+              free(cvt.buf);
+              return false;
+            }
+            free(wav_buf);
+
+            audio_locker lock(mx);
+            buf = cvt.buf;
+            len = cvt.len_cvt;
+            spec = audio;
+          }
         }
-        catch (...) {
-          Clear();
-          return false;
+        else if (mx)
+        {
+          // trying to load Vorbis
+          boost::shared_ptr<mySoundLoader> l(myVorbisLoader::Open(filename));
+          if (! l) { return false; }
+          else if (! l->LoadAll(&get_spec(mx), &wav_buf, &wav_len)) { return false; }
+          // success to load Vorbis
+          audio_locker lock(mx);
+          buf = wav_buf;
+          len = wav_len;
+          spec = get_spec(mx);
         }
+
+        return true;
       }
 
       bool OpenStream(const std::string &filename)
       {
         Clear();
-        try {
-          stream = al_load_audio_stream(filename.c_str(), 4, 2024);
-          if (! stream) { throw -1; }
-          if (! al_attach_audio_stream_to_mixer(stream, mx)) { throw -2; }
-          gain = 1;
-          return true;
+        Uint8 *wav_buf;
+        Uint32 wav_len;
+
+        // trying to load WAV
+        if (SDL_LoadWAV(filename.c_str(), &spec, &wav_buf, &wav_len) != NULL)
+        {
+          // success to load WAV
+          if (mx)
+          {
+            SDL_AudioCVT cvt;
+            SDL_AudioSpec &audio = get_spec(mx);
+//test("WAV SPEC", spec);
+            SDL_BuildAudioCVT(&cvt, spec.format,  spec.channels,  spec.freq,
+                                    audio.format, audio.channels, audio.freq);
+            cvt.buf = (Uint8 *)malloc(wav_len * cvt.len_mult);
+            memcpy(cvt.buf, wav_buf, wav_len);
+            cvt.len = wav_len;
+            if (SDL_ConvertAudio(&cvt) < 0)
+            {
+              free(wav_buf);
+              free(cvt.buf);
+              return false;
+            }
+            free(wav_buf);
+
+            audio_locker lock(mx);
+            buf = cvt.buf;
+            len = cvt.len_cvt;
+            spec = audio;
+          }
         }
-        catch (...) {
-          Clear();
-          return false;
+        else if (mx)
+        {
+          audio_locker lock(mx);
+          // trying to load Vorbis
+          loader = myVorbisLoader::Open(filename);
+          if (! loader) { return false; }
+          // success to load Vorbis
+          len = loader->GetLength();
+          spec = get_spec(mx);
         }
+
+        return true;
       }
 
       bool Play(const std::string &filename, bool repeat)
@@ -235,68 +473,68 @@ namespace lev
 
       bool SetPan(float pan)
       {
-        if (instance) { return al_set_sample_instance_pan(instance, pan); }
-        if (stream) { return al_set_audio_stream_pan(stream, pan); }
-        return false;
+        return 0;
+//        if (this->buf == NULL) { return false; }
+//        playback->set_pan(pan);
+//        return true;
       }
 
       bool SetPlaying(bool play, bool repeat)
       {
-        ALLEGRO_PLAYMODE mode = ALLEGRO_PLAYMODE_ONCE;
-        if (repeat) { mode = ALLEGRO_PLAYMODE_LOOP; }
-
         if (mx)
         {
-          if (instance)
-          {
-            if (! al_set_sample_instance_playing(instance, play)) { return false; }
-            return al_set_sample_instance_playmode(instance, mode);
-          }
-          if (stream)
-          {
-            if (! al_set_audio_stream_playing(stream, play)) { return false; }
-            return al_set_audio_stream_playmode(stream, mode);
-          }
+          playing = play;
+          loop = repeat;
+          return true;
         }
         return false;
       }
 
       bool SetPosition(double s)
       {
-        if (instance)
+        audio_locker locker(mx);
+        if (len > 0)
         {
-          unsigned int len = al_get_sample_instance_length(instance);
-          float time = al_get_sample_instance_time(instance);
-          return al_set_sample_instance_position(instance, len * s / time);
+          long new_pos = len * (s / GetLength());
+          if (new_pos < 0)
+          {
+            pos = len + new_pos;
+            if (pos < 0) { pos = 0; }
+          }
+          else if (new_pos >= len) { pos = len; }
+          else { pos = new_pos; }
+
+          if (loader)
+          {
+            if (s >= 0)
+            {
+              loader->Seek(s);
+            }
+            else
+            {
+              loader->Seek(GetLength() + s);
+            }
+          }
+          return true;
         }
-        if (stream) { return al_seek_audio_stream_secs(stream, s); }
         return false;
       }
 
       bool SetVolume(double vol)
       {
-        if (instance)
-        {
-          if (! al_set_sample_instance_gain(instance, vol)) { return false; }
-          gain = vol;
-          return true;
-        }
-        if (stream)
-        {
-          if (! al_set_audio_stream_gain(stream, vol)) { return false; }
-          gain = vol;
-          return true;
-        }
-        return false;
+        if (vol < 0 || vol > 1) { return false; }
+        audio_locker locker(mx);
+        volume = vol;
       }
 
-      ALLEGRO_SAMPLE *sample;
-      ALLEGRO_SAMPLE_INSTANCE *instance;
-      ALLEGRO_AUDIO_STREAM *stream;
-      ALLEGRO_MIXER *mx;
-      float gain;
+      SDL_AudioSpec spec;
+      Uint8* buf;
+      Uint32 len, pos;
       bool loop;
-      int id;
+      bool playing;
+      class myMixer *mx;
+      double volume;
+      mySoundLoader *loader;
   };
 
   static mySound *cast_snd(void *obj) { return (mySound *)obj; }
@@ -324,41 +562,37 @@ namespace lev
     return snd;
   }
 
-  bool sound::clear() { return cast_snd(_obj)->Clear(); }
-  int sound::get_id() const { return cast_snd(_obj)->id; }
-  double sound::get_length() { return cast_snd(_obj)->GetLength(); }
-  float sound::get_pan() { return cast_snd(_obj)->GetPan(); }
+  bool sound::clear() { return ((mySound *)_obj)->Clear(); }
+  double sound::get_length() { return ((mySound *)_obj)->GetLength(); }
+  float sound::get_pan() { return ((mySound *)_obj)->GetPan(); }
   double sound::get_position() { return cast_snd(_obj)->GetPosition(); }
-  float sound::get_volume() { return cast_snd(_obj)->GetVolume(); }
+  double sound::get_volume() { return cast_snd(_obj)->GetVolume(); }
   bool sound::is_playing() { return ((mySound *)_obj)->GetPlaying(); }
 
   bool sound::load(const std::string &filename)
   {
     return cast_snd(_obj)->LoadSample(filename);
   }
-  bool sound::load_path(boost::shared_ptr<path> p)
+  bool sound::load_path(boost::shared_ptr<file_path> path)
   {
-    if (! p) { return false; }
-    return cast_snd(_obj)->LoadSample(p->to_str());
+    return load(path->get_full_path());
   }
   bool sound::load_and_play(const std::string &filename, bool repeat)
   {
     return ((mySound *)_obj)->Play(filename, repeat);
   }
-  bool sound::load_and_play_path(boost::shared_ptr<path> p)
+  bool sound::load_and_play_path(boost::shared_ptr<file_path> path, bool repeat)
   {
-    if (! p) { return false; }
-    return ((mySound *)_obj)->Play(p->to_str(), false);
+    return load_and_play(path->get_full_path(), repeat);
   }
 
   bool sound::open(const std::string &filename)
   {
     return cast_snd(_obj)->OpenStream(filename);
   }
-  bool sound::open_path(boost::shared_ptr<path> p)
+  bool sound::open_path(boost::shared_ptr<file_path> path)
   {
-    if (! p) { return false; }
-    return cast_snd(_obj)->OpenStream(p->to_str());
+    return open(path->get_full_path());
   }
   bool sound::set_pan(float pan) { return ((mySound *)_obj)->SetPan(pan); }
   bool sound::set_playing(bool play, bool repeat)
@@ -369,18 +603,18 @@ namespace lev
   bool sound::set_position(double pos) { return cast_snd(_obj)->SetPosition(pos); }
   bool sound::set_volume(double vol) { return cast_snd(_obj)->SetVolume(vol); }
 
+
+
   // Mixer Implementation
+
+  // private mixing function (proto-type)
+  void my_mix_audio(void *mixer, Uint8 *stream, int len);
 
   class myMixer
   {
     private:
-      myMixer() :
-        active(false),
-        mixer(NULL),
-        slots(),
-        voice(NULL)
-      {}
 
+      myMixer() : active(false), slots(), spec() {}
     public:
 
       ~myMixer()
@@ -390,47 +624,51 @@ namespace lev
         {
           if (i->second != NULL) { i->second->clear(); }
         }
-        if (system::get_interpreter())
-        {
-//printf("DETACH MIXER\n");
-//          al_detach_mixer(mixer);
-//printf("DESTROY MIXER\n");
-          al_destroy_mixer(mixer);
-          mixer = NULL;
-//printf("DESTROY VOICE\n");
-          al_destroy_voice(voice);
-          voice = NULL;
-        }
-//printf("DESTROYED MYMIXER\n");
       }
 
       bool Activate(bool active)
       {
-        return al_set_mixer_playing(mixer, active);
+        if (active) { SDL_PauseAudio(0); }
+        else { SDL_PauseAudio(1); }
+        this->active = active;
+        return true;
       }
 
       bool ClearSlot(int slot_num)
       {
-        std::map<int, boost::shared_ptr<sound> >::iterator found;
-        found = slots.find(slot_num);
-        if (found != slots.end())
-        {
-          slots.erase(found);
-          return true;
-        }
-        else { return false; }
+        return false;
+//        if (slot_num < 0) { return false; }
+//        std::map<unsigned int, sound *>::iterator found;
+//        found = slots.find(slot_num);
+//        if (found != slots.end())
+//        {
+//          delete found->second;
+//          //found->second = NULL;
+//          channels.erase(found);
+//          return true;
+//        }
+//        else { return false; }
       }
+
 
       static myMixer *Create()
       {
         myMixer *mx = NULL;
+        SDL_AudioSpec request;
         try {
           mx = new myMixer;
-          if (! mx) { throw -1; }
-          mx->voice = al_create_voice(44100, ALLEGRO_AUDIO_DEPTH_INT16, ALLEGRO_CHANNEL_CONF_2);
-          if (! mx->voice) { throw -2; }
-          mx->mixer = al_create_mixer(44100, ALLEGRO_AUDIO_DEPTH_FLOAT32, ALLEGRO_CHANNEL_CONF_2);
-          if (! al_attach_mixer_to_voice(mx->mixer, mx->voice)) { throw -3; }
+          request.freq     = 44100;
+          request.format   = AUDIO_S16;
+          request.channels = 2;
+          request.samples  = 512;
+          request.callback = my_mix_audio;
+          request.userdata = mx;
+//          if (system::init() == NULL) { throw -1; }
+          if (SDL_OpenAudio(&request, &mx->spec) < 0) { throw -2; }
+//test("REQUEST", request);
+//test("ACCEPT",  mx->spec);
+          SDL_PauseAudio(0);
+          mx->active = true;
           return mx;
         }
         catch (...) {
@@ -445,9 +683,9 @@ namespace lev
         try {
           slot = sound::create();
           if (! slot) { throw -1; }
+          audio_locker lock(this);
           slots[slot_num] = slot;
-          cast_snd(slot->get_rawobj())->mx = mixer;
-          cast_snd(slot->get_rawobj())->id = slot_num;
+          cast_snd(slot->get_rawobj())->mx = this;
         }
         catch (...) {
           slot.reset();
@@ -459,7 +697,6 @@ namespace lev
       {
         if (slot_num == 0)
         {
-          // auto finding a non-used slot
           int i;
           for (i = -1; ; i--)
           {
@@ -500,73 +737,128 @@ namespace lev
 
       bool IsActive()
       {
-        return al_get_mixer_playing(mixer);
+        return active;
       }
 
     public:
       bool active;
-      ALLEGRO_VOICE *voice;
-      ALLEGRO_MIXER *mixer;
+      SDL_AudioSpec spec;
 //      std::map<int, sound *> slots;
       std::map<int, boost::shared_ptr<sound> > slots;
   };
-  static myMixer *cast_mixer(void *obj) { return (myMixer *)obj; }
+
+  static myMixer *cast_mx(void *obj) { return (myMixer *)obj; }
+
+  SDL_AudioSpec& get_spec(class myMixer *mx)
+  {
+    return mx->spec;
+  }
+
+  void my_mix_audio(void *udata, Uint8 *stream, int len)
+  {
+    myMixer *mx = cast_mx(udata);
+
+    std::map<int, boost::shared_ptr<sound> >::iterator i;
+    memset(stream, 0, len);
+    for (i = mx->slots.begin(); i != mx->slots.end(); i++)
+    {
+      if (! i->second) { continue; }
+      else
+      {
+        mySound *snd = cast_snd(i->second->get_rawobj());
+        int seek_len = snd->len - snd->pos;
+        if (! snd->playing) { continue; }
+        if (seek_len > len) { seek_len = len; }
+        if (seek_len > 0)
+        {
+          if (snd->buf)
+          {
+            SDL_MixAudio(stream, &snd->buf[snd->pos], seek_len, SDL_MIX_MAXVOLUME * snd->volume);
+          }
+          else if (snd->loader)
+          {
+            boost::shared_array<Uint8> buf(new Uint8[seek_len]);
+            snd->loader->Decode(&mx->spec, buf.get(), seek_len);
+            SDL_MixAudio(stream, buf.get(), seek_len, SDL_MIX_MAXVOLUME * snd->volume);
+          }
+          snd->pos += seek_len;
+        }
+        else // if (seek_len <= 0)
+        {
+          if (snd->loop)
+          {
+            snd->SetPosition(0);
+          }
+          else
+          {
+            snd->playing = false;
+          }
+        }
+      }
+    }
+  }
+
+  static SDL_AudioSpec& get_spec(mixer *mx)
+  {
+    return cast_mx(mx->get_rawobj())->spec;
+  }
+
 
   mixer::mixer() : base(), _obj(NULL) { }
 
   mixer::~mixer()
   {
-    if (_obj)
-    {
-      delete cast_mixer(_obj);
-      _obj = NULL;
-    }
+    if (_obj) { delete (myMixer *)_obj; }
+//printf("CLOSING AUDIO!\n");
+    SDL_CloseAudio();
+//printf("CLOSED AUDIO!\n");
   }
 
   bool mixer::activate(bool active)
   {
-    return cast_mixer(_obj)->Activate(active);
+    return cast_mx(_obj)->Activate(active);
   }
 
   bool mixer::clear_slot(int slot_num)
   {
-    return cast_mixer(_obj)->ClearSlot(slot_num);
-  }
-
-  boost::shared_ptr<mixer> mixer::create()
-  {
-    boost::shared_ptr<mixer> mx;
-    try {
-      mx.reset(new mixer);
-      if (! mx) { throw -1; }
-      mx->_obj = myMixer::Create();
-      if (! mx->_obj) { throw -2; }
-    }
-    catch (...) {
-      mx.reset();
-      lev::debug_print("error on mixer instance creation");
-    }
-    return mx;
+    return ((myMixer *)_obj)->ClearSlot(slot_num);
   }
 
   int mixer::get_channels()
   {
-    return al_get_mixer_channels(cast_mixer(_obj)->mixer);
+    return cast_mx(_obj)->spec.channels;
   }
 
   int mixer::get_freq()
   {
-    return al_get_mixer_frequency(cast_mixer(_obj)->mixer);
+    return cast_mx(_obj)->spec.freq;
   }
 
   boost::shared_ptr<sound> mixer::get_slot(int slot_num)
   {
-    return cast_mixer(_obj)->GetSlot(slot_num);
+    return cast_mx(_obj)->GetSlot(slot_num);
+  }
+
+  boost::shared_ptr<mixer> mixer::init(boost::shared_ptr<system> sys)
+  {
+    if (! sys) { return boost::shared_ptr<mixer>(); }
+    if (singleton) { return singleton; }
+    try {
+      singleton.reset(new mixer);
+      if (! singleton) { throw -1; }
+      singleton->_obj = myMixer::Create();
+      if (! singleton->_obj) { throw -2; }
+    }
+    catch (...) {
+      singleton.reset();
+      lev::debug_print("error on mixer instance creation");
+    }
+    return singleton;
   }
 
   bool mixer::is_active()
   {
-    return cast_mixer(_obj)->IsActive();
+    return cast_mx(_obj)->IsActive();
   }
 
 }

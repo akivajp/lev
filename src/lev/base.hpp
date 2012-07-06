@@ -31,12 +31,14 @@ namespace lev
 
           LEV_TARCHIVE,
           LEV_TCOLOR,
+          LEV_TDEBUGGER,
 
           LEV_TDRAWABLE,
             LEV_TANIMATION,
-            LEV_TBITMAP,
+            LEV_TCANVAS,
+              LEV_TBITMAP,
               LEV_TSCREEN,
-            LEV_TBITMAP_END,
+            LEV_TCANVAS_END,
             LEV_TLAYOUT,
             LEV_TMAP,
             LEV_TSPACER,
@@ -45,15 +47,11 @@ namespace lev
           LEV_TDRAWABLE_END,
 
           LEV_TEVENT,
-          LEV_TFILE,
-          LEV_TPATH,
+          LEV_TFILEPATH,
           LEV_TFONT,
-          LEV_TINPUT,
           LEV_TMIXER,
-          LEV_TMOUSE,
           LEV_TPOINT,
-          LEV_TRASTER,
-          LEV_TRECTANGLE,
+          LEV_TRECT,
           LEV_TSIZE,
           LEV_TSOUND,
           LEV_TSREGEX,
@@ -68,11 +66,6 @@ namespace lev
 
           LEV_TUSTRING,
           LEV_TVECTOR,
-
-          LEV_TWINDOW,
-            LEV_TDEBUG_WINDOW,
-          LEV_TWINDOW_END,
-
         LEV_TBASE_END,
       };
     protected:

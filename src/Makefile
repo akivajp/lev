@@ -1,25 +1,23 @@
 CC = gcc
 CXX = g++
-CXXFLAGS = -fPIC -Os
-CXXFLAGS = -fPIC -g
-#CXXFLAGS = -fPIC -Os `/usr/local/bin/sdl2-config --cflags`
-#CXXFLAGS = -fPIC -Os -I/usr/include/freetype2 `sdl2-config --cflags`
+#CXXFLAGS = -fPIC -Os -I/usr/include/freetype2 `/usr/local/bin/sdl-config --cflags` \
+	   -I./minizip
+CXXFLAGS = -fPIC -g -I/usr/include/freetype2 `/usr/local/bin/sdl2-config --cflags`
 SHARED= -shared
 SLIB = liblev.a
 OUT = a.out
 PCH = prec.h.gch
 AR = ar
 RANLIB = ranlib
-SRC  = base.cpp debug.cpp draw.cpp entry.cpp font.cpp fs.cpp image.cpp input.cpp map.cpp \
-       package.cpp prim.cpp screen.cpp sound.cpp string.cpp system.cpp timer.cpp util.cpp
+SRC  = archive.cpp base.cpp debug.cpp draw.cpp entry.cpp font.cpp fs.cpp image.cpp map.cpp \
+       package.cpp prim.cpp sound.cpp string.cpp system.cpp timer.cpp util.cpp screen.cpp
 OBJS = $(SRC:%.cpp=%.o)
 DLIB = lev.so
-LIBS = -llua -lluabind -lfreetype \
-       -lallegro -lallegro_acodec -lallegro_audio -lallegro_dialog -lallegro_font -lallegro_image \
-       -lallegro_physfs -lallegro_primitives -lallegro_ttf
+#LIBS = -llua -lluabind -lSDL -lvorbisfile -lfreetype -lGL
+LIBS = -llua -lluabind -lvorbisfile -lfreetype -lGL `/usr/local/bin/sdl2-config --libs` \
+       -lminizip -lboost_filesystem
 
 all: pch tags bin lib
-#all: pch bin lib
 
 bin: $(OUT)
 
@@ -67,17 +65,16 @@ entry.o: entry.cpp lev/entry.hpp
 font.o: font.cpp lev/font.hpp
 fs.o: fs.cpp lev/fs.hpp
 image.o: image.cpp lev/image.hpp
-input.o: input.cpp lev/input.hpp
 main.o: main.cpp
 map.o: map.cpp lev/map.hpp
 package.o: package.cpp lev/package.hpp
 prim.o: prim.cpp lev/prim.hpp
-screen.o: screen.cpp lev/screen.hpp
 sound.o: sound.cpp lev/sound.hpp
 string.o: string.cpp lev/string.hpp
 system.o: system.cpp lev/system.hpp
 timer.o: timer.cpp lev/timer.hpp
 util.o: util.cpp lev/util.hpp
+screen.o: screen.cpp lev/screen.hpp
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $<
 

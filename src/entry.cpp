@@ -10,14 +10,13 @@
 // pre-compiled header
 #include "prec.h"
 
-// declarations
-#include "lev/entry.hpp"
-
 // dependencies
 #include "lev/lev.hpp"
+#include "register.hpp"
 
 // libraries
 #include <sstream>
+#include <luabind/adopt_policy.hpp>
 
 int luaopen_lev(lua_State *L)
 {
@@ -47,16 +46,17 @@ int luaopen_lev_std(lua_State *L)
     globals(L)["require"]("table");
 
     globals(L)["require"]("lev");
-//    globals(L)["require"]("lev.archive");
-//  //  globals(L)["require"]("lev.db");
+    globals(L)["require"]("lev.archive");
+  //  globals(L)["require"]("lev.db");
     globals(L)["require"]("lev.debug");
     globals(L)["require"]("lev.draw");
+  //  globals(L)["require"]("lev.gui");
     globals(L)["require"]("lev.font");
     globals(L)["require"]("lev.fs");
-//  //  globals(L)["require"]("lev.gl");
+  //  globals(L)["require"]("lev.gl");
     globals(L)["require"]("lev.image");
-//  //  globals(L)["require"]("lev.info");
-//  //  globals(L)["require"]("lev.net");
+  //  globals(L)["require"]("lev.info");
+  //  globals(L)["require"]("lev.net");
     globals(L)["require"]("lev.package");
     globals(L)["require"]("lev.screen");
     globals(L)["require"]("lev.sound");
@@ -66,6 +66,7 @@ int luaopen_lev_std(lua_State *L)
     globals(L)["require"]("lev.util");
 
     globals(L)["system"] = globals(L)["lev"]["system"]();
+//    globals(L)["mixer"] = globals(L)["lev"]["sound"]["mixer"]();
     globals(L)["mixer"] = globals(L)["system"]["create_mixer"](globals(L)["system"]);
     globals(L)["package"]["loaded"]["lev.std"] = globals(L)["lev"];
     globals(L)["collectgarbage"]();
@@ -80,46 +81,24 @@ int luaopen_lev_std(lua_State *L)
 namespace lev
 {
 
-  bool load_to(luabind::object to, const char *funcname, const char *code)
-  {
-    lua_State *L = to.interpreter();
-    if (luaL_loadstring(L, code) != 0) { return false; }
-    luabind::object loaded(luabind::from_stack(L, -1));
-    lua_pop(L, 1);
-    to[funcname] = loaded();
-    return true;
-  }
-
-
-  bool register_to(luabind::object to, const char *funcname, lua_CFunction func)
-  {
-    lua_State *L = to.interpreter();
-    lua_pushcfunction(L, func);
-    luabind::object f(luabind::from_stack(L, -1));
-    lua_pop(L, 1);
-    to[funcname] = f;
-    return true;
-  }
-
-
   void set_preloaders(lua_State *L)
   {
     using namespace luabind;
     register_to(globals(L)["package"]["preload"], "lev", luaopen_lev);
-//    register_to(globals(L)["package"]["preload"], "lev.archive", luaopen_lev_archive);
+    register_to(globals(L)["package"]["preload"], "lev.archive", luaopen_lev_archive);
     register_to(globals(L)["package"]["preload"], "lev.base", luaopen_lev_base);
-////    register_to(globals(L)["package"]["preload"], "lev.db", luaopen_lev_db);
+//    register_to(globals(L)["package"]["preload"], "lev.db", luaopen_lev_db);
     register_to(globals(L)["package"]["preload"], "lev.debug", luaopen_lev_debug);
     register_to(globals(L)["package"]["preload"], "lev.draw", luaopen_lev_draw);
     register_to(globals(L)["package"]["preload"], "lev.font", luaopen_lev_font);
     register_to(globals(L)["package"]["preload"], "lev.fs", luaopen_lev_fs);
-////    register_to(globals(L)["package"]["preload"], "lev.gl", luaopen_lev_gl);
-////    register_to(globals(L)["package"]["preload"], "lev.gui", luaopen_lev_gui);
+//    register_to(globals(L)["package"]["preload"], "lev.gl", luaopen_lev_gl);
+//    register_to(globals(L)["package"]["preload"], "lev.gui", luaopen_lev_gui);
     register_to(globals(L)["package"]["preload"], "lev.image", luaopen_lev_image);
-////    register_to(globals(L)["package"]["preload"], "lev.info", luaopen_lev_info);
-    register_to(globals(L)["package"]["preload"], "lev.input", luaopen_lev_input);
-////    register_to(globals(L)["package"]["preload"], "lev.locale", luaopen_lev_locale);
-////    register_to(globals(L)["package"]["preload"], "lev.net", luaopen_lev_net);
+//    register_to(globals(L)["package"]["preload"], "lev.info", luaopen_lev_info);
+//    register_to(globals(L)["package"]["preload"], "lev.input", luaopen_lev_input);
+//    register_to(globals(L)["package"]["preload"], "lev.locale", luaopen_lev_locale);
+//    register_to(globals(L)["package"]["preload"], "lev.net", luaopen_lev_net);
     register_to(globals(L)["package"]["preload"], "lev.package", luaopen_lev_package);
     register_to(globals(L)["package"]["preload"], "lev.prim", luaopen_lev_prim);
     register_to(globals(L)["package"]["preload"], "lev.screen", luaopen_lev_screen);
@@ -130,7 +109,6 @@ namespace lev
     register_to(globals(L)["package"]["preload"], "lev.timer", luaopen_lev_timer);
     register_to(globals(L)["package"]["preload"], "lev.util", luaopen_lev_util);
   }
-
 
 }
 

@@ -14,7 +14,6 @@
 #include "base.hpp"
 #include "draw.hpp"
 #include "prim.hpp"
-#include <boost/shared_ptr.hpp>
 #include <luabind/luabind.hpp>
 
 extern "C" {
@@ -24,94 +23,86 @@ extern "C" {
 namespace lev
 {
 
-  // class dependencies
-  class path;
+  // class dependency
+  class file_path;
   class font;
-//  class raster;
-  class screen;
+  class raster;
+  class window;
+  typedef boost::shared_ptr<class screen> screen_ptr;
 
-  class bitmap : public drawable
+  class bitmap : public canvas
   {
-    protected:
-      bitmap();
     public:
-      virtual ~bitmap();
-      bool blit(int x, int y, bitmap *src,
-                int src_x = 0, int src_y = 0, int w = -1, int h = -1,
-                unsigned char alpha = 255);
-      bool blit1(bitmap *src) { return blit(0, 0, src); }
-      bool blit2(bitmap *src, unsigned char alpha) { return blit(0, 0, src, 0, 0, -1, -1, alpha); }
-      bool blit3(int x, int y, bitmap *src) { return blit(x, y, src); }
-      bool blit4(int x, int y, bitmap *src, unsigned char alpha) { return blit(x, y, src, 0, 0, -1, -1, alpha); }
+      typedef boost::shared_ptr<bitmap> ptr;
+    protected:
+      bitmap() : canvas() { }
+    public:
+      virtual ~bitmap() { }
 
-      virtual bool clear(unsigned char r = 0, unsigned char g = 0, unsigned char b = 0, unsigned char a = 0);
-      bool clear0() { return clear(); }
-      bool clear3(unsigned char r, unsigned char g, unsigned char b) { return clear(r, g, b); }
-      bool clear_color(boost::shared_ptr<color> c = color::transparent());
-      bool clear_rect(int x, int y, int w, int h, boost::shared_ptr<color> c = color::transparent());
-      bool clear_rect1(const rect &r) { return clear_rect2(r); }
-      bool clear_rect2(const rect &r, boost::shared_ptr<color> c = color::transparent());
+      // clone method
+      virtual bitmap::ptr clone() { return bitmap::ptr(); }
 
-      virtual boost::shared_ptr<bitmap> clone();
-      static boost::shared_ptr<bitmap> create(int width, int height);
-      virtual bool draw(drawable *src, int x = 0, int y = 0, unsigned char alpha = 255);
-      virtual bool draw_on(bitmap *dst, int x = 0, int y = 0, unsigned char alpha = 255);
-      bool draw_pixel(int x, int y, const color &c);
-//      bool draw_raster(const raster *r, int x = 0, int y = 0,
-//                       boost::shared_ptr<const color> c = boost::shared_ptr<const color>());
-      static int draw_l(lua_State *L);
-      bool fill_circle(int cx, int cy, int radius, boost::shared_ptr<color> filling);
-      bool fill_rectangle(int x1, int y1, int x2, int y2, boost::shared_ptr<color> filling);
-      virtual int get_h() const;
-      boost::shared_ptr<color> get_pixel(int x, int y);
-      void* get_rawobj() const { return _obj; }
-      boost::shared_ptr<rect> get_rect() const;
-      boost::shared_ptr<size> get_size() const;
-      virtual boost::shared_ptr<bitmap> get_sub_bitmap(int x, int y, int w, int h);
-      static int get_sub_bitmap_l(lua_State *L);
+      // create method (static)
+      static bitmap::ptr create(int width, int height);
+
+      // get methods
+      virtual unsigned char *get_buffer() { return NULL; }
+      virtual const unsigned char *get_buffer() const { return NULL; }
+      virtual rect::ptr get_rect() const { return rect::ptr(); }
+      virtual size::ptr get_size() const { return size::ptr(); }
+      virtual boost::shared_ptr<texture> get_texture() const
+      { return boost::shared_ptr<texture>(); }
+
       virtual type_id get_type_id() const { return LEV_TBITMAP; }
+//      static bitmap* levana_icon();
+      static bitmap::ptr load(const std::string &filename);
+      static bitmap::ptr load_path(boost::shared_ptr<file_path> path);
+      virtual bitmap::ptr resize(int width, int height) { return bitmap::ptr(); }
+      virtual bool save(const std::string &filename) const { return false; }
+      virtual bool set_pixel(int x, int y, const color &c) { return false; }
+      virtual bitmap::ptr sub(int x, int y, int w, int h) { return bitmap::ptr(); }
+//      static bitmap::ptr take_screenshot(boost::shared_ptr<window> win) { return bitmap::ptr(); }
+      virtual bitmap::ptr to_bitmap() { return bitmap::ptr(); }
+  };
+
+  class texture : public drawable
+  {
+    public:
+      typedef boost::shared_ptr<texture> ptr;
+    protected:
+      texture();
+    public:
+      ~texture();
+      virtual bool blit_on(boost::shared_ptr<class screen> dst,
+                           int dst_x = 0, int dst_y = 0,
+                           int src_x = 0, int src_y = 0,
+                           int w = -1, int h = -1,
+                           unsigned char alpha = 255) const;
+      static texture::ptr create(bitmap::ptr src);
+//      virtual bool draw_on_screen(screen_ptr dst, int x = 0, int y = 0, unsigned char alpha = 255) const;
+      virtual int get_h() const;
+      virtual type_id get_type_id() const { return LEV_TTEXTURE; }
       virtual int get_w() const;
-      static bitmap* levana_icon();
-      static boost::shared_ptr<bitmap> load(const std::string &filename);
-      static boost::shared_ptr<bitmap> load_path(boost::shared_ptr<path> p);
-      bool reload(const std::string &filename);
-      boost::shared_ptr<bitmap> resize(int width, int height);
-      virtual bool save(const std::string &filename) const;
-      virtual bool set_as_target();
-      bool set_pixel(int x, int y, const color &c);
-      static boost::shared_ptr<bitmap> string(boost::shared_ptr<font> f, const std::string &str,
-                                             boost::shared_ptr<color> fore  = boost::shared_ptr<color>(),
-                                             boost::shared_ptr<color> shade = boost::shared_ptr<color>(),
-                                             boost::shared_ptr<color> back  = boost::shared_ptr<color>(),
-                                             int spacing = 1);
-      static int string_l(lua_State *L);
-      bool stroke_circle(int x, int y, int radius, boost::shared_ptr<color> border, int width);
-      bool stroke_line(int x1, int y1, int x2, int y2, boost::shared_ptr<color> c, int width);
-      bool stroke_rectangle(int x1, int y1, int x2, int y2, boost::shared_ptr<color> border, int width);
-      bool swap(boost::shared_ptr<bitmap> img);
+      virtual bool is_texturized() { return true; }
+      static boost::shared_ptr<texture> load(const std::string &file);
     protected:
       void *_obj;
-
-      friend class screen;
   };
 
   class animation : public drawable
   {
     protected:
-      animation();
+      animation() : drawable() { }
     public:
-      virtual ~animation();
-      bool append(boost::shared_ptr<drawable> img, double duration);
-      bool append_file(const std::string &filename, double duration);
-      bool append_path(boost::shared_ptr<path> p, double duration);
-      static int append_l(lua_State *L);
-      static boost::shared_ptr<animation> create(bool repeating = true);
-      static boost::shared_ptr<animation> create0() { return create(); }
-      virtual bool draw_on(bitmap *dst, int x = 0, int y = 0, unsigned char alpha = 255);
-      boost::shared_ptr<drawable> get_current();
-      virtual int get_h() const;
+      virtual ~animation() { }
+
+      virtual bool append(boost::shared_ptr<drawable> img, double duration) = 0;
+      virtual bool append_file(const std::string &filename, double duration) = 0;
+      virtual bool append_path(const file_path *path, double duration) = 0;
+      static animation::ptr create(bool repeating = true);
+      static animation::ptr create0() { return create(); }
+      virtual drawable::ptr get_current() const = 0;
       virtual type_id get_type_id() const { return LEV_TANIMATION; }
-      virtual int get_w() const;
     protected:
       void *_obj;
   };
@@ -122,29 +113,31 @@ namespace lev
       transition();
     public:
       virtual ~transition();
-      virtual bool draw_on(bitmap *dst, int x = 0, int y = 0, unsigned char alpha = 255);
+      virtual bool draw_on(canvas::ptr dst, int x = 0, int y = 0, unsigned char alpha = 255);
       static boost::shared_ptr<transition> create(boost::shared_ptr<drawable> img);
-      static boost::shared_ptr<transition> create_with_path(boost::shared_ptr<path> p);
-      static boost::shared_ptr<transition> create_with_string(const std::string &bitmap_path);
+      static boost::shared_ptr<transition> create_with_path(boost::shared_ptr<file_path> path);
+      static boost::shared_ptr<transition> create_with_string(const std::string &image_path);
       static boost::shared_ptr<transition> create0() { return create(boost::shared_ptr<drawable>()); }
-      boost::shared_ptr<drawable> get_current();
       virtual int get_h() const;
       virtual type_id get_type_id() const { return LEV_TTRANSITION; }
       virtual int get_w() const;
       bool is_running();
       bool rewind();
       bool set_current(boost::shared_ptr<drawable> current);
-      bool set_current(const std::string &bitmap_path);
+      bool set_current(const std::string &image_path);
       static int set_current_l(lua_State *L);
       bool set_next(boost::shared_ptr<drawable> next, double duration = 1, const std::string &mode = "");
-      bool set_next(const std::string &bitmap_path, double duration = 1, const std::string &mode = "");
+      bool set_next(const std::string &image_path, double duration = 1, const std::string &mode = "");
       static int set_next_l(lua_State *L);
+      virtual bool texturize(bool force = false);
     protected:
       void *_obj;
   };
 
   class layout : public drawable
   {
+    public:
+      typedef boost::shared_ptr<layout> ptr;
     protected:
       layout();
     public:
@@ -152,13 +145,11 @@ namespace lev
       virtual bool clear();
       bool complete();
       static boost::shared_ptr<layout> create(int width_stop = -1);
-      static boost::shared_ptr<layout> create0() { return create(); }
-      virtual bool draw_on(bitmap *dst, int x = 0, int y = 0, unsigned char alpha = 255);
+      virtual bool draw_on(canvas::ptr dst, int x = 0, int y = 0, unsigned char alpha = 255);
       boost::shared_ptr<color> get_fg_color();
       boost::shared_ptr<font> get_font();
       virtual int get_h() const;
       boost::shared_ptr<font> get_ruby_font();
-      int get_spacing();
       boost::shared_ptr<color> get_shade_color();
       virtual type_id get_type_id() const { return LEV_TLAYOUT; }
       virtual int get_w() const;
@@ -170,7 +161,7 @@ namespace lev
                              luabind::object lclick_func, luabind::object hover_func);
       bool reserve_clickable_text(const std::string &text,
                                   luabind::object lclick_func, luabind::object hover_func);
-      bool reserve_bitmap(boost::shared_ptr<bitmap> img);
+      bool reserve_image(boost::shared_ptr<bitmap> img);
       bool reserve_new_line();
       bool reserve_word(const std::string &word, const std::string &ruby = "");
       bool reserve_word_lua(luabind::object word, luabind::object ruby);
@@ -179,8 +170,8 @@ namespace lev
       bool set_font(boost::shared_ptr<font> f);
       bool set_shade_color(const color *c);
       bool set_ruby_font(boost::shared_ptr<font> f);
-      bool set_spacing(int space = 1);
       bool show_next();
+      virtual bool texturize(bool force = false);
     protected:
       void *_obj;
   };

@@ -49,30 +49,46 @@ namespace lev
 
   class timer : public base
   {
-    protected:
-      timer();
     public:
-      virtual ~timer();
-      static boost::shared_ptr<timer>
-        create(double interval_seconds = 1, bool one_shot = false);
-      double get_freq() const;
-      double get_interval() const;
-      long get_count() const;
-      long get_id() const;
-      luabind::object get_on_tick();
-      virtual type_id get_type_id() const { return LEV_TTIMER; }
-      bool is_one_shot() const;
-      bool is_running() const;
-      bool set_count(long count);
-      bool set_freq(double freq);
-      bool set_interval(double new_interval);
-      bool set_on_tick(luabind::object func);
-      virtual bool start(double interval_seconds = -1, bool one_shot = false);
-      virtual bool start0() { return start(); }
-      virtual bool start1(double interval) { return start(interval); }
-      bool stop();
+      typedef boost::shared_ptr<timer> ptr;
     protected:
-      void *_obj;
+      timer() : base() { }
+    public:
+      virtual ~timer() { }
+
+      virtual bool close() = 0;
+      static boost::shared_ptr<timer> create(double interval = 1000);
+      virtual double get_interval() const = 0;
+      virtual luabind::object get_notify() = 0;
+      virtual type_id get_type_id() const { return LEV_TTIMER; }
+      virtual bool is_one_shot() const = 0;
+      virtual bool is_running() const = 0;
+      virtual bool notify() = 0;
+      virtual bool probe() = 0;
+      virtual bool set_interval(double new_interval) = 0;
+      virtual bool set_notify(luabind::object func) = 0;
+      virtual bool start(double milliseconds = -1, bool one_shot = false) = 0;
+      bool start0() { return start(); }
+      bool start1(double milliseconds) { return start(milliseconds); }
+      virtual bool stop() = 0;
+      virtual timer::ptr to_timer() = 0;
+  };
+
+  class clock : public timer
+  {
+    public:
+      typedef boost::shared_ptr<clock> ptr;
+    protected:
+      clock() : timer() { }
+    public:
+      virtual ~clock() { }
+
+      static boost::shared_ptr<clock> create(double freq = 50);
+      virtual double get_freq() const = 0;
+      virtual type_id get_type_id() const { return LEV_TCLOCK; }
+      virtual bool set_freq(double freq) = 0;
+      virtual bool start(double freq = -1) = 0;
+      bool start0() { return start(); }
   };
 
 }

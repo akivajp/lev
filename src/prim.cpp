@@ -10,9 +10,9 @@
 #include "prec.h"
 
 #include "lev/debug.hpp"
-#include "lev/entry.hpp"
 #include "lev/prim.hpp"
 #include "lev/util.hpp"
+#include "register.hpp"
 
 #include <boost/format.hpp>
 
@@ -562,12 +562,12 @@ namespace lev
     else if (t["h"]) { h = object_cast<int>(t["h"]); }
     else if (t["lua.number4"]) { h = object_cast<int>(t["lua.number4"]); }
 
-    if (t["lev.prim.vector1"])
+    if (t["lev.vector1"])
     {
-      object vec1 = t["lev.prim.vector1"];
-      if (t["lev.prim.vector2"])
+      object vec1 = t["lev.vector1"];
+      if (t["lev.vector2"])
       {
-        object vec2 = t["lev.prim.vector2"];
+        object vec2 = t["lev.vector2"];
         int x1 = object_cast<int>(vec1["x"]);
         int y1 = object_cast<int>(vec1["y"]);
         int x2 = object_cast<int>(vec2["x"]);
@@ -588,9 +588,9 @@ namespace lev
       }
     }
 
-    if (t["lev.prim.size1"])
+    if (t["lev.size1"])
     {
-      object sz = t["lev.prim.size1"];
+      object sz = t["lev.size1"];
       w = object_cast<int>(sz["w"]);
       h = object_cast<int>(sz["h"]);
     }

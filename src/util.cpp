@@ -15,9 +15,9 @@
 
 // dependencies
 #include "lev/debug.hpp"
-#include "lev/entry.hpp"
 //#include "lev/fs.hpp"
-//#include "lev/string.hpp"
+#include "lev/string.hpp"
+#include "register.hpp"
 
 // libraries
 #include <boost/format.hpp>
@@ -117,10 +117,10 @@ int luaopen_lev_util(lua_State *L)
   object lev = globals(L)["lev"];
   object util = lev["util"];
 
-  lev::register_to(util, "execute_code", &util::execute_code_l);
-  lev::register_to(util, "merge", &util::merge);
-  lev::register_to(util, "remove_first", &util::remove_first);
-  lev::register_to(util, "reverse", &util::reverse);
+  register_to(util, "execute_code", &util::execute_code_l);
+  register_to(util, "merge", &util::merge);
+  register_to(util, "remove_first", &util::remove_first);
+  register_to(util, "reverse", &util::reverse);
   load_to(util, "using", code_using);
 
   lev["execute"] = util["execute"];
@@ -227,12 +227,6 @@ namespace lev
     object t(from_stack(L, -1));
     lua_pop(L, 1);
     return t;
-  }
-
-  bool util::is_boolean(luabind::object var)
-  {
-    if (! var.is_valid()) { return false; }
-    return luabind::type(var) == LUA_TBOOLEAN;
   }
 
   int util::merge(lua_State *L)

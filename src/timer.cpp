@@ -19,10 +19,9 @@
 #include "lev/system.hpp"
 
 // libraries
-//#include <boost/date_time/posix_time/posix_time.hpp>
-#include <allegro5/allegro.h>
+#include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/shared_ptr.hpp>
-#include <boost/weak_ptr.hpp>
+#include <SDL2/SDL.h>
 
 int luaopen_lev_timer(lua_State *L)
 {
@@ -48,8 +47,6 @@ int luaopen_lev_timer(lua_State *L)
         .property("milli", &stop_watch::milliseconds)
         .property("milliseconds", &stop_watch::milliseconds)
         .def("pause", &stop_watch::pause)
-        .def("restart", &stop_watch::start)
-        .def("restart", &stop_watch::start0)
         .def("resume", &stop_watch::resume)
         .property("seconds", &stop_watch::seconds)
         .def("start", &stop_watch::start)
@@ -60,25 +57,39 @@ int luaopen_lev_timer(lua_State *L)
           def("create", &stop_watch::create)
         ],
       class_<timer, base, boost::shared_ptr<base> >("timer")
-        .property("count", &timer::get_count, &timer::set_count)
-        .property("fps", &timer::get_freq, &timer::set_freq)
-        .property("freq", &timer::get_freq, &timer::set_freq)
-        .property("frequency", &timer::get_freq, &timer::set_freq)
+        .def("close", &timer::close)
         .property("is_one_shot", &timer::is_one_shot)
         .property("is_running", &timer::is_running)
         .property("interval", &timer::get_interval, &timer::set_interval)
-        .property("notify", &timer::get_on_tick, &timer::set_on_tick)
-        .property("on_notify", &timer::get_on_tick, &timer::set_on_tick)
-        .property("on_tick", &timer::get_on_tick, &timer::set_on_tick)
+        .property("notify", &timer::get_notify, &timer::set_notify)
+        .property("on_notify", &timer::get_notify, &timer::set_notify)
+        .property("on_tick", &timer::get_notify, &timer::set_notify)
+        .def("probe", &timer::probe)
         .def("start", &timer::start)
         .def("start", &timer::start0)
         .def("start", &timer::start1)
         .def("stop", &timer::stop)
+        .scope
+        [
+          def("create", &timer::create)
+        ],
+      class_<lev::clock, timer, boost::shared_ptr<base> >("clock")
+        .property("fps", &clock::get_freq, &clock::set_freq)
+        .property("freq", &clock::get_freq, &clock::set_freq)
+        .property("frequency", &clock::get_freq, &clock::set_freq)
+        .def("start", &clock::start)
+        .def("start", &clock::start0)
+        .scope
+        [
+          def("create", &clock::create)
+        ]
     ]
   ];
   object lev = globals(L)["lev"];
 
   lev["stop_watch"] = lev["classes"]["stop_watch"]["create"];
+  lev["timer"] = lev["classes"]["timer"]["create"];
+  lev["clock"] = lev["classes"]["clock"]["create"];
 
   globals(L)["package"]["loaded"]["lev.timer"] = true;
   return 0;
@@ -90,21 +101,21 @@ namespace lev
   class myStopWatch
   {
     public:
-      myStopWatch(long initial_seconds = 0) :
-        last_time(al_get_time()),
-        running(true), total(initial_seconds)
+      myStopWatch(long initial_sec = 0) :
+        last_time(boost::posix_time::microsec_clock::local_time()),
+        running(true), ticks(initial_sec * 1000000)
       { }
 
       double Microseconds()
       {
         Update();
-        return Time() * 1000000;
+        return double(ticks);
       }
 
       double Milliseconds()
       {
         Update();
-        return Time() * 1000;
+        return double(ticks) / 1000;
       }
 
       bool Pause()
@@ -116,49 +127,48 @@ namespace lev
 
       bool Resume()
       {
-        if (! running)
-        {
-          last_time = al_get_time();
-          running = true;
-        }
-        return false;
+        last_time = boost::posix_time::microsec_clock::local_time();
+        running = true;
+        return true;
       }
 
       bool SetTime(double seconds)
       {
-        total = seconds;
+        this->ticks = seconds * 1000000;
         return true;
       }
 
-      bool Start(double initial_seconds)
+      bool Start(double initial_sec)
       {
         running = true;
-        total = initial_seconds;
-        last_time = al_get_time();
+        ticks = initial_sec * 1000000;
+        last_time = boost::posix_time::microsec_clock::local_time();
         return true;
       }
 
       double Time()
       {
         Update();
-        return total;
+        return double(ticks) / 1000000;
       }
 
       bool Update()
       {
         if (running)
         {
-          double new_time = al_get_time();
-          double duration = new_time - last_time;
-          total += duration;
+          boost::posix_time::ptime new_time = boost::posix_time::microsec_clock::local_time();
+          boost::posix_time::time_duration d = new_time - last_time;
+          ticks += d.total_microseconds();
           last_time = new_time;
           return true;
         }
         return false;
       }
 
-      double last_time, total;
+//      long last_time;
+      boost::posix_time::ptime last_time;
       bool running;
+      long ticks;
   };
   static myStopWatch *cast_watch(void *obj) { return (myStopWatch *)obj; }
 
@@ -229,156 +239,205 @@ namespace lev
 //  // prototype of timer callback function
 //  static Uint32 timer_callback(Uint32 interval, void *param);
 
-  class myTimer
+  template <typename T>
+  class impl_timer : public T
   {
-
     public:
+      typedef boost::shared_ptr<impl_timer> ptr;
+    protected:
+      impl_timer() :
+        T(),
+        base_time(0), interval(1000), func_notify(),
+        one_shot(false),
+        running(false), wptr()
+      { }
+    public:
+      virtual ~impl_timer() { }
 
-      myTimer(bool one_shot) :
-        t(NULL), on_tick(), one_shot(one_shot), running(false) { }
-
-      ~myTimer()
+      virtual bool close()
       {
-        if (t && system::get_interpreter())
-        {
-          al_destroy_timer(t);
-          t = NULL;
-        }
+        return false;
       }
 
-      static myTimer *Create(double interval_seconds = 1, bool one_shot = false)
+      static impl_timer::ptr create(double interval = 1000)
       {
-        myTimer *timer = NULL;
+        impl_timer::ptr t;
+        system::ptr sys = system::get();
+        if (! sys) { return t; }
         try {
-          timer = new myTimer(one_shot);
-          if (! timer) { throw -1; }
-          timer->t = al_create_timer(interval_seconds);
-          if (! timer->t) { throw -2; }
-          return timer;
+          t.reset(new impl_timer);
+          if (! t) { throw -1; }
+          t->wptr = t;
+          t->start(interval, false);
+          if (! sys->attach(t->to_timer())) { throw -2; }
         }
         catch (...) {
-          delete timer;
-          return NULL;
+          t.reset();
+          lev::debug_print("error on timer class creation");
         }
+        return t;
       }
 
-      bool Start(double interval_seconds, bool one_shot)
+      virtual double get_interval() const
       {
-        if (interval_seconds > 0) { al_set_timer_speed(t, interval_seconds); }
-        al_start_timer(t);
+        return interval;
+      }
+
+      virtual luabind::object get_notify()
+      {
+        return func_notify;
+      }
+
+      virtual bool is_one_shot() const
+      {
+        return one_shot;
+      }
+
+      virtual bool is_running() const
+      {
+        return running;
+      }
+
+      virtual bool notify()
+      {
+        if (func_notify && luabind::type(func_notify) == LUA_TFUNCTION)
+        {
+          func_notify();
+          return true;
+        }
+        return false;
+      }
+
+      virtual bool probe()
+      {
+        if (! running) { return false; }
+        system::ptr sys = system::get();
+        if (! sys) { return false; }
+        if (sys->get_ticks() - base_time > interval)
+        {
+          notify();
+          base_time = sys->get_ticks();
+          if (one_shot) { running = false; }
+          return true;
+        }
+        return false;
+      }
+
+      virtual bool set_interval(double new_interval)
+      {
+        if (new_interval < 0) { return false; }
+        interval = new_interval;
+        return true;
+      }
+
+      virtual bool set_notify(luabind::object func)
+      {
+        func_notify = func;
+        return true;
+      }
+
+      virtual bool start(double milliseconds = -1, bool one_shot = false)
+      {
+        if (milliseconds > 0) { interval = milliseconds; }
+        system::ptr sys = system::get();
+        if (! sys) { return false; }
+
+        base_time = sys->get_ticks();
         this->one_shot = one_shot;
         running = true;
         return true;
-      };
+      }
 
-      bool Stop()
+      virtual bool stop()
       {
-        al_stop_timer(t);
         running = false;
         return true;
       }
 
-      ALLEGRO_TIMER *t;
-      luabind::object on_tick;
-      bool one_shot, running;
+      virtual timer::ptr to_timer()
+      {
+        return timer::ptr(wptr);
+      }
+
+      double base_time, interval;
+      bool one_shot;
+      bool running;
+      luabind::object func_notify;
+      boost::weak_ptr<timer> wptr;
+      boost::weak_ptr<system> sys;
   };
-  static myTimer* cast_timer(void *obj) { return (myTimer *)obj; }
 
-  timer::timer() : _obj(NULL) { }
-
-  timer::~timer()
+  timer::ptr timer::create(double interval)
   {
-    if (_obj)
-    {
-      delete cast_timer(_obj);
-      _obj = NULL;
-    }
+    return impl_timer<timer>::create(interval);
   }
 
-  boost::shared_ptr<timer> timer::create(double interval, bool one_shot)
+  class impl_clock : public impl_timer<clock>
   {
-    boost::shared_ptr<timer> t;
-    try {
-      t.reset(new timer);
-      if (! t) { throw -1; }
-      t->_obj = myTimer::Create(interval, one_shot);
-      if (! t->_obj) { throw -2; }
-    }
-    catch (...) {
-      t.reset();
-      lev::debug_print("error on timer class creation");
-    }
-    return t;
-  }
+    public:
+      typedef boost::shared_ptr<impl_clock> ptr;
+    protected:
+      impl_clock() : impl_timer<clock>() { }
+    public:
+      virtual ~impl_clock() { }
 
-  long timer::get_count() const
-  {
-    return al_get_timer_count(cast_timer(_obj)->t);
-  }
+      static impl_clock::ptr create(double freq)
+      {
+        impl_clock::ptr c;
+        system::ptr sys = system::get();
+        if (! sys) { return c; }
+        try {
+          c.reset(new impl_clock);
+          if (! c) { throw -1; }
+          c->wptr = c;
+          c->start(freq);
+          if (! sys->attach(c->to_timer())) { throw -1; }
+        }
+        catch (...) {
+          c.reset();
+          lev::debug_print("error on clock instance creation");
+        }
+        return c;
+      }
 
-  long timer::get_id() const
-  {
-    return (long)cast_timer(_obj)->t;
-  }
+      virtual double get_freq() const
+      {
+        return 1000 / get_interval();
+      }
 
-  double timer::get_freq() const
-  {
-    return 1 / get_interval();
-  }
+      virtual bool probe()
+      {
+        if (! running) { return false; }
+        system::ptr sys = system::get();
+        if (! sys) { return false; }
+        if (sys->get_ticks() - base_time > interval)
+        {
+          base_time = base_time + interval;
+          notify();
+          if (one_shot) { running = false; }
+          return true;
+        }
+      }
 
-  double timer::get_interval() const
-  {
-    return al_get_timer_speed(cast_timer(_obj)->t);
-  }
+      virtual bool set_freq(double freq)
+      {
+        return set_interval(1000 / freq);
+      }
 
-  bool timer::is_one_shot() const
-  {
-    return cast_timer(_obj)->one_shot;
-  }
+      virtual bool start(double freq)
+      {
+        if (freq <= 0)
+        {
+          return impl_timer<clock>::start(-1, false);
+        }
+        return impl_timer<clock>::start(1000 / freq, false);
+      }
 
-  luabind::object timer::get_on_tick()
-  {
-    return cast_timer(_obj)->on_tick;
-  }
+  };
 
-  bool timer::is_running() const
+  clock::ptr clock::create(double freq)
   {
-    return cast_timer(_obj)->running;
-  }
-
-  bool timer::set_count(long count)
-  {
-    al_set_timer_count(cast_timer(_obj)->t, count);
-    return true;
-  }
-
-  bool timer::set_freq(double freq)
-  {
-    return set_interval(1 / freq);
-  }
-
-  bool timer::set_interval(double new_interval)
-  {
-//    if (new_interval < 0) { return false; }
-    al_set_timer_speed(cast_timer(_obj)->t, new_interval);
-    return true;
-  }
-
-  bool timer::set_on_tick(luabind::object func)
-  {
-    cast_timer(_obj)->on_tick = func;
-    return true;
-  }
-
-  bool timer::start(double interval_seconds, bool one_shot)
-  {
-    return cast_timer(_obj)->Start(interval_seconds, one_shot);
-  }
-
-  bool timer::stop()
-  {
-    cast_timer(_obj)->Stop();
-    return true;
+    return impl_clock::create(freq);
   }
 
 }

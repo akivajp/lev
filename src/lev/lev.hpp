@@ -11,14 +11,13 @@
 // Licence:     MIT License
 /////////////////////////////////////////////////////////////////////////////
 
-//#include "archive.hpp"
+#include "archive.hpp"
 #include "debug.hpp"
 #include "draw.hpp"
 #include "entry.hpp"
 #include "font.hpp"
 #include "fs.hpp"
 #include "image.hpp"
-#include "input.hpp"
 #include "package.hpp"
 #include "prim.hpp"
 #include "screen.hpp"
