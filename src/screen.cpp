@@ -18,9 +18,9 @@
 
 // dependencies
 #include "lev/debug.hpp"
+#include "lev/entry.hpp"
 #include "lev/system.hpp"
 #include "lev/util.hpp"
-#include "register.hpp"
 
 // libraries
 #include <boost/shared_ptr.hpp>
@@ -65,6 +65,7 @@ namespace lev
       virtual bool blit(int dst_x, int dst_y, bitmap::ptr src,
                         int src_x, int src_y, int w, int h, unsigned char alpha)
       {
+//printf("SCREEN BLIT?\n");
         if (src == NULL) { return false; }
         if (src->is_texturized())
         {
@@ -227,45 +228,12 @@ namespace lev
 
       virtual bool draw(drawable::ptr src, int x, int y, unsigned char alpha)
       {
-printf("SCREEN DRAW!\n");
+//printf("SCREEN DRAW!\n");
         if (! src) { return false; }
         set_current();
-printf("SCREEN DRAW ON!\n");
-printf("TO SCREEN: %p\n", to_screen().get());
+//printf("SCREEN DRAW ON!\n");
+//printf("TO SCREEN: %p\n", to_screen().get());
         return src->draw_on(to_screen(), x, y, alpha);
-      }
-
-      virtual bool draw_bitmap(bitmap::ptr src, int offset_x, int offset_y, unsigned char alpha)
-      {
-        if (! src) { return false; }
-        if (src->is_texturized())
-        {
-          texture::ptr tex = src->get_texture();
-          if (! tex) { return false; }
-          return tex->blit_on(to_screen(), offset_x, offset_y, 0, 0, -1, -1, alpha);
-//          return tex->draw_on_screen(to_screen(), offset_x, offset_y, alpha);
-        }
-
-        int w = get_w();
-        int h = get_h();
-        const unsigned char *pixel = src->get_buffer();
-        set_current();
-        glBegin(GL_POINTS);
-          for (int y = 0; y < h; y++)
-          {
-            for (int x = 0; x < w; x++)
-            {
-              unsigned char a = (unsigned short)pixel[3] * alpha / 255;
-              if (a > 0)
-              {
-                glColor4ub(pixel[0], pixel[1], pixel[2], a);
-                glVertex2i(offset_x + x, offset_y + y);
-              }
-              pixel += 4;
-            }
-          }
-        glEnd();
-        return true;
       }
 
       virtual bool draw_pixel(int x, int y, const color &c)

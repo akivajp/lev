@@ -16,6 +16,7 @@
 
 // dependencies
 #include "lev/debug.hpp"
+#include "lev/entry.hpp"
 #include "lev/image.hpp"
 #include "lev/prim.hpp"
 #include "lev/util.hpp"
@@ -26,28 +27,20 @@
 namespace lev
 {
 
-  class myMap
+  // map implementation
+  class impl_map : public map
   {
-    protected:
-      myMap() : rects(), imgs(), texturized(false) { }
     public:
-      ~myMap() { }
+      typedef boost::shared_ptr<impl_map> ptr;
+    protected:
+      impl_map() :
+        map(),
+        rects(), imgs(), texturized(false)
+      { }
+    public:
+      virtual ~impl_map() { }
 
-      static myMap* Create()
-      {
-        myMap *m = NULL;
-        try {
-          m = new myMap;
-          if (! m) { throw -1; }
-          return m;
-        }
-        catch (...) {
-          delete m;
-          return NULL;
-        }
-      }
-
-      bool Clear()
+      virtual bool clear()
       {
         hovered.clear();
         imgs.clear();
@@ -60,7 +53,22 @@ namespace lev
         return true;
       }
 
-      bool DrawOn(canvas::ptr dst, int x, int y, unsigned char alpha)
+      static impl_map::ptr create()
+      {
+        impl_map::ptr m;
+        try {
+          m.reset(new impl_map);
+          if (! m) { throw -1; }
+          m->wptr = m;
+        }
+        catch (...) {
+          m.reset();
+          lev::debug_print("error on image map instance creation");
+        }
+        return m;
+      }
+
+      virtual bool draw_on(canvas::ptr dst, int x, int y, unsigned char alpha)
       {
         for (int i = 0; i < imgs.size(); i++)
         {
@@ -77,7 +85,7 @@ namespace lev
         return true;
       }
 
-      int GetHeight()
+      virtual int get_h() const
       {
         int max = 0;
         for (int i = 0; i < rects.size(); i++)
@@ -88,7 +96,7 @@ namespace lev
         return max;
       }
 
-      int GetWidth()
+      virtual int get_w() const
       {
         int max = 0;
         for (int i = 0; i < rects.size(); i++)
@@ -99,7 +107,7 @@ namespace lev
         return max;
       }
 
-      bool MapImage(boost::shared_ptr<drawable> img, int x, int y, unsigned char a)
+      virtual bool map_image(drawable::ptr img, int x, int y, unsigned char a)
       {
         if (! img) { return false; }
 
@@ -117,9 +125,46 @@ namespace lev
         return true;
       }
 
-      bool MapLink(boost::shared_ptr<drawable> img, boost::shared_ptr<drawable> hover_img,
-                   int x, int y, luabind::object on_lclick, luabind::object on_hover,
-                   unsigned char alpha = 255)
+      static int map_image_l(lua_State *L)
+      {
+        using namespace luabind;
+
+        try {
+          int x = 0, y = 0;
+          unsigned char alpha = 255;
+          bool result = false;
+
+          luaL_checktype(L, 1, LUA_TUSERDATA);
+          map* m = object_cast<map *>(object(from_stack(L, 1)));
+          object t = util::get_merged(L, 2, -1);
+
+          if (t["x"]) { x = object_cast<int>(t["x"]); }
+          else if (t["lua.number1"]) { x = object_cast<int>(t["lua.number1"]); }
+
+          if (t["y"]) { y = object_cast<int>(t["y"]); }
+          else if (t["lua.number2"]) { y = object_cast<int>(t["lua.number2"]); }
+
+          if (t["alpha"]) { alpha = object_cast<unsigned char>(t["alpha"]); }
+          else if (t["a"]) { alpha = object_cast<unsigned char>(t["a"]); }
+          else if (t["lua.number3"]) { alpha = object_cast<unsigned char>(t["lua.number3"]); }
+
+          if (t["lev.drawable1"])
+          {
+            object obj = t["lev.drawable1"];
+            boost::shared_ptr<drawable> img = object_cast<boost::shared_ptr<drawable> >(obj["to_drawable"](obj));
+            result = m->map_image(img, x, y, alpha);
+          }
+          lua_pushboolean(L, result);
+        }
+        catch (...) {
+          lua_pushboolean(L, false);
+        }
+        return 1;
+      }
+
+      virtual bool map_link(drawable::ptr img, drawable::ptr hover_img,
+                            int x, int y, luabind::object on_lclick, luabind::object on_hover,
+                            unsigned char alpha = 255)
       {
         if (! img) { return false; }
         if (! hover_img) { hover_img = img; }
@@ -137,7 +182,62 @@ namespace lev
         return true;
       }
 
-      bool OnHover(int x, int y)
+      static int map_link_l(lua_State *L)
+      {
+        using namespace luabind;
+
+        try {
+          int x = 0, y = 0;
+          object lclick_func, hover_func;
+          boost::shared_ptr<drawable> img1, img2;
+          unsigned char alpha = 255;
+          bool result = false;
+
+          luaL_checktype(L, 1, LUA_TUSERDATA);
+          map* m = object_cast<map *>(object(from_stack(L, 1)));
+          object t = util::get_merged(L, 2, -1);
+
+          if (t["x"]) { x = object_cast<int>(t["x"]); }
+          else if (t["lua.number1"]) { x = object_cast<int>(t["lua.number1"]); }
+
+          if (t["y"]) { y = object_cast<int>(t["y"]); }
+          else if (t["lua.number2"]) { y = object_cast<int>(t["lua.number2"]); }
+
+          if (t["alpha"]) { alpha = object_cast<unsigned char>(t["alpha"]); }
+          else if (t["a"]) { alpha = object_cast<unsigned char>(t["a"]); }
+          else if (t["lua.number3"]) { y = object_cast<int>(t["lua.number3"]); }
+
+          if (t["left_click_func"]) { lclick_func = t["left_click_func"]; }
+          else if (t["lclick_func"]) { lclick_func = t["lclick_func"]; }
+          else if (t["on_left_click"]) { lclick_func = t["on_left_click"]; }
+          else if (t["on_lclick"]) { lclick_func = t["on_lclick"]; }
+          else if (t["lua.function1"]) { lclick_func = t["lua.function1"]; }
+
+          if (t["hover_func"]) { hover_func = t["hover_func"]; }
+          if (t["on_hover"]) { hover_func = t["on_hover"]; }
+          else if (t["lua.function2"]) { hover_func = t["lua.function2"]; }
+
+          if (t["lev.drawable1"])
+          {
+            object obj = t["lev.drawable1"];
+            img1 = object_cast<drawable::ptr>(obj["to_drawable"](obj));
+          }
+          if (t["lev.drawable2"])
+          {
+            object obj = t["lev.drawable2"];
+            img2 = object_cast<drawable::ptr>(obj["to_drawable"](obj));
+          }
+          result = m->map_link(img1, img2, x, y, lclick_func, hover_func, alpha);
+          lua_pushboolean(L, result);
+        }
+        catch (...) {
+          lev::debug_print("error on map link setting");
+          lua_pushboolean(L, false);
+        }
+        return 1;
+      }
+
+      virtual bool on_hover(int x, int y)
       {
         bool hovered_any = false;
         try {
@@ -168,7 +268,7 @@ namespace lev
         return hovered_any;
       }
 
-      bool OnLeftClick(int x, int y)
+      virtual bool on_left_click(int x, int y)
       {
         lua_State *L = NULL;
         try {
@@ -193,19 +293,7 @@ namespace lev
         return false;
       }
 
-      bool TexturizeAll(bool force)
-      {
-        if (texturized && !force) { return false; }
-        for (int i = 0; i < imgs.size(); i++)
-        {
-          imgs[i]->texturize(force);
-          hover_imgs[i]->texturize(force);
-        }
-        texturized = true;
-        return true;
-      }
-
-      bool PopBack()
+      virtual bool pop_back()
       {
         if (imgs.size() == 0) { return false; }
         hovered.pop_back();
@@ -219,6 +307,24 @@ namespace lev
         return true;
       }
 
+      virtual bool texturize(bool force)
+      {
+        if (texturized && !force) { return false; }
+        for (int i = 0; i < imgs.size(); i++)
+        {
+          imgs[i]->texturize(force);
+          hover_imgs[i]->texturize(force);
+        }
+        texturized = true;
+        return true;
+      }
+
+      virtual drawable::ptr to_drawable()
+      {
+        return drawable::ptr(wptr);
+      }
+
+      boost::weak_ptr<impl_map> wptr;
       std::vector<bool> hovered;
       std::vector<boost::shared_ptr<drawable> > imgs;
       std::vector<boost::shared_ptr<drawable> > hover_imgs;
@@ -228,178 +334,46 @@ namespace lev
       std::vector<unsigned char> alphas;
       bool texturized;
   };
-  static myMap* cast_map(void *obj) { return (myMap *)obj; }
 
-  map::map() : _obj(NULL) { }
-
-  map::~map()
+  map::ptr map::create()
   {
-    if (_obj)
-    {
-      delete cast_map(_obj);
-      _obj = NULL;
-    }
+    return impl_map::create();
   }
 
-  bool map::clear()
-  {
-    return cast_map(_obj)->Clear();
-  }
+}
 
-  boost::shared_ptr<map> map::create()
-  {
-    boost::shared_ptr<map> m;
-    try {
-      m.reset(new map);
-      if (! m) { throw -1; }
-      m->_obj = myMap::Create();
-      if (! m->_obj) { throw -2; }
-    }
-    catch (...) {
-      m.reset();
-      lev::debug_print("error on image map instance creation");
-    }
-    return m;
-  }
+int luaopen_lev_map(lua_State *L)
+{
+  using namespace luabind;
+  using namespace lev;
+  open(L);
+  globals(L)["package"]["loaded"]["lev.map"] = true;
+  globals(L)["require"]("lev.draw");
 
-  bool map::draw_on(canvas::ptr dst, int x, int y, unsigned char alpha)
-  {
-    return cast_map(_obj)->DrawOn(dst, x, y, alpha);
-  }
+  module(L, "lev")
+  [
+    namespace_("classes")
+    [
+      class_<map, drawable, boost::shared_ptr<drawable> >("map")
+        .def("clear", &map::clear)
+        .def("on_hover", &map::on_hover)
+        .def("on_lclick", &map::on_left_click)
+        .def("on_left_click", &map::on_left_click)
+        .def("pop_back", &map::pop_back)
+        .scope
+        [
+          def("create", &map::create)
+        ]
+    ]
+  ];
+  object lev = globals(L)["lev"];
+  object classes = lev["classes"];
 
-  int map::get_h() const
-  {
-    return cast_map(_obj)->GetHeight();
-  }
+  register_to(classes["map"], "map_image", &impl_map::map_image_l);
+  register_to(classes["map"], "map_link", &impl_map::map_link_l);
 
-  int map::get_w() const
-  {
-    return cast_map(_obj)->GetWidth();
-  }
-
-  bool map::map_image(boost::shared_ptr<drawable> img, int x, int y, unsigned char alpha)
-  {
-    return cast_map(_obj)->MapImage(img, x, y, alpha);
-  }
-
-  int map::map_image_l(lua_State *L)
-  {
-    using namespace luabind;
-
-    try {
-      int x = 0, y = 0;
-      unsigned char alpha = 255;
-      bool result = false;
-
-      luaL_checktype(L, 1, LUA_TUSERDATA);
-      map* m = object_cast<map *>(object(from_stack(L, 1)));
-      object t = util::get_merged(L, 2, -1);
-
-      if (t["x"]) { x = object_cast<int>(t["x"]); }
-      else if (t["lua.number1"]) { x = object_cast<int>(t["lua.number1"]); }
-
-      if (t["y"]) { y = object_cast<int>(t["y"]); }
-      else if (t["lua.number2"]) { y = object_cast<int>(t["lua.number2"]); }
-
-      if (t["alpha"]) { alpha = object_cast<unsigned char>(t["alpha"]); }
-      else if (t["a"]) { alpha = object_cast<unsigned char>(t["a"]); }
-      else if (t["lua.number3"]) { alpha = object_cast<unsigned char>(t["lua.number3"]); }
-
-      if (t["lev.drawable1"])
-      {
-        object obj = t["lev.drawable1"];
-        boost::shared_ptr<drawable> img = object_cast<boost::shared_ptr<drawable> >(obj["cast"](obj));
-        result = m->map_image(img, x, y, alpha);
-      }
-      lua_pushboolean(L, result);
-    }
-    catch (...) {
-      lua_pushboolean(L, false);
-    }
-    return 1;
-  }
-
-  bool map::map_link(boost::shared_ptr<drawable> img, boost::shared_ptr<drawable> hover_img,
-                     int x, int y, luabind::object on_lclick, luabind::object on_hover,
-                     unsigned char alpha)
-  {
-    return cast_map(_obj)->MapLink(img, hover_img, x, y, on_lclick, on_hover, alpha);
-  }
-
-  int map::map_link_l(lua_State *L)
-  {
-    using namespace luabind;
-
-    try {
-      int x = 0, y = 0;
-      object lclick_func, hover_func;
-      boost::shared_ptr<drawable> img1, img2;
-      unsigned char alpha = 255;
-      bool result = false;
-
-      luaL_checktype(L, 1, LUA_TUSERDATA);
-      map* m = object_cast<map *>(object(from_stack(L, 1)));
-      object t = util::get_merged(L, 2, -1);
-
-      if (t["x"]) { x = object_cast<int>(t["x"]); }
-      else if (t["lua.number1"]) { x = object_cast<int>(t["lua.number1"]); }
-
-      if (t["y"]) { y = object_cast<int>(t["y"]); }
-      else if (t["lua.number2"]) { y = object_cast<int>(t["lua.number2"]); }
-
-      if (t["alpha"]) { alpha = object_cast<unsigned char>(t["alpha"]); }
-      else if (t["a"]) { alpha = object_cast<unsigned char>(t["a"]); }
-      else if (t["lua.number3"]) { y = object_cast<int>(t["lua.number3"]); }
-
-      if (t["left_click_func"]) { lclick_func = t["left_click_func"]; }
-      else if (t["lclick_func"]) { lclick_func = t["lclick_func"]; }
-      else if (t["on_left_click"]) { lclick_func = t["on_left_click"]; }
-      else if (t["on_lclick"]) { lclick_func = t["on_lclick"]; }
-      else if (t["lua.function1"]) { lclick_func = t["lua.function1"]; }
-
-      if (t["hover_func"]) { hover_func = t["hover_func"]; }
-      if (t["on_hover"]) { hover_func = t["on_hover"]; }
-      else if (t["lua.function2"]) { hover_func = t["lua.function2"]; }
-
-      if (t["lev.drawable1"])
-      {
-        object obj = t["lev.drawable1"];
-        img1 = object_cast<boost::shared_ptr<drawable> >(obj["cast"](obj));
-      }
-      if (t["lev.drawable2"])
-      {
-        object obj = t["lev.drawable2"];
-        img2 = object_cast<boost::shared_ptr<drawable> >(obj["cast"](obj));
-      }
-      result = m->map_link(img1, img2, x, y, lclick_func, hover_func, alpha);
-      lua_pushboolean(L, result);
-    }
-    catch (...) {
-      lev::debug_print("error on map link setting");
-      lua_pushboolean(L, false);
-    }
-    return 1;
-  }
-
-  bool map::on_hover(int x, int y)
-  {
-    return cast_map(_obj)->OnHover(x, y);
-  }
-
-  bool map::on_left_click(int x, int y)
-  {
-    return cast_map(_obj)->OnLeftClick(x, y);
-  }
-
-  bool map::pop_back()
-  {
-    return cast_map(_obj)->PopBack();
-  }
-
-  bool map::texturize(bool force)
-  {
-    return cast_map(_obj)->TexturizeAll(force);
-  }
-
+  lev["map"]           = classes["map"]["create"];
+  globals(L)["package"]["loaded"]["lev.map"] = true;
+  return 0;
 }
 

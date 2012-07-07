@@ -16,9 +16,9 @@
 
 // dependencies
 #include "lev/debug.hpp"
+#include "lev/entry.hpp"
 #include "lev/fs.hpp"
 #include "lev/system.hpp"
-#include "register.hpp"
 
 // libraries
 #include <boost/shared_array.hpp>
@@ -573,7 +573,7 @@ namespace lev
   {
     return cast_snd(_obj)->LoadSample(filename);
   }
-  bool sound::load_path(boost::shared_ptr<file_path> path)
+  bool sound::load_path(filepath::ptr path)
   {
     return load(path->get_full_path());
   }
@@ -581,7 +581,7 @@ namespace lev
   {
     return ((mySound *)_obj)->Play(filename, repeat);
   }
-  bool sound::load_and_play_path(boost::shared_ptr<file_path> path, bool repeat)
+  bool sound::load_and_play_path(filepath::ptr path, bool repeat)
   {
     return load_and_play(path->get_full_path(), repeat);
   }
@@ -590,7 +590,7 @@ namespace lev
   {
     return cast_snd(_obj)->OpenStream(filename);
   }
-  bool sound::open_path(boost::shared_ptr<file_path> path)
+  bool sound::open_path(filepath::ptr path)
   {
     return open(path->get_full_path());
   }

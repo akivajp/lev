@@ -83,6 +83,7 @@ namespace lev
           }
           lay->complete();
           scr->clear();
+          lay->texturize();
           if (lay->get_h() > scr->get_h())
           {
             scr->draw(lay, 0, - (lay->get_h() - scr->get_h()), 255);

@@ -17,10 +17,10 @@
 // dependencies
 #include "lev/archive.hpp"
 #include "lev/debug.hpp"
+#include "lev/entry.hpp"
 #include "lev/fs.hpp"
 #include "lev/util.hpp"
 #include "lev/system.hpp"
-#include "register.hpp"
 
 // libraries
 #include <luabind/raw_policy.hpp>
@@ -80,23 +80,24 @@ namespace lev
 
   bool package::add_font(lua_State *L, const std::string &filename)
   {
-    open(L);
-    globals(L)["require"]("lev.package");
-    object t = globals(L)["lev"]["package"]["get_font_list"]();
-    globals(L)["table"]["insert"](t, 1, filename);
+    luabind::open(L);
+    luabind::globals(L)["require"]("lev.package");
+    luabind::object t = luabind::globals(L)["lev"]["package"]["get_font_list"]();
+    luabind::globals(L)["table"]["insert"](t, 1, filename);
     return true;
   }
 
   bool package::add_font_dir(lua_State *L, const std::string &dir)
   {
-    open(L);
-    globals(L)["require"]("lev.package");
-    object t = globals(L)["lev"]["package"]["get_font_dirs"]();
-    globals(L)["table"]["insert"](t, 1, dir);
+    luabind::open(L);
+    luabind::globals(L)["require"]("lev.package");
+    luabind::object t = luabind::globals(L)["lev"]["package"]["get_font_dirs"]();
+    luabind::globals(L)["table"]["insert"](t, 1, dir);
   }
 
   bool package::add_path(lua_State *L, const std::string &path)
   {
+    using namespace luabind;
     open(L);
     globals(L)["require"]("lev.package");
     if (! globals(L)["lev"]["package"]["path_list"])
@@ -109,6 +110,7 @@ namespace lev
 
   bool package::add_search(lua_State *L, const std::string &search)
   {
+    using namespace luabind;
     open(L);
     globals(L)["require"]("table");
     module(L, "lev")
@@ -141,8 +143,9 @@ namespace lev
 
   int package::clear_search_l(lua_State *L)
   {
-    luabind::module(L, "lev") [ namespace_("package") ];
-    luabind::globals(L)["lev"]["package"]["search_path"] = luabind::nil;
+    using namespace luabind;
+    module(L, "lev") [ namespace_("package") ];
+    globals(L)["lev"]["package"]["search_path"] = luabind::nil;
     lua_pushboolean(L, true);
     return 1;
   }
@@ -155,7 +158,7 @@ namespace lev
     std::string filename = object_cast<const char *>(object(from_stack(L, 1)));
 
     object path_list = package::get_path_list(L);
-    boost::shared_ptr<file_path> fpath = package::resolve(L, filename);
+    filepath::ptr fpath = package::resolve(L, filename);
     if (fpath)
     {
       if (luaL_dofile(L, fpath->get_full_path().c_str()) != 0)
@@ -174,6 +177,7 @@ namespace lev
 
   boost::shared_ptr<font> package::find_font(lua_State *L, const std::string &filename)
   {
+    using namespace luabind;
     boost::shared_ptr<font> f;
     try {
       globals(L)["require"]("lev.font");
@@ -199,6 +203,7 @@ namespace lev
 
   boost::shared_ptr<font> package::find_font0(lua_State *L)
   {
+    using namespace luabind;
     boost::shared_ptr<font> f;
     try {
       globals(L)["require"]("lev.font");
@@ -221,6 +226,7 @@ namespace lev
 
   luabind::object package::get_font_dirs(lua_State *L)
   {
+    using namespace luabind;
     open(L);
     module(L, "lev")
     [
@@ -241,6 +247,7 @@ namespace lev
 
   luabind::object package::get_font_list(lua_State *L)
   {
+    using namespace luabind;
     open(L);
     globals(L)["require"]("lev.package");
     if (! globals(L)["lev"]["package"]["font_list"])
@@ -255,6 +262,7 @@ namespace lev
 
   luabind::object package::get_path_list(lua_State *L)
   {
+    using namespace luabind;
     open(L);
     module(L, "lev")
     [
@@ -271,6 +279,7 @@ namespace lev
 
   luabind::object package::get_search_list(lua_State *L)
   {
+    using namespace luabind;
     open(L);
     module(L, "lev")
     [
@@ -300,7 +309,7 @@ namespace lev
     }
 
     object path_list = package::get_path_list(L);
-    boost::shared_ptr<file_path> fpath = package::resolve(L, module);
+    filepath::ptr fpath = package::resolve(L, module);
     if (! fpath) { fpath = package::resolve(L, module + ".lua"); }
     if (fpath)
     {
@@ -329,8 +338,7 @@ namespace lev
     }
   }
 
-  boost::shared_ptr<file_path> package::resolve(lua_State *L,
-                                                const std::string &file)
+  filepath::ptr package::resolve(lua_State *L, const std::string &file)
   {
     using namespace luabind;
 
@@ -351,7 +359,7 @@ namespace lev
 
           if (file_system::file_exists(real_path))
           {
-            return file_path::create(real_path);
+            return filepath::create(real_path);
           }
         }
 
@@ -368,7 +376,7 @@ namespace lev
               if (system::get()) { sys_name = system::get()->get_name(); }
               std::string ext = file_system::get_ext(file);
 
-              boost::shared_ptr<file_path> fpath(file_path::create_temp(sys_name + "/", ext));
+              filepath::ptr fpath(filepath::create_temp(sys_name + "/", ext));
               if (! fpath) { return fpath; }
               lev::archive::extract_direct_to(path, entry, fpath->get_full_path());
               return fpath;
@@ -387,7 +395,7 @@ namespace lev
               if (system::get()) { sys_name = system::get()->get_name(); }
               std::string ext = file_system::get_ext(file);
 
-              boost::shared_ptr<file_path> fpath(file_path::create_temp(sys_name + "/", ext));
+              filepath::ptr fpath(filepath::create_temp(sys_name + "/", ext));
               if (! fpath) { return fpath; }
               lev::archive::extract_direct_to(path, entry, fpath->get_full_path());
               return fpath;
@@ -399,87 +407,12 @@ namespace lev
     catch (...) {
       lev::debug_print("error on file path resolving");
     }
-    return boost::shared_ptr<file_path>();
+    return filepath::ptr();
   }
-
-//  file_path *package::resolve(lua_State *L, const std::string &file)
-//  {
-//    using namespace luabind;
-//
-//    try {
-//      object path_list   = package::get_path_list(L);
-//      object search_list = package::get_search_list(L);
-//
-//      for (iterator p(path_list), end; p != end; p++)
-//      {
-//        const char *path = object_cast<const char *>(*p);
-//        if (path == NULL) { throw -1; }
-//        std::string full = file_system::to_full_path(path);
-//
-//        if (file_system::dir_exists(full))
-//        {
-//          for (iterator s(search_list); s != end; s++)
-//          {
-//            const char *search = object_cast<const char *>(*s);
-//            if (search == NULL) { throw -2; }
-//
-//            std::string real_path = std::string(full) + "/" + search + "/" + file;
-//            if (file_system::file_exists(real_path.c_str()))
-//            {
-//              return file_path::create(real_path);
-//            }
-//          }
-//        }
-//        else if (lev::archive::is_archive(full))
-//        {
-//          for (iterator s(search_list); s != end; s++)
-//          {
-//            std::string entry = object_cast<const char *>(*s);
-//            if (entry.empty()) { entry = file; }
-//            else { entry = entry + "/" + file; }
-//            if (archive::entry_exists_direct(full, entry))
-//            {
-//              std::string app_name = application::get_app()->get_name();
-//              std::string ext = file_system::get_ext(file);
-//              if (! ext.empty()) { ext = "." + ext; }
-//
-//              file_path *fpath = file_path::create_temp(app_name + "/", ext);
-//              if (fpath == NULL) { return NULL; }
-//              lev::archive::extract_direct_to(full, entry, fpath->get_full_path());
-//              return fpath;
-//            }
-//          }
-//
-//          std::string arc_name = file_system::to_name(path);
-//          for (iterator s(search_list); s != end; s++)
-//          {
-//            std::string entry = object_cast<const char *>(*s);
-//            if (entry.empty()) { entry = arc_name + "/" + file; }
-//            else { entry = arc_name + "/" + entry + "/" + file; }
-//            if (archive::entry_exists_direct(full, entry))
-//            {
-//              std::string app_name = application::get_app()->get_name();
-//              std::string ext = file_system::get_ext(file);
-//              if (! ext.empty()) { ext = "." + ext; }
-//
-//              file_path *fpath = file_path::create_temp(app_name + "/", ext);
-//              if (fpath == NULL) { return NULL; }
-//              lev::archive::extract_direct_to(full, entry, fpath->get_full_path());
-//              return fpath;
-//            }
-//          }
-//        }
-//      }
-//    }
-//    catch (...) {
-//      return NULL;
-//    }
-//
-//    return NULL;
-//  }
 
   bool package::set_default_font_dirs(lua_State *L)
   {
+    using namespace luabind;
     open(L);
     globals(L)["require"]("table");
     module(L, "lev")

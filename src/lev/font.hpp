@@ -14,6 +14,7 @@
 #include "prim.hpp"
 #include "string.hpp"
 #include <luabind/luabind.hpp>
+#include <boost/shared_ptr.hpp>
 
 extern "C" {
   int luaopen_lev_font(lua_State *L);
@@ -24,6 +25,8 @@ namespace lev
 
   class font : public base
   {
+    public:
+      typedef boost::shared_ptr<font> ptr;
     protected:
       font();
     public:

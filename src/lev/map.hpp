@@ -16,33 +16,31 @@
 #include <boost/shared_ptr.hpp>
 #include <luabind/luabind.hpp>
 
+extern "C" {
+  int luaopen_lev_map(lua_State *L);
+}
+
 namespace lev
 {
 
   class map : public drawable
   {
-    protected:
-      map();
     public:
-      virtual ~map();
-      bool clear();
-      static boost::shared_ptr<map> create();
-      virtual bool draw_on(canvas::ptr dst, int x = 0, int y = 0, unsigned char alpha = 255);
-      virtual int get_h() const;
-      virtual type_id get_type_id() const { return LEV_TMAP; }
-      virtual int get_w() const;
-      bool map_image(boost::shared_ptr<drawable> img, int x, int y, unsigned char alpha = 255);
-      static int map_image_l(lua_State *L);
-      bool map_link(boost::shared_ptr<drawable> img, boost::shared_ptr<drawable> hover_img,
-                    int x, int y, luabind::object on_lclick, luabind::object on_hover,
-                    unsigned char alpha = 255);
-      static int map_link_l(lua_State *L);
-      bool on_hover(int x, int y);
-      bool on_left_click(int x, int y);
-      bool pop_back();
-      virtual bool texturize(bool force = false);
+      typedef boost::shared_ptr<map> ptr;
     protected:
-      void *_obj;
+      map() : drawable() { }
+    public:
+      virtual ~map() { }
+      virtual bool clear() = 0;
+      static boost::shared_ptr<map> create();
+      virtual type_id get_type_id() const { return LEV_TMAP; }
+      virtual bool map_image(drawable::ptr img, int x, int y, unsigned char alpha = 255) = 0;
+      virtual bool map_link(drawable::ptr img, drawable::ptr hover_img,
+                            int x, int y, luabind::object on_lclick, luabind::object on_hover,
+                            unsigned char alpha = 255) = 0;
+      virtual bool on_hover(int x, int y) = 0;
+      virtual bool on_left_click(int x, int y) = 0;
+      virtual bool pop_back() = 0;
   };
 
 }

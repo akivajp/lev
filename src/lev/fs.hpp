@@ -37,16 +37,18 @@ namespace lev
   };
 
 
-  class file_path : public base
+  class filepath : public base
   {
-    protected:
-      file_path();
     public:
-      virtual ~file_path();
+      typedef boost::shared_ptr<filepath> ptr;
+    protected:
+      filepath();
+    public:
+      virtual ~filepath();
       bool clear();
-      static boost::shared_ptr<file_path> create(const std::string &path);
+      static boost::shared_ptr<filepath> create(const std::string &path);
       static int create_l(lua_State *L);
-      static boost::shared_ptr<file_path> create_temp(const std::string &prefix = "temp",
+      static boost::shared_ptr<filepath> create_temp(const std::string &prefix = "temp",
                                     const std::string &suffix = "");
       static int create_temp_l(lua_State *L);
 //      bool dir_exists();
@@ -80,7 +82,7 @@ namespace lev
 //      virtual ~file_system();
       static bool dir_exists(const std::string &dir_path);
       static bool exists(const std::string &path);
-      static bool file_exists(const std::string &file_path);
+      static bool file_exists(const std::string &filepath);
 //      bool find(const std::string &pattern, std::string &file_name);
 //      static int find_l(lua_State *L);
 //      bool find_next(std::string &file_name);
@@ -90,7 +92,7 @@ namespace lev
       static std::string get_ext(const std::string &path);
 //      std::string get_path();
 //      static std::string get_resource_dir();
-      static long get_size(const std::string &file_path);
+      static long get_size(const std::string &filepath);
       static std::string get_temp_dir();
 //      virtual type_id get_type_id() const { return LEV_TFILE_SYSTEM; }
       static bool mkdir(const std::string &path, bool force = false);
@@ -100,10 +102,10 @@ namespace lev
       static bool remove(const std::string &path, bool force);
       static bool remove1(const std::string &path) { return file_system::remove(path, false); }
 //      bool set_path(const std::string &path);
-//      static std::string to_file_path(const std::string &url);
+//      static std::string to_filepath(const std::string &url);
 //      static std::string to_full_path(const std::string &path);
 //      static std::string to_name(const std::string &path_to_file);
-      static std::string to_stem(const std::string &file_path);
+      static std::string to_stem(const std::string &filepath);
 //      static std::string to_url(const std::string &filename);
       static bool touch(const std::string &path);
 //

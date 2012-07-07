@@ -18,7 +18,6 @@
 #include "lev/fs.hpp"
 #include "lev/package.hpp"
 #include "lev/system.hpp"
-#include "register.hpp"
 
 // libraries
 #include <iostream>
@@ -250,7 +249,9 @@ int main(int argc, char **argv)
   if (sys)
   {
     boost::shared_ptr<debugger> dbg = sys->get_debugger();
-    while (dbg->get_screen()->is_shown())
+    screen::ptr dbg_scr;
+    if (dbg) { dbg_scr = dbg->get_screen(); }
+    while (dbg_scr && dbg_scr->is_shown())
     {
       try {
         sys->do_event();

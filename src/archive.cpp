@@ -15,9 +15,9 @@
 
 // dependencies
 #include "lev/debug.hpp"
+#include "lev/entry.hpp"
 #include "lev/fs.hpp"
 #include "lev/util.hpp"
-#include "register.hpp"
 
 // external libraries
 extern "C" {

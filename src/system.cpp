@@ -17,11 +17,11 @@
 // dependencies
 #include "lev/debug.hpp"
 #include "lev/draw.hpp"
+#include "lev/entry.hpp"
 #include "lev/screen.hpp"
 #include "lev/sound.hpp"
 #include "lev/timer.hpp"
 #include "lev/util.hpp"
-#include "register.hpp"
 
 // libraries
 #include <map>
@@ -368,6 +368,7 @@ namespace lev
 
   static luabind::object safe_call(luabind::object func)
   {
+    using namespace luabind;
     lua_State *L = func.interpreter();
     func.push(L);
     if (lua_pcall(L, 0 /* nargs */, 1 /* nreturns */, 0 /* std errror */))
@@ -380,6 +381,7 @@ namespace lev
   }
   static luabind::object safe_call(luabind::object func, luabind::object arg1)
   {
+    using namespace luabind;
     lua_State *L = func.interpreter();
     func.push(L);
     arg1.push(L);
@@ -779,8 +781,7 @@ printf("DETACHING TIMER!\n");
           }
           else if (sdl_evt.type == SDL_MOUSEMOTION)
           {
-            SDL_MouseMotionEvent &motion = (SDL_MouseMotionEvent &)sdl_evt;
-            if (boost::shared_ptr<screen> s = core->screens[motion.windowID].lock())
+            if (screen::ptr s = core->screens[sdl_evt.motion.windowID].lock())
             {
               f = s->get_on_motion();
             }

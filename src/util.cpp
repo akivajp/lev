@@ -15,9 +15,9 @@
 
 // dependencies
 #include "lev/debug.hpp"
+#include "lev/entry.hpp"
 //#include "lev/fs.hpp"
 #include "lev/string.hpp"
-#include "register.hpp"
 
 // libraries
 #include <boost/format.hpp>

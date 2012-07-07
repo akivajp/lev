@@ -12,6 +12,7 @@
 /////////////////////////////////////////////////////////////////////////////
 
 #include "base.hpp"
+#include "fs.hpp"
 
 #include <boost/shared_ptr.hpp>
 #include <luabind/luabind.hpp>
@@ -23,7 +24,6 @@ extern "C" { int luaopen_lev_sound(lua_State *L); }
 
 namespace lev
 {
-  class file_path;
   class system;
   class mixer;
 
@@ -43,17 +43,17 @@ namespace lev
       virtual type_id get_type_id() const { return LEV_TSOUND; }
       bool is_playing();
       bool load(const std::string &filename);
-      bool load_path(boost::shared_ptr<file_path> path);
+      bool load_path(filepath::ptr path);
       bool load_and_play(const std::string &filename, bool repeat = false);
       bool load_and_play1(const std::string &filename) { return load_and_play(filename); }
-      bool load_and_play_path(boost::shared_ptr<file_path> path, bool repeat = false);
-      bool load_and_play_path1(boost::shared_ptr<file_path> path)
+      bool load_and_play_path(filepath::ptr path, bool repeat = false);
+      bool load_and_play_path1(filepath::ptr path)
       {
         return load_and_play_path(path);
       }
 
       bool open(const std::string &filename);
-      bool open_path(boost::shared_ptr<file_path> path);
+      bool open_path(filepath::ptr path);
       bool pause() { return set_playing(false); }
       bool play(bool repeat = false) { return set_playing(true, repeat); }
       bool play0() { return play(); }

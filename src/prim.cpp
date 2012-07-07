@@ -10,9 +10,9 @@
 #include "prec.h"
 
 #include "lev/debug.hpp"
+#include "lev/entry.hpp"
 #include "lev/prim.hpp"
 #include "lev/util.hpp"
-#include "register.hpp"
 
 #include <boost/format.hpp>
 

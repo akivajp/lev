@@ -15,11 +15,11 @@
 
 // dependencies
 #include "lev/debug.hpp"
+#include "lev/entry.hpp"
 #include "lev/image.hpp"
 #include "lev/package.hpp"
 #include "lev/system.hpp"
 #include "lev/util.hpp"
-#include "register.hpp"
 
 // libraries
 #include <ft2build.h>

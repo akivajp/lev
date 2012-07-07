@@ -12,11 +12,10 @@
 
 // dependencies
 #include "lev/lev.hpp"
-#include "register.hpp"
+#include "lev/entry.hpp"
 
 // libraries
-#include <sstream>
-#include <luabind/adopt_policy.hpp>
+// ...
 
 int luaopen_lev(lua_State *L)
 {
@@ -56,6 +55,7 @@ int luaopen_lev_std(lua_State *L)
   //  globals(L)["require"]("lev.gl");
     globals(L)["require"]("lev.image");
   //  globals(L)["require"]("lev.info");
+    globals(L)["require"]("lev.map");
   //  globals(L)["require"]("lev.net");
     globals(L)["require"]("lev.package");
     globals(L)["require"]("lev.screen");
@@ -81,6 +81,26 @@ int luaopen_lev_std(lua_State *L)
 namespace lev
 {
 
+  bool load_to(luabind::object to, const char *funcname, const char *code)
+  {
+    lua_State *L = to.interpreter();
+    if (luaL_loadstring(L, code) != 0) { return false; }
+    luabind::object loaded(luabind::from_stack(L, -1));
+    lua_pop(L, 1);
+    to[funcname] = loaded();
+    return true;
+  }
+
+  bool register_to(luabind::object to, const char *funcname, lua_CFunction func)
+  {
+    lua_State *L = to.interpreter();
+    lua_pushcfunction(L, func);
+    luabind::object f(luabind::from_stack(L, -1));
+    lua_pop(L, 1);
+    to[funcname] = f;
+    return true;
+  }
+
   void set_preloaders(lua_State *L)
   {
     using namespace luabind;
@@ -95,6 +115,7 @@ namespace lev
 //    register_to(globals(L)["package"]["preload"], "lev.gl", luaopen_lev_gl);
 //    register_to(globals(L)["package"]["preload"], "lev.gui", luaopen_lev_gui);
     register_to(globals(L)["package"]["preload"], "lev.image", luaopen_lev_image);
+    register_to(globals(L)["package"]["preload"], "lev.map", luaopen_lev_map);
 //    register_to(globals(L)["package"]["preload"], "lev.info", luaopen_lev_info);
 //    register_to(globals(L)["package"]["preload"], "lev.input", luaopen_lev_input);
 //    register_to(globals(L)["package"]["preload"], "lev.locale", luaopen_lev_locale);

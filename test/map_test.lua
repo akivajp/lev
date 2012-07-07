@@ -2,13 +2,14 @@ require 'lev.std'
 require 'debug'
 
 system:start_debug()
-screen = system:screen()
+screen = lev.screen()
 
 img1 = lev.bitmap(320, 240)
 img1:clear(lev.color(255, 0, 0))
 img2 = img1:clone()
 img2:clear(lev.color(0, 0, 255))
 map = lev.map()
+map:texturize()
 
 local on_lclick = function()
   lev.debug.print('on left click')

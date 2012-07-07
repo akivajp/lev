@@ -112,11 +112,7 @@ namespace lev
 
       // draw methods
       virtual bool draw(drawable::ptr src, int x = 0, int y = 0, unsigned char alpha = 255) = 0;
-      virtual bool draw_bitmap(bitmap_ptr src, int x = 0, int y = 0, unsigned char alpha = 255) { return false; }
       virtual bool draw_pixel(int x, int y, const color &c) = 0;
-//      virtual bool draw_raster(const class raster *r, int x = 0, int y = 0,
-//                               color::ptr c = color::transparent()) { return false; }
-      virtual bool draw_texture(texture_ptr src, int x = 0, int y = 0, unsigned char alpha = 255) { return false; }
       static int draw_l(lua_State *L);
 
       // fill methods

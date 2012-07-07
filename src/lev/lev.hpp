@@ -18,6 +18,7 @@
 #include "font.hpp"
 #include "fs.hpp"
 #include "image.hpp"
+#include "map.hpp"
 #include "package.hpp"
 #include "prim.hpp"
 #include "screen.hpp"

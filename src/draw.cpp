@@ -16,11 +16,11 @@
 
 // dependencies
 #include "lev/debug.hpp"
+#include "lev/entry.hpp"
 #include "lev/font.hpp"
 #include "lev/image.hpp"
 #include "lev/map.hpp"
 #include "lev/util.hpp"
-#include "register.hpp"
 
 // libraries
 
@@ -103,7 +103,8 @@ namespace lev
 
         boost::shared_ptr<bitmap> r = f->rasterize_utf8(str, c);
         if (! r.get()) { throw -2; }
-        cv->draw_bitmap(r, x, y, 255);
+        cv->draw(r, x, y, 255);
+//        cv->draw_bitmap(r, x, y, 255);
       }
       else
       {
