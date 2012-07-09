@@ -24,6 +24,7 @@
 #include "lev/util.hpp"
 
 // libraries
+#include <boost/weak_ptr.hpp>
 #include <map>
 #include <luabind/luabind.hpp>
 #include <luabind/raw_policy.hpp>
@@ -51,6 +52,8 @@ int luaopen_lev_system(lua_State *L)
     [
       class_<event, base, boost::shared_ptr<base> >("event")
         .property("button", &event::get_button)
+        .property("clone", &event::clone)
+        .def("copy", &event::clone)
         .property("dx", &event::get_dx)
         .property("dy", &event::get_dy)
         .property("id", &event::get_id)
@@ -64,10 +67,14 @@ int luaopen_lev_system(lua_State *L)
         .property("pressed", &event::is_pressed)
         .property("released", &event::is_released)
         .property("right_is_down", &event::right_is_down)
-        .property("scan_code", &event::get_scan_code)
-        .property("scancode", &event::get_scan_code)
+        .property("scan_code", &event::get_scancode)
+        .property("scancode", &event::get_scancode)
+        .property("time", &event::get_timestamp)
+        .property("timestamp", &event::get_timestamp)
         .property("x", &event::get_x)
-        .property("y", &event::get_y),
+        .property("xrel", &event::get_dx)
+        .property("y", &event::get_y)
+        .property("yrel", &event::get_dy),
       class_<lev::system, base, boost::shared_ptr<base> >("system")
         .def("close", &system::done)
         .def("create_mixer", &mixer::init)
@@ -77,12 +84,14 @@ int luaopen_lev_system(lua_State *L)
         .def("do_event", &system::do_event)
         .def("do_events", &system::do_events)
         .def("done", &system::done)
+        .property("elapsed", &system::get_elapsed)
         .property("is_debugging", &system::is_debugging)
         .property("is_running", &system::is_running, &system::set_running)
         .def("mixer", &mixer::init)
         .property("name", &system::get_name, &system::set_name)
         .property("on_button_down", &system::get_on_button_down, &system::set_on_button_down)
         .property("on_button_up", &system::get_on_button_up, &system::set_on_button_up)
+        .property("on_idle", &system::get_on_idle, &system::set_on_idle)
         .property("on_key_down", &system::get_on_key_down, &system::set_on_key_down)
         .property("on_key_up", &system::get_on_key_up, &system::set_on_key_up)
         .property("on_left_down", &system::get_on_left_down, &system::set_on_left_down)
@@ -93,14 +102,13 @@ int luaopen_lev_system(lua_State *L)
         .property("on_quit", &system::get_on_quit, &system::set_on_quit)
         .property("on_right_down", &system::get_on_right_down, &system::set_on_right_down)
         .property("on_right_up", &system::get_on_right_up, &system::set_on_right_up)
-        .property("on_tick", &system::get_on_tick, &system::set_on_tick)
         .def("quit", &system::quit)
         .def("quit", &system::quit0)
         .def("run", &system::run)
         .def("set_running", &system::set_running)
         .def("start_debug", &system::start_debug)
         .def("stop_debug", &system::stop_debug)
-        .property("ticks", &system::get_ticks)
+        .property("time", &system::get_elapsed)
         .scope
         [
           def("get", &system::get),
@@ -351,21 +359,6 @@ namespace lev
     else { return found->second.c_str(); }
   }
 
-  class myEvent
-  {
-    public:
-      myEvent() : evt() { }
-
-      ~myEvent() { }
-
-      SDL_Event evt;
-//      int x, y, dx, dy, button, device;
-//      bool left, middle, right;
-//      bool pressed, released;
-//      long key_code;
-  };
-  static myEvent* cast_evt(void *obj) { return (myEvent *)obj; }
-
   static luabind::object safe_call(luabind::object func)
   {
     using namespace luabind;
@@ -394,199 +387,208 @@ namespace lev
     return o;
   }
 
-  event::event() : base(), _obj(NULL)
-  {
-    _obj = new myEvent();
-  }
 
-  event::~event()
+  // event class implementation
+  class impl_event : public event
   {
-    if (_obj) { delete cast_evt(_obj); }
-  }
+    public:
+      typedef boost::shared_ptr<impl_event> ptr;
+    protected:
+      impl_event() :
+        event(),
+        evt()
+      { }
+    public:
+      virtual ~impl_event() { }
 
-  std::string event::get_button() const
-  {
-    SDL_Event &evt = cast_evt(_obj)->evt;
-    if (evt.type == SDL_MOUSEBUTTONDOWN || evt.type == SDL_MOUSEBUTTONUP)
-    {
-      SDL_MouseButtonEvent &mouse = (SDL_MouseButtonEvent &)evt;
-      switch (mouse.button)
+      virtual event::ptr clone()
       {
-        case SDL_BUTTON_LEFT:
-          return "left";
-        case SDL_BUTTON_MIDDLE:
-          return "middle";
-        case SDL_BUTTON_RIGHT:
-          return "right";
-        case SDL_BUTTON_X1:
-          return "up";
-        case SDL_BUTTON_X2:
-          return "down";
-        default:
-          return "";
+        impl_event::ptr e;
+        try {
+          e.reset(new impl_event);
+          if (! e) { throw -1; }
+          e->evt = evt;
+        }
+        catch (...) {
+          e.reset();
+          lev::debug_print("error on event instance cloning");
+        }
+        return e;
       }
-    }
-    return "";
-  }
 
-  int event::get_dx() const
-  {
-    SDL_Event &evt = cast_evt(_obj)->evt;
-    if (evt.type == SDL_MOUSEMOTION)
-    {
-      SDL_MouseMotionEvent &motion = (SDL_MouseMotionEvent &)evt;
-      return motion.xrel;
-    }
-    return 0;
-  }
+      static impl_event::ptr create()
+      {
+        impl_event::ptr e;
+        try {
+          e.reset(new impl_event);
+          if (! e) { throw -1; }
+        }
+        catch (...) {
+          e.reset();
+          lev::debug_print("error on event instance creation");
+        }
+        return e;
+      }
 
-  int event::get_dy() const
-  {
-    SDL_Event &evt = cast_evt(_obj)->evt;
-    if (evt.type == SDL_MOUSEMOTION)
-    {
-      SDL_MouseMotionEvent &motion = (SDL_MouseMotionEvent &)evt;
-      return motion.yrel;
-    }
-    return 0;
-  }
+      virtual std::string get_button() const
+      {
+        if (evt.type == SDL_MOUSEBUTTONDOWN || evt.type == SDL_MOUSEBUTTONUP)
+        {
+          switch (evt.button.button)
+          {
+            case SDL_BUTTON_LEFT:
+              return "left";
+            case SDL_BUTTON_MIDDLE:
+              return "middle";
+            case SDL_BUTTON_RIGHT:
+              return "right";
+            case SDL_BUTTON_X1:
+              return "wheel_up";
+            case SDL_BUTTON_X2:
+              return "wheel_down";
+            default:
+              return "";
+          }
+        }
+        return "";
+      }
 
-  int event::get_id() const
-  {
-    SDL_WindowEvent &evt = (SDL_WindowEvent &)cast_evt(_obj)->evt;
-    return evt.windowID;
-  }
+      virtual int get_dx() const
+      {
+        if (evt.type == SDL_MOUSEMOTION)
+        {
+          return evt.motion.xrel;
+        }
+        return 0;
+      }
 
-  std::string event::get_key() const
-  {
-    SDL_Event &evt = cast_evt(_obj)->evt;
-    if (evt.type == SDL_KEYDOWN || evt.type == SDL_KEYUP)
-    {
-      SDL_KeyboardEvent &key = (SDL_KeyboardEvent &)evt;
-      return input::to_keyname(key.keysym.sym);
-    }
-    return "";
-  }
+      virtual int get_dy() const
+      {
+        if (evt.type == SDL_MOUSEMOTION)
+        {
+          return evt.motion.yrel;
+        }
+        return 0;
+      }
 
-  long event::get_key_code() const
-  {
-    SDL_Event &evt = cast_evt(_obj)->evt;
-    if (evt.type == SDL_KEYDOWN || evt.type == SDL_KEYUP)
-    {
-      SDL_KeyboardEvent &key = (SDL_KeyboardEvent &)evt;
-//      return key.keysym.unicode;
-      return key.keysym.sym;
-    }
-    return -1;
-  }
+      virtual int get_id() const
+      {
+        return evt.window.windowID;
+      }
 
-  long event::get_scan_code() const
-  {
-    SDL_Event &evt = cast_evt(_obj)->evt;
-    if (evt.type == SDL_KEYDOWN || evt.type == SDL_KEYUP)
-    {
-      SDL_KeyboardEvent &key = (SDL_KeyboardEvent &)evt;
-      return key.keysym.scancode;
-    }
-    return -1;
-  }
+      virtual std::string get_key() const
+      {
+        if (evt.type == SDL_KEYDOWN || evt.type == SDL_KEYUP)
+        {
+          return input::to_keyname(evt.key.keysym.sym);
+        }
+        return "";
+      }
 
-  int event::get_x() const
-  {
-    SDL_Event &evt = cast_evt(_obj)->evt;
-    if (evt.type == SDL_MOUSEMOTION)
-    {
-      SDL_MouseMotionEvent &motion = (SDL_MouseMotionEvent &)evt;
-      return motion.x;
-    }
-    else if (evt.type == SDL_MOUSEBUTTONDOWN || evt.type == SDL_MOUSEBUTTONUP)
-    {
-      SDL_MouseButtonEvent &mouse = (SDL_MouseButtonEvent &)evt;
-      return mouse.x;
-    }
-    else if (evt.type == SDL_MOUSEWHEEL)
-    {
-      SDL_MouseWheelEvent &wheel = (SDL_MouseWheelEvent &)evt;
-      return wheel.x;
-    }
-    return -1;
-  }
+      virtual long get_key_code() const
+      {
+        if (evt.type == SDL_KEYDOWN || evt.type == SDL_KEYUP)
+        {
+          return evt.key.keysym.sym;
+        }
+        return -1;
+      }
 
-  int event::get_y() const
-  {
-    SDL_Event &evt = cast_evt(_obj)->evt;
-    if (evt.type == SDL_MOUSEMOTION)
-    {
-      SDL_MouseMotionEvent &motion = (SDL_MouseMotionEvent &)evt;
-      return motion.y;
-    }
-    else if (evt.type == SDL_MOUSEBUTTONDOWN || evt.type == SDL_MOUSEBUTTONUP)
-    {
-      SDL_MouseButtonEvent &mouse = (SDL_MouseButtonEvent &)evt;
-      return mouse.y;
-    }
-    else if (evt.type == SDL_MOUSEWHEEL)
-    {
-      SDL_MouseWheelEvent &wheel = (SDL_MouseWheelEvent &)evt;
-      return wheel.y;
-    }
-    return -1;
-  }
+      virtual long get_scancode() const
+      {
+        if (evt.type == SDL_KEYDOWN || evt.type == SDL_KEYUP)
+        {
+          return evt.key.keysym.scancode;
+        }
+        return -1;
+      }
 
-  bool event::is_pressed() const
-  {
-    SDL_Event &evt = cast_evt(_obj)->evt;
-    if (evt.type == SDL_MOUSEBUTTONDOWN || evt.type == SDL_MOUSEBUTTONUP)
-    {
-      SDL_MouseButtonEvent &mouse = (SDL_MouseButtonEvent &)evt;
-      return mouse.state == SDL_PRESSED;
-    }
-    return false;
-  }
+      virtual double get_timestamp() const
+      {
+        return double(evt.window.timestamp) / 1000;
+      }
 
-  bool event::is_released() const
-  {
-    SDL_Event &evt = cast_evt(_obj)->evt;
-    if (evt.type == SDL_MOUSEBUTTONDOWN || evt.type == SDL_MOUSEBUTTONUP)
-    {
-      SDL_MouseButtonEvent &mouse = (SDL_MouseButtonEvent &)evt;
-      return mouse.state == SDL_RELEASED;
-    }
-    return false;
-  }
+      virtual int get_x() const
+      {
+        if (evt.type == SDL_MOUSEMOTION)
+        {
+          return evt.motion.x;
+        }
+        else if (evt.type == SDL_MOUSEBUTTONDOWN || evt.type == SDL_MOUSEBUTTONUP)
+        {
+          return evt.button.x;
+        }
+        else if (evt.type == SDL_MOUSEWHEEL)
+        {
+          return evt.wheel.x;
+        }
+        return -1;
+      }
 
-  bool event::left_is_down() const
-  {
-    SDL_Event &evt = cast_evt(_obj)->evt;
-    if (evt.type == SDL_MOUSEMOTION)
-    {
-      SDL_MouseMotionEvent &motion = (SDL_MouseMotionEvent &)evt;
-      return motion.state & SDL_BUTTON_LMASK;
-    }
-    return false;
-  }
+      virtual int get_y() const
+      {
+        if (evt.type == SDL_MOUSEMOTION)
+        {
+          return evt.motion.y;
+        }
+        else if (evt.type == SDL_MOUSEBUTTONDOWN || evt.type == SDL_MOUSEBUTTONUP)
+        {
+          return evt.button.y;
+        }
+        else if (evt.type == SDL_MOUSEWHEEL)
+        {
+          return evt.wheel.y;
+        }
+        return -1;
+      }
 
-  bool event::middle_is_down() const
-  {
-    SDL_Event &evt = cast_evt(_obj)->evt;
-    if (evt.type == SDL_MOUSEMOTION)
-    {
-      SDL_MouseMotionEvent &motion = (SDL_MouseMotionEvent &)evt;
-      return motion.state & SDL_BUTTON_MMASK;
-    }
-    return false;
-  }
+      virtual bool is_pressed() const
+      {
+        if (evt.type == SDL_MOUSEBUTTONDOWN || evt.type == SDL_MOUSEBUTTONUP)
+        {
+          return evt.button.state == SDL_PRESSED;
+        }
+        return false;
+      }
 
-  bool event::right_is_down() const
-  {
-    SDL_Event &evt = cast_evt(_obj)->evt;
-    if (evt.type == SDL_MOUSEMOTION)
-    {
-      SDL_MouseMotionEvent &motion = (SDL_MouseMotionEvent &)evt;
-      return motion.state & SDL_BUTTON_RMASK;
-    }
-    return false;
-  }
+      virtual bool is_released() const
+      {
+        if (evt.type == SDL_MOUSEBUTTONDOWN || evt.type == SDL_MOUSEBUTTONUP)
+        {
+          return evt.button.state == SDL_RELEASED;
+        }
+        return false;
+      }
+
+      virtual bool left_is_down() const
+      {
+        if (evt.type == SDL_MOUSEMOTION)
+        {
+          return evt.motion.state & SDL_BUTTON_LMASK;
+        }
+        return false;
+      }
+
+      virtual bool middle_is_down() const
+      {
+        if (evt.type == SDL_MOUSEMOTION)
+        {
+          return evt.motion.state & SDL_BUTTON_MMASK;
+        }
+        return false;
+      }
+
+      virtual bool right_is_down() const
+      {
+        if (evt.type == SDL_MOUSEMOTION)
+        {
+          return evt.motion.state & SDL_BUTTON_RMASK;
+        }
+        return false;
+      }
+
+      SDL_Event evt;
+  };
 
   class system_core
   {
@@ -597,7 +599,7 @@ namespace lev
       system_core(lua_State *L) :
         dbg(),
         funcs(), name("lev"), running(true),
-        on_tick(),
+        on_idle(),
         on_left_down(),   on_left_up(),
         on_middle_down(), on_middle_up(),
         on_right_down(),  on_right_up(),
@@ -615,6 +617,8 @@ namespace lev
           if (! singleton) { throw -1; }
 printf("INITTING!\n");
           if (SDL_Init(SDL_INIT_EVERYTHING) < 0) { throw -2; }
+//          if (SDL_Init(SDL_INIT_VIDEO) < 0) { throw -2; }
+//printf("VIDEO INITTED!\n");
 printf("INITTED!\n");
 
           // Fullscreen feature of SDL is not yet completed.
@@ -627,9 +631,13 @@ printf("INITTED!\n");
           SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE,  8);
           SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
           SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+
+          singleton->evt = impl_event::create();
+          if (! singleton->evt) { throw -3; }
         }
         catch (...) {
           singleton.reset();
+          lev::debug_print("error on system initialization");
         }
         return singleton;
       }
@@ -647,12 +655,13 @@ printf("QUITING3\n");
       debugger::ptr dbg;
       std::map<Uint32, luabind::object> funcs;
       std::string name;
-      luabind::object on_tick;
+      luabind::object on_idle;
       luabind::object on_left_down,   on_left_up;
       luabind::object on_middle_down, on_middle_up;
       luabind::object on_right_down,  on_right_up;
       std::map<Uint32, boost::weak_ptr<screen> > screens;
       std::vector<boost::weak_ptr<timer> > timers;
+      impl_event::ptr evt;
       bool running;
   };
   system_core::ptr system_core::singleton;
@@ -707,108 +716,115 @@ printf("ATTACH TIMER!\n");
       virtual bool do_event()
       {
         if (! core) { return false; }
-        SDL_Event sdl_evt;
-        event e;
+
         std::vector<boost::weak_ptr<timer> >::iterator i = core->timers.begin();
         for ( ; i != core->timers.end(); i++)
         {
           if (boost::shared_ptr<timer> t = i->lock())
           {
-printf("PROVING!\n");
+//printf("PROVING!\n");
             t->probe();
           }
           else
           {
-printf("DETACHING TIMER!\n");
+//printf("DETACHING TIMER!\n");
             core->timers.erase(i);
             break;
           }
         }
 
-        if (SDL_PollEvent(&sdl_evt))
+        SDL_Event &e = core->evt->evt;
+        if (SDL_PollEvent(&e))
         {
           luabind::object f;
-          cast_evt(e.get_rawobj())->evt = sdl_evt;
 
-          if (sdl_evt.type == SDL_KEYDOWN || sdl_evt.type == SDL_KEYUP)
+          if (e.type == SDL_KEYDOWN || e.type == SDL_KEYUP)
           {
-            SDL_KeyboardEvent &keyboard = (SDL_KeyboardEvent &)sdl_evt;
-            if (boost::shared_ptr<screen> s = core->screens[keyboard.windowID].lock())
+            if (screen::ptr s = core->screens[e.key.windowID].lock())
             {
-              if (sdl_evt.type == SDL_KEYDOWN) { f = s->get_on_key_down(); }
+              if (e.type == SDL_KEYDOWN) { f = s->get_on_key_down(); }
               else { f = s->get_on_key_up(); }
             }
           }
-          else if (sdl_evt.type == SDL_MOUSEBUTTONDOWN || sdl_evt.type == SDL_MOUSEBUTTONUP)
+          else if (e.type == SDL_MOUSEBUTTONDOWN ||
+                   e.type == SDL_MOUSEBUTTONUP)
           {
-            SDL_MouseButtonEvent &mouse = (SDL_MouseButtonEvent &)sdl_evt;
-            if (boost::shared_ptr<screen> s = core->screens[mouse.windowID].lock())
+            SDL_MouseButtonEvent &btn = e.button;
+            if (screen::ptr s = core->screens[e.button.windowID].lock())
             {
-              if (mouse.button == SDL_BUTTON_LEFT)
+              if (btn.button == SDL_BUTTON_LEFT)
               {
-                if (mouse.state == SDL_PRESSED)       { f = s->get_on_left_down(); }
-                else if (mouse.state == SDL_RELEASED) { f = s->get_on_left_up(); }
+                if (btn.state == SDL_PRESSED)       { f = s->get_on_left_down(); }
+                else if (btn.state == SDL_RELEASED) { f = s->get_on_left_up(); }
               }
-              else if (mouse.button == SDL_BUTTON_MIDDLE)
+              else if (btn.button == SDL_BUTTON_MIDDLE)
               {
-                if (mouse.state == SDL_PRESSED)       { f = s->get_on_middle_down(); }
-                else if (mouse.state == SDL_RELEASED) { f = s->get_on_middle_up(); }
+                if (btn.state == SDL_PRESSED)       { f = s->get_on_middle_down(); }
+                else if (btn.state == SDL_RELEASED) { f = s->get_on_middle_up(); }
               }
-              else if (mouse.button == SDL_BUTTON_RIGHT)
+              else if (btn.button == SDL_BUTTON_RIGHT)
               {
-                if (mouse.state == SDL_PRESSED)       { f = s->get_on_right_down(); }
-                else if (mouse.state == SDL_RELEASED) { f = s->get_on_right_up(); }
+                if (btn.state == SDL_PRESSED)       { f = s->get_on_right_down(); }
+                else if (btn.state == SDL_RELEASED) { f = s->get_on_right_up(); }
               }
             }
             if (! f.is_valid())
             {
-              if (mouse.button == SDL_BUTTON_LEFT)
+              if (btn.button == SDL_BUTTON_LEFT)
               {
-                if (mouse.state == SDL_PRESSED)       { f = core->on_left_down; }
-                else if (mouse.state == SDL_RELEASED) { f = core->on_left_up; }
+                if (btn.state == SDL_PRESSED)       { f = core->on_left_down; }
+                else if (btn.state == SDL_RELEASED) { f = core->on_left_up; }
               }
-              if (mouse.button == SDL_BUTTON_MIDDLE)
+              if (btn.button == SDL_BUTTON_MIDDLE)
               {
-                if (mouse.state == SDL_PRESSED)       { f = core->on_middle_down; }
-                else if (mouse.state == SDL_RELEASED) { f = core->on_middle_up; }
+                if (btn.state == SDL_PRESSED)       { f = core->on_middle_down; }
+                else if (btn.state == SDL_RELEASED) { f = core->on_middle_up; }
               }
-              if (mouse.button == SDL_BUTTON_RIGHT)
+              if (btn.button == SDL_BUTTON_RIGHT)
               {
-                if (mouse.state == SDL_PRESSED)       { f = core->on_right_down; }
-                else if (mouse.state == SDL_RELEASED) { f = core->on_right_up; }
+                if (btn.state == SDL_PRESSED)       { f = core->on_right_down; }
+                else if (btn.state == SDL_RELEASED) { f = core->on_right_up; }
               }
             }
           }
-          else if (sdl_evt.type == SDL_MOUSEMOTION)
+          else if (e.type == SDL_MOUSEMOTION)
           {
-            if (screen::ptr s = core->screens[sdl_evt.motion.windowID].lock())
+            if (screen::ptr s = core->screens[e.motion.windowID].lock())
             {
               f = s->get_on_motion();
             }
           }
-          else if (sdl_evt.type == SDL_MOUSEWHEEL)
+          else if (e.type == SDL_MOUSEWHEEL)
           {
-            SDL_MouseWheelEvent &wheel = (SDL_MouseWheelEvent &)sdl_evt;
-            if (boost::shared_ptr<screen> s = core->screens[wheel.windowID].lock())
+            if (screen::ptr s = core->screens[e.wheel.windowID].lock())
             {
               f = s->get_on_wheel();
             }
           }
-          else if (sdl_evt.type == SDL_WINDOWEVENT)
+          else if (e.type == SDL_WINDOWEVENT)
           {
-            if (screen::ptr s = core->screens[sdl_evt.window.windowID].lock())
+            if (screen::ptr s = core->screens[e.window.windowID].lock())
             {
-              if (sdl_evt.window.event == SDL_WINDOWEVENT_CLOSE)
+              if (e.window.event == SDL_WINDOWEVENT_CLOSE)
               {
                 f = s->get_on_close();
                 if (! f.is_valid())
                 {
-                  s->close();
+                  if (core->dbg && s == core->dbg->get_screen())
+                  {
+                    // debug window
+                    s->hide();
+                  }
+                  else
+                  {
+                    // normal window
+                    s->close();
+                  }
                 }
               }
             }
           }
-          else if (sdl_evt.type == SDL_QUIT)
+          else if (e.type == SDL_QUIT)
           {
             f = core->funcs[SDL_QUIT];
             if (! f.is_valid()) { set_running(false); }
@@ -820,12 +836,12 @@ printf("DETACHING TIMER!\n");
 
           if (! f.is_valid())
           {
-            f = core->funcs[sdl_evt.type];
+            f = core->funcs[e.type];
           }
           if (f.is_valid() && luabind::type(f) == LUA_TFUNCTION)
           {
             try {
-              f(&e);
+              f(event::ptr(core->evt));
             }
             catch (...) {
               lev::debug_print(lua_tostring(core->L, -1));
@@ -856,24 +872,6 @@ printf("SINGLETON CLEAR!\n");
           system_core::singleton.reset();
         }
         return true;
-      }
-
-      static impl_system::ptr init(lua_State *L)
-      {
-        impl_system::ptr sys;
-        if (! L) { return sys; }
-        try {
-          sys.reset(new impl_system);
-          if (! sys) { throw -1; }
-          sys->core = system_core::init(L);
-          if (! sys->core) { throw -2; }
-//printf("INIT CORE COUNT: %ld\n", sys->core.use_count());
-        }
-        catch (...) {
-          lev::debug_print("error on system initialization");
-          sys.reset();
-        }
-        return sys;
       }
 
       static impl_system::ptr get()
@@ -977,15 +975,33 @@ printf("SINGLETON CLEAR!\n");
         return core->on_right_up;
       }
 
-      virtual luabind::object get_on_tick()
+      virtual luabind::object get_on_idle()
       {
         if (! core) { return luabind::object(); }
-        return core->on_tick;
+        return core->on_idle;
       }
 
-      virtual unsigned long get_ticks() const
+      virtual double get_elapsed() const
       {
-        return SDL_GetTicks();
+        return double(SDL_GetPerformanceCounter()) / SDL_GetPerformanceFrequency();
+      }
+
+      static impl_system::ptr init(lua_State *L)
+      {
+        impl_system::ptr sys;
+        if (! L) { return sys; }
+        try {
+          sys.reset(new impl_system);
+          if (! sys) { throw -1; }
+          sys->core = system_core::init(L);
+          if (! sys->core) { throw -2; }
+//printf("INIT CORE COUNT: %ld\n", sys->core.use_count());
+        }
+        catch (...) {
+          lev::debug_print("error on system initialization");
+          sys.reset();
+        }
+        return sys;
       }
 
       virtual bool is_debugging() const
@@ -1022,10 +1038,10 @@ printf("SINGLETON CLEAR!\n");
         while (is_running())
         {
           try {
-            if (core->on_tick && luabind::type(core->on_tick) == LUA_TFUNCTION)
+            if (core->on_idle && luabind::type(core->on_idle) == LUA_TFUNCTION)
             {
-              core->on_tick();
-    //          safe_call(core->on_tick);
+              core->on_idle();
+    //          safe_call(core->on_idle);
             }
             do_events();
           }
@@ -1129,10 +1145,10 @@ printf("SINGLETON CLEAR!\n");
         return true;
       }
 
-      virtual bool set_on_tick(luabind::object func)
+      virtual bool set_on_idle(luabind::object func)
       {
         if (! core) { return false; }
-        core->on_tick = func;
+        core->on_idle = func;
         return true;
       }
 

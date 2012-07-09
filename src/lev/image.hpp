@@ -140,6 +140,7 @@ namespace lev
       virtual bool clear() = 0;
       virtual bool complete() = 0;
       static boost::shared_ptr<layout> create(int width_stop = -1);
+      static layout::ptr create0() { return create(); }
       virtual boost::shared_ptr<color> get_fg_color() = 0;
       virtual boost::shared_ptr<font> get_font() = 0;
       virtual boost::shared_ptr<font> get_ruby_font() = 0;
@@ -153,11 +154,18 @@ namespace lev
                                      luabind::object lclick_func, luabind::object hover_func) = 0;
       virtual bool reserve_clickable_text(const std::string &text,
                                           luabind::object lclick_func, luabind::object hover_func) = 0;
-      virtual bool reserve_image(drawable::ptr img) = 0;
+      virtual bool reserve_image(drawable::ptr img, bool auto_filling = true) = 0;
+      bool reserve_image1(drawable::ptr img) { return reserve_image(img); }
       virtual bool reserve_new_line() = 0;
-      virtual bool reserve_word(const std::string &word, const std::string &ruby = "") = 0;
-      virtual bool reserve_word_lua(luabind::object word, luabind::object ruby) = 0;
-      virtual bool reserve_word_lua1(luabind::object word) = 0;
+
+      virtual bool reserve_word(const std::string &word, const std::string &ruby = "",
+                                bool auto_filling = true) = 0;
+      bool reserve_word_filling(const std::string &word, bool auto_filling = true)
+      { return reserve_word(word, "", auto_filling); }
+      bool reserve_word1(const std::string &word) { return reserve_word(word); }
+      bool reserve_word2(const std::string &word, const std::string &ruby = "")
+      { return reserve_word(word, ruby); }
+
       virtual bool set_fg_color(boost::shared_ptr<color> fg) = 0;
       virtual bool set_font(boost::shared_ptr<font> f) = 0;
       virtual bool set_ruby_font(boost::shared_ptr<font> f) = 0;

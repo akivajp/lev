@@ -96,6 +96,8 @@ int luaopen_lev_string(lua_State *L)
   object classes = lev["classes"];
   object string = lev["string"];
 
+  lev["ustring"] = classes["ustring"]["create"];
+
   string["compiler"] = classes["sregex_compiler"]["create"];
   string["concat"] = classes["ustring"]["concat"];
   string["create"] = classes["ustring"]["create"];

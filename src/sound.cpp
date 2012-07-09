@@ -26,6 +26,7 @@
 #include <boost/weak_ptr.hpp>
 #include <luabind/luabind.hpp>
 #include <map>
+#include <SDL2/SDL.h>
 #include <vorbis/vorbisfile.h>
 
 // static member variable initialization

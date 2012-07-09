@@ -131,7 +131,11 @@ namespace lev
         system::ptr sys = system::get();
         impl_debugger::ptr dbg;
         if (! sys) { return dbg; }
-        if (sys->get_debugger()) { return sys->get_debugger(); }
+        if (sys->get_debugger())
+        {
+          sys->get_debugger()->show();
+          return sys->get_debugger();
+        }
         try {
           const int w = 640, h = 480;
           dbg.reset(new impl_debugger);
@@ -141,6 +145,7 @@ namespace lev
           dbg->lay = layout::create(w);
           if (! dbg->lay) { throw -3; }
           if (! sys->attach(dbg)) { throw -4; }
+          dbg->clear();
         }
         catch (...) {
           dbg.reset();
@@ -169,6 +174,7 @@ namespace lev
 
   bool debug_print(const std::string &message_utf8)
   {
+//printf("DEBUG PRINT!\n");
     time_t t;
     struct tm *t_st;
     time(&t);
@@ -177,10 +183,13 @@ namespace lev
     strftime(buf, 9, "%H:%M:%S", t_st);
 
     system::ptr sys = system::get();
-    if (sys->get_debugger())
+    if (sys && sys->get_debugger())
     {
       sys->get_debugger()->show();
-      return sys->get_debugger()->print1(std::string("[") + buf + "]: " + message_utf8 + "\n");
+      if (sys->get_debugger()->print1(std::string("[") + buf + "]: " + message_utf8 + "\n"))
+      {
+        return true;
+      }
     }
     printf("Debug Message (%s): %s\n", buf, message_utf8.c_str());
   }

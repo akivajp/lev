@@ -10,7 +10,7 @@ PCH = prec.h.gch
 AR = ar
 RANLIB = ranlib
 SRC  = archive.cpp base.cpp debug.cpp draw.cpp entry.cpp font.cpp fs.cpp image.cpp map.cpp \
-       package.cpp prim.cpp sound.cpp string.cpp system.cpp timer.cpp util.cpp screen.cpp
+       package.cpp prim.cpp screen.cpp sound.cpp string.cpp system.cpp timer.cpp util.cpp
 OBJS = $(SRC:%.cpp=%.o)
 DLIB = lev.so
 #LIBS = -llua -lluabind -lSDL -lvorbisfile -lfreetype -lGL
@@ -28,7 +28,7 @@ slib: $(SLIB)
 
 win-bin: $(WIN_OUT)
 
-$(WIN_OUT): $(ALL_OBJS) main.o resource.rc
+$(WIN_OUT): $(OBJS) main.o resource.rc
 	$(WINDRES) -o resource.o resource.rc
 	$(CXX) -o $(WIN_OUT) main.o resource.o $(SLIB) $(LIBS)
 

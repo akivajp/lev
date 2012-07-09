@@ -410,6 +410,8 @@ namespace lev
        if (str.empty()) { throw -1; }
        std::vector<boost::shared_ptr<bitmap> > array;
        int max_a = 0, max_d = 0, total_w = 0;
+       max_a = get_size();
+       max_d = get_size() * 0.2;
        int current_x = 0;
        for (int i = 0; i < str.length(); i++)
        {
@@ -422,6 +424,7 @@ namespace lev
            array.push_back(b);
          }
        }
+//printf("MAX A: %d, MAX D: %d\n", max_a, max_d);
        r = bitmap::create(total_w, max_a + max_d);
        if (! r) { throw -2; }
        r->set_descent(max_d);

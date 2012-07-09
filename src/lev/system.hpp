@@ -22,11 +22,6 @@ extern "C" {
 namespace lev
 {
 
-  // class dependencies
-  class clock;
-  class debugger;
-  class timer;
-
   class input
   {
     public:
@@ -36,26 +31,28 @@ namespace lev
   class event : public base
   {
     public:
-      event();
-      virtual ~event();
-      std::string get_button() const;
-      int get_dx() const;
-      int get_dy() const;
-      int get_id() const;
-      std::string get_key() const;
-      long get_key_code() const;
-      void *get_rawobj() { return _obj; }
-      long get_scan_code() const;
-      virtual type_id get_type_id() const { return LEV_TEVENT; }
-      int get_x() const;
-      int get_y() const;
-      bool is_pressed() const;
-      bool is_released() const;
-      bool left_is_down() const;
-      bool middle_is_down() const;
-      bool right_is_down() const;
+      typedef boost::shared_ptr<event> ptr;
     protected:
-      void *_obj;
+      event() { }
+    public:
+      virtual ~event() { }
+      virtual event::ptr clone() = 0;
+      virtual std::string get_button() const = 0;
+      virtual int get_dx() const = 0;
+      virtual int get_dy() const = 0;
+      virtual int get_id() const = 0;
+      virtual std::string get_key() const = 0;
+      virtual long get_key_code() const = 0;
+      virtual long get_scancode() const = 0;
+      virtual double get_timestamp() const = 0;
+      virtual type_id get_type_id() const { return LEV_TEVENT; }
+      virtual int get_x() const = 0;
+      virtual int get_y() const = 0;
+      virtual bool is_pressed() const = 0;
+      virtual bool is_released() const = 0;
+      virtual bool left_is_down() const = 0;
+      virtual bool middle_is_down() const = 0;
+      virtual bool right_is_down() const = 0;
   };
 
   class system : public base
@@ -83,13 +80,14 @@ namespace lev
       virtual bool done() = 0;
 
       static system::ptr get();
-      virtual boost::shared_ptr<debugger> get_debugger() = 0;
+      virtual boost::shared_ptr<class debugger> get_debugger() = 0;
 
       static lua_State *get_interpreter();
 
       virtual std::string get_name() const = 0;
       virtual luabind::object get_on_button_down() = 0;
       virtual luabind::object get_on_button_up() = 0;
+      virtual luabind::object get_on_idle() = 0;
       virtual luabind::object get_on_key_down() = 0;
       virtual luabind::object get_on_key_up() = 0;
       virtual luabind::object get_on_left_down() = 0;
@@ -100,8 +98,7 @@ namespace lev
       virtual luabind::object get_on_quit() = 0;
       virtual luabind::object get_on_right_down() = 0;
       virtual luabind::object get_on_right_up() = 0;
-      virtual luabind::object get_on_tick() = 0;
-      virtual unsigned long get_ticks() const = 0;
+      virtual double get_elapsed() const = 0;
       virtual type_id get_type_id() const { return LEV_TSYSTEM; }
 
       static boost::shared_ptr<system> init(lua_State *L);
@@ -114,6 +111,7 @@ namespace lev
       virtual bool set_name(const std::string &name) = 0;
       virtual bool set_on_button_down(luabind::object func) = 0;
       virtual bool set_on_button_up(luabind::object func) = 0;
+      virtual bool set_on_idle(luabind::object func) = 0;
       virtual bool set_on_key_down(luabind::object func) = 0;
       virtual bool set_on_key_up(luabind::object func) = 0;
       virtual bool set_on_left_down(luabind::object func) = 0;
@@ -124,9 +122,8 @@ namespace lev
       virtual bool set_on_quit(luabind::object func) = 0;
       virtual bool set_on_right_down(luabind::object func) = 0;
       virtual bool set_on_right_up(luabind::object func) = 0;
-      virtual bool set_on_tick(luabind::object func) = 0;
       virtual bool set_running(bool run = true) = 0;
-      virtual boost::shared_ptr<debugger> start_debug() = 0;
+      virtual boost::shared_ptr<class debugger> start_debug() = 0;
       virtual bool stop_debug() = 0;
   };
 

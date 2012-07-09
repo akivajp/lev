@@ -33,6 +33,7 @@ screen.on_left_down = function(e)
 end
 
 screen.on_close = function()
+  screen:close()
   system:quit(true)
 end
 

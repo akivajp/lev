@@ -26,7 +26,6 @@ extern "C" {
 #include <string>
 #include <vector>
 
-#include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/format.hpp>
 #include <boost/scoped_array.hpp>
@@ -36,8 +35,6 @@ extern "C" {
 #include <boost/weak_ptr.hpp>
 #include <boost/xpressive/xpressive.hpp>
 
-//#include <luabind/adopt_policy.hpp>
-//#include <luabind/copy_policy.hpp>
 #include <luabind/raw_policy.hpp>
 #include <luabind/luabind.hpp>
 

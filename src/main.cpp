@@ -20,6 +20,11 @@
 #include "lev/system.hpp"
 
 // libraries
+extern "C" {
+  #include <lua.h>
+  #include <lualib.h>
+}
+#include <boost/format.hpp>
 #include <iostream>
 #include <string>
 
@@ -144,7 +149,7 @@ static bool execute_path(lua_State *L, const std::string &path)
     std::string entry_name;
     for (int i = 0; i < entry_files_len; i++)
     {
-      std::string arc_name = boost::filesystem::path(path).stem().generic_string();
+      std::string arc_name = file_system::to_stem(path);
       if (lev::archive::find_direct(path, entry_files[i], entry_name)
           || lev::archive::find_direct(path, arc_name + "/" + entry_files[i], entry_name))
       {

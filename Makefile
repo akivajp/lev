@@ -14,7 +14,7 @@ none:
 	@echo "Please do"
 	@echo "  make PLATFORM"
 	@echo "where PLATFORM is one of these:"
-	@echo "  linux mac mingw"
+	@echo "  linux mac mingw32"
 
 linux: build-all bin lib
 
@@ -22,8 +22,8 @@ mac:
 	make -f build/Makefile.macosx build-all \
 		VERSION=$(VERSION)
 
-mingw:
-	make -f build/Makefile.mingw build-all \
+mingw32:
+	make -f build/Makefile.mingw32 build-all \
 		VERSION=$(VERSION)
 
 build-all:

@@ -26,8 +26,9 @@
 //#include "resource/levana.xpm"
 
 // libraries
-#include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
+#include <boost/weak_ptr.hpp>
+#include <GL/glu.h>
 #include <luabind/adopt_policy.hpp>
 #include <luabind/luabind.hpp>
 
@@ -745,9 +746,9 @@ namespace lev
             const char *path = object_cast<const char *>(t["lua.string1"]);
             lua_pushboolean(L, anim->append_file(path, duration));
           }
-          else if (t["lua.filepath1"])
+          else if (t["lev.filepath1"])
           {
-            boost::shared_ptr<filepath> path = object_cast<boost::shared_ptr<filepath> >(t["lua.filepath1"]);
+            filepath::ptr path = object_cast<filepath::ptr>(t["lev.filepath1"]);
             lua_pushboolean(L, anim->append_path(path.get(), duration));
           }
           else
@@ -791,11 +792,10 @@ namespace lev
 
       virtual bool draw_on(canvas::ptr dst, int x, int y, unsigned char alpha)
       {
-printf("ANIMATION DRAW ON\n");
         drawable::ptr img = get_current();
-printf("ANIMATION DRAW ON\n");
+//printf("ANIMATION SIZE: %d\n", (int)imgs.size());
         if (! img) { return false; }
-printf("ANIMATION DRAW ON\n");
+//printf("ANIMATION DRAW ON: %p\n", img.get());
         return img->draw_on(dst, x, y, alpha);
       }
 
@@ -1172,13 +1172,16 @@ printf("ANIMATION DRAW ON\n");
         item_type() :
           x(-1), y(-1), fixed(false),
           img(), img_hover(), img_showing(),
-          func_hover(), func_lclick() { }
+          func_hover(), func_lclick(),
+          auto_fill(true)
+        { }
 
         drawable::ptr img;
         drawable::ptr img_hover;
         drawable::ptr img_showing;
         luabind::object func_hover;
         luabind::object func_lclick;
+        bool auto_fill;
         int x, y;
         bool fixed;
       };
@@ -1208,7 +1211,8 @@ printf("ANIMATION DRAW ON\n");
         for (int i = 0; i < items.size(); i++)
         {
           const item_type &item = items[i];
-          if (! item.img || (width_stop > 0 && x > 0 && x + item.img->get_w() > width_stop))
+          if (! item.img ||
+              (item.auto_fill && width_stop > 0 && x > 0 && x + item.img->get_w() > width_stop))
           {
             // newline
             if (x > max_w) { max_w = x; }
@@ -1257,7 +1261,8 @@ printf("ANIMATION DRAW ON\n");
         for (; i < items.size(); i++)
         {
           item_type &item = items[i];
-          if (! item.img || (width_stop > 0 && x > 0 && x + item.img->get_w() > width_stop))
+          if (! item.img ||
+              (item.auto_fill && width_stop > 0 && x > 0 && x + item.img->get_w() > width_stop))
           {
             // newline
             x = 0;
@@ -1273,8 +1278,8 @@ printf("ANIMATION DRAW ON\n");
               if (items[j].fixed) { break; }
               if (items[j].img)
               {
-//                items[j].y = y - items[j].img->get_h();
-                items[j].y = y - items[j].img->get_ascent();
+                items[j].y = y - items[j].img->get_h();
+//                items[j].y = y - items[j].img->get_ascent();
                 items[j].fixed = true;
               }
             }
@@ -1283,6 +1288,10 @@ printf("ANIMATION DRAW ON\n");
               return true;
             }
           }
+//if (! item.auto_fill && width_stop > 0 && x > 0 && x + item.img->get_w() > width_stop)
+//{
+//  printf("NO AUTO FILL!\n");
+//}
           if (item.img)
           {
             // calc by next item
@@ -1297,6 +1306,7 @@ printf("ANIMATION DRAW ON\n");
         y += (max_ascent + max_descent);
 //        items[index].y = y - items[index].img->get_h();
         items[index].y = y - max_descent - items[index].img->get_ascent();
+//        items[index].y = y - items[index].img->get_ascent();
         return true;
       }
 
@@ -1540,13 +1550,14 @@ printf("ANIMATION DRAW ON\n");
         }
       }
 
-      virtual bool reserve_image(drawable::ptr img)
+      virtual bool reserve_image(drawable::ptr img, bool auto_filling = true)
       {
         try {
           if (! img) { throw -1; }
 
           items.push_back(item_type());
           (items.end() - 1)->img = img;
+          (items.end() - 1)->auto_fill = auto_filling;
           texturized = false;
           return true;
         }
@@ -1567,7 +1578,8 @@ printf("ANIMATION DRAW ON\n");
       }
 
       virtual bool
-        reserve_word(const std::string &word, const std::string &ruby = "")
+        reserve_word(const std::string &word, const std::string &ruby = "",
+                     bool auto_filling = true)
       {
         if (! font_text) { return false; }
         if (! ruby.empty() && ! font_ruby) { return false; }
@@ -1576,7 +1588,7 @@ printf("ANIMATION DRAW ON\n");
           bitmap::ptr img;
           if (ruby.empty()) {
             img = font_text->rasterize(word, color_fg, color::ptr(), color_shade);
-            return reserve_image(img);
+            return reserve_image(img, auto_filling);
           }
           else
           {
@@ -1592,22 +1604,12 @@ printf("ANIMATION DRAW ON\n");
             img = bitmap::create(w, h);
             img->draw(img_ruby, (w - img_ruby->get_w()) / 2, 0);
             img->draw(img_word, (w - img_word->get_w()) / 2, img_ruby->get_h());
-            return reserve_image(img);
+            return reserve_image(img, auto_filling);
           }
         }
         catch (...) {
           return false;
         }
-      }
-
-      virtual bool reserve_word_lua(luabind::object word, luabind::object ruby)
-      {
-        return reserve_word(util::tostring(word), util::tostring(ruby));
-      }
-
-      virtual bool reserve_word_lua1(luabind::object word)
-      {
-        return reserve_word(util::tostring(word));
       }
 
       virtual bool set_fg_color(color::ptr fg)
@@ -1764,9 +1766,12 @@ int luaopen_lev_image(lua_State *L)
         .def("reserve_clickable", &layout::reserve_clickable)
         .def("reserve_clickable", &layout::reserve_clickable_text)
         .def("reserve_image", &layout::reserve_image)
+        .def("reserve_image", &layout::reserve_image1)
         .def("reserve_new_line", &layout::reserve_new_line)
-        .def("reserve_word", &layout::reserve_word_lua)
-        .def("reserve_word", &layout::reserve_word_lua1)
+        .def("reserve_word", &layout::reserve_word)
+        .def("reserve_word", &layout::reserve_word_filling)
+        .def("reserve_word", &layout::reserve_word1)
+        .def("reserve_word", &layout::reserve_word2)
         .property("ruby",  &layout::get_ruby_font, &layout::set_ruby_font)
         .property("ruby_font",  &layout::get_ruby_font, &layout::set_ruby_font)
         .property("shade", &layout::get_shade_color, &layout::set_shade_color)
@@ -1775,7 +1780,8 @@ int luaopen_lev_image(lua_State *L)
         .property("text_font",  &layout::get_font, &layout::set_font)
         .scope
         [
-          def("create", &layout::create)
+          def("create", &layout::create),
+          def("create", &layout::create0)
         ]
     ]
   ];

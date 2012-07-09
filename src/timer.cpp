@@ -19,8 +19,8 @@
 #include "lev/system.hpp"
 
 // libraries
-#include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/shared_ptr.hpp>
+#include <boost/weak_ptr.hpp>
 #include <SDL2/SDL.h>
 
 int luaopen_lev_timer(lua_State *L)
@@ -98,147 +98,117 @@ int luaopen_lev_timer(lua_State *L)
 namespace lev
 {
 
-  class myStopWatch
+  // stop watch implementation
+  class impl_stop_watch : public stop_watch
   {
     public:
-      myStopWatch(long initial_sec = 0) :
-        last_time(boost::posix_time::microsec_clock::local_time()),
-        running(true), ticks(initial_sec * 1000000)
+      typedef boost::shared_ptr<impl_stop_watch> ptr;
+    protected:
+      impl_stop_watch() :
+        stop_watch(),
+        running(true),
+        total(0)
       { }
-
-      double Microseconds()
+    public:
+      virtual ~impl_stop_watch()
       {
-        Update();
-        return double(ticks);
       }
 
-      double Milliseconds()
+      static impl_stop_watch::ptr create()
       {
-        Update();
-        return double(ticks) / 1000;
+        impl_stop_watch::ptr sw;
+        try {
+          sw.reset(new impl_stop_watch);
+          if (! sw) { throw -1; }
+          sw->last = double(SDL_GetPerformanceCounter()) / SDL_GetPerformanceFrequency();
+        }
+        catch (...) {
+          sw.reset();
+          lev::debug_print("error on stop watch instance creation");
+        }
+        return sw;
       }
 
-      bool Pause()
+      virtual double get_time()
       {
-        Update();
+        update();
+        return total;
+      }
+
+      virtual bool is_running() const
+      {
+        return running;
+      }
+
+      virtual double microseconds()
+      {
+        update();
+        return total * 1000000;
+      }
+
+      virtual double milliseconds()
+      {
+        update();
+        return total * 1000;
+      }
+
+      virtual bool pause()
+      {
+        update();
         running = false;
         return true;
       }
 
-      bool Resume()
+      virtual bool resume()
       {
-        last_time = boost::posix_time::microsec_clock::local_time();
+        if (running) { return false; }
+        last = double(SDL_GetPerformanceCounter()) / SDL_GetPerformanceFrequency();
         running = true;
         return true;
       }
 
-      bool SetTime(double seconds)
+      virtual bool set_time(double seconds)
       {
-        this->ticks = seconds * 1000000;
+        total = seconds;
+        last = double(SDL_GetPerformanceCounter()) / SDL_GetPerformanceFrequency();
         return true;
       }
 
-      bool Start(double initial_sec)
+      virtual bool start(double init = 0)
       {
         running = true;
-        ticks = initial_sec * 1000000;
-        last_time = boost::posix_time::microsec_clock::local_time();
+        total = init;
+        last = double(SDL_GetPerformanceCounter()) / SDL_GetPerformanceFrequency();
         return true;
       }
 
-      double Time()
-      {
-        Update();
-        return double(ticks) / 1000000;
-      }
-
-      bool Update()
+      bool update()
       {
         if (running)
         {
-          boost::posix_time::ptime new_time = boost::posix_time::microsec_clock::local_time();
-          boost::posix_time::time_duration d = new_time - last_time;
-          ticks += d.total_microseconds();
-          last_time = new_time;
+          double new_time = double(SDL_GetPerformanceCounter()) / SDL_GetPerformanceFrequency();
+          double d = new_time - last;
+          last = new_time;
+          if (d > 0)
+          {
+            total += d;
+          }
           return true;
         }
         return false;
       }
 
-//      long last_time;
-      boost::posix_time::ptime last_time;
+      double total, last;
       bool running;
-      long ticks;
   };
-  static myStopWatch *cast_watch(void *obj) { return (myStopWatch *)obj; }
 
-  stop_watch::stop_watch() : base(), _obj(NULL) { }
-
-  stop_watch::~stop_watch()
+  stop_watch::ptr stop_watch::create()
   {
-    if (_obj) { delete cast_watch(_obj); }
-  }
-
-  boost::shared_ptr<stop_watch> stop_watch::create()
-  {
-    boost::shared_ptr<stop_watch> sw;
-    try {
-      sw.reset(new stop_watch);
-      if (! sw) { throw -1; }
-      sw->_obj = new myStopWatch;
-      if (! sw->_obj) { throw -2; }
-    }
-    catch(...) {
-      sw.reset();
-      lev::debug_print("error on stop watch instance creation");
-    }
-    return sw;
-  }
-
-  double stop_watch::get_time()
-  {
-    return cast_watch(_obj)->Time();
-  }
-
-  bool stop_watch::is_running()
-  {
-    return cast_watch(_obj)->running;
-  }
-
-  double stop_watch::microseconds()
-  {
-    return cast_watch(_obj)->Microseconds();
-  }
-
-  double stop_watch::milliseconds()
-  {
-    return cast_watch(_obj)->Milliseconds();
-  }
-
-  bool stop_watch::pause()
-  {
-    return cast_watch(_obj)->Pause();
-  }
-
-  bool stop_watch::resume()
-  {
-    return cast_watch(_obj)->Resume();
-  }
-
-  bool stop_watch::set_time(double seconds)
-  {
-    return cast_watch(_obj)->SetTime(seconds);
-  }
-
-  bool stop_watch::start(double initial_sec)
-  {
-    return cast_watch(_obj)->Start(initial_sec);
+    return impl_stop_watch::create();
   }
 
 
-//  // prototype of timer callback function
-//  static Uint32 timer_callback(Uint32 interval, void *param);
-
+  // timer class implementation
   template <typename T>
   class impl_timer : public T
   {
@@ -247,7 +217,7 @@ namespace lev
     protected:
       impl_timer() :
         T(),
-        base_time(0), interval(1000), func_notify(),
+        base_time(0), func_notify(),
         one_shot(false),
         running(false), wptr()
       { }
@@ -259,7 +229,7 @@ namespace lev
         return false;
       }
 
-      static impl_timer::ptr create(double interval = 1000)
+      static impl_timer::ptr create(double interval = 1)
       {
         impl_timer::ptr t;
         system::ptr sys = system::get();
@@ -313,10 +283,10 @@ namespace lev
         if (! running) { return false; }
         system::ptr sys = system::get();
         if (! sys) { return false; }
-        if (sys->get_ticks() - base_time > interval)
+        if (sys->get_elapsed() - base_time >= interval)
         {
           notify();
-          base_time = sys->get_ticks();
+          base_time = sys->get_elapsed();
           if (one_shot) { running = false; }
           return true;
         }
@@ -336,14 +306,14 @@ namespace lev
         return true;
       }
 
-      virtual bool start(double milliseconds = -1, bool one_shot = false)
+      virtual bool start(double new_interval = -1, bool new_one_shot = false)
       {
-        if (milliseconds > 0) { interval = milliseconds; }
+        if (new_interval > 0) { interval = new_interval; }
         system::ptr sys = system::get();
         if (! sys) { return false; }
 
-        base_time = sys->get_ticks();
-        this->one_shot = one_shot;
+        base_time = sys->get_elapsed();
+        one_shot = new_one_shot;
         running = true;
         return true;
       }
@@ -372,6 +342,7 @@ namespace lev
     return impl_timer<timer>::create(interval);
   }
 
+  // clock class implementation
   class impl_clock : public impl_timer<clock>
   {
     public:
@@ -402,7 +373,7 @@ namespace lev
 
       virtual double get_freq() const
       {
-        return 1000 / get_interval();
+        return 1.0 / get_interval();
       }
 
       virtual bool probe()
@@ -410,7 +381,7 @@ namespace lev
         if (! running) { return false; }
         system::ptr sys = system::get();
         if (! sys) { return false; }
-        if (sys->get_ticks() - base_time > interval)
+        if (sys->get_elapsed() - base_time > interval)
         {
           base_time = base_time + interval;
           notify();
@@ -421,7 +392,7 @@ namespace lev
 
       virtual bool set_freq(double freq)
       {
-        return set_interval(1000 / freq);
+        return set_interval(1.0 / freq);
       }
 
       virtual bool start(double freq)
@@ -430,7 +401,7 @@ namespace lev
         {
           return impl_timer<clock>::start(-1, false);
         }
-        return impl_timer<clock>::start(1000 / freq, false);
+        return impl_timer<clock>::start(1.0 / freq, false);
       }
 
   };

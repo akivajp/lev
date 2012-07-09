@@ -12,6 +12,7 @@
 /////////////////////////////////////////////////////////////////////////////
 
 #include "base.hpp"
+#include <boost/shared_ptr.hpp>
 #include <luabind/luabind.hpp>
 
 extern "C" {

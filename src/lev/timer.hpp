@@ -27,24 +27,24 @@ namespace lev
 
   class stop_watch : public base
   {
-    protected:
-      stop_watch();
     public:
-      virtual ~stop_watch();
-      static boost::shared_ptr<stop_watch> create();
-      virtual type_id get_type_id() const { return LEV_TSTOP_WATCH; }
-      double get_time();
-      bool is_running();
-      double microseconds();
-      double milliseconds();
-      bool pause();
-      bool resume();
-      double seconds() { return get_time(); }
-      bool set_time(double seconds);
-      bool start(double initial_msec = 0);
-      bool start0() { return start(0); }
+      typedef boost::shared_ptr<stop_watch> ptr;
     protected:
-      void *_obj;
+      stop_watch() : base() { }
+    public:
+      virtual ~stop_watch() { }
+      static stop_watch::ptr create();
+      virtual type_id get_type_id() const { return LEV_TSTOP_WATCH; }
+      virtual double get_time() = 0;
+      virtual bool is_running() const = 0;
+      virtual double microseconds() = 0;
+      virtual double milliseconds() = 0;
+      virtual bool pause() = 0;
+      virtual bool resume() = 0;
+      double seconds() { return get_time(); }
+      virtual bool set_time(double seconds) = 0;
+      virtual bool start(double init = 0) = 0;
+      bool start0() { return start(0); }
   };
 
   class timer : public base
@@ -57,7 +57,7 @@ namespace lev
       virtual ~timer() { }
 
       virtual bool close() = 0;
-      static boost::shared_ptr<timer> create(double interval = 1000);
+      static boost::shared_ptr<timer> create(double interval = 1);
       virtual double get_interval() const = 0;
       virtual luabind::object get_notify() = 0;
       virtual type_id get_type_id() const { return LEV_TTIMER; }
@@ -67,9 +67,9 @@ namespace lev
       virtual bool probe() = 0;
       virtual bool set_interval(double new_interval) = 0;
       virtual bool set_notify(luabind::object func) = 0;
-      virtual bool start(double milliseconds = -1, bool one_shot = false) = 0;
+      virtual bool start(double interval = -1, bool one_shot = false) = 0;
       bool start0() { return start(); }
-      bool start1(double milliseconds) { return start(milliseconds); }
+      bool start1(double interval) { return start(interval); }
       virtual bool stop() = 0;
       virtual timer::ptr to_timer() = 0;
   };

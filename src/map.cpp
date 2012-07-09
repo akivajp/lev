@@ -22,6 +22,7 @@
 #include "lev/util.hpp"
 
 // libraries
+#include <boost/weak_ptr.hpp>
 #include <vector>
 
 namespace lev
@@ -241,7 +242,7 @@ namespace lev
       {
         bool hovered_any = false;
         try {
-          for (int i = 0; i < rects.size(); i++)
+          for (int i = rects.size() - 1; i >= 0; i--)
           {
             if (rects[i]->include(x, y))
             {
@@ -272,14 +273,17 @@ namespace lev
       {
         lua_State *L = NULL;
         try {
-          for (int i = 0; i < rects.size(); i++)
+          for (int i = rects.size() - 1; i >= 0; i--)
           {
             if (rects[i]->include(x, y))
             {
+//printf("MAP HIT! ITEM(%d), X:%d Y:%d\n", i, x, y);
               if (funcs_lclick[i] && luabind::type(funcs_lclick[i]) == LUA_TFUNCTION)
               {
                 L = funcs_lclick[i].interpreter();
+//printf("DO ON LCICK! ITEM(%d), X:%d Y:%d\n", i, x, y);
                 funcs_lclick[i](x, y);
+//printf("DONE ON LCICK! ITEM(%d), X:%d Y:%d\n\n", i, x, y);
                 return true;
               }
             }

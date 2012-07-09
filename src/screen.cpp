@@ -24,9 +24,10 @@
 
 // libraries
 #include <boost/shared_ptr.hpp>
+#include <boost/weak_ptr.hpp>
 #include <luabind/luabind.hpp>
+#include <GL/glu.h>
 #include <SDL2/SDL.h>
-
 
 namespace lev
 {
