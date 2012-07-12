@@ -42,7 +42,8 @@ namespace lev
       static luabind::object get_path_list(lua_State *L);
       static luabind::object get_search_list(lua_State *L);
       static int require_l(lua_State *L);
-      static filepath::ptr resolve(lua_State *L, const std::string &file);
+      static file::ptr resolve(lua_State *L, const std::string &file);
+//      static filepath::ptr resolve(lua_State *L, const std::string &file);
       static bool set_default_font_dirs(lua_State *L);
   };
 

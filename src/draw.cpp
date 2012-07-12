@@ -73,7 +73,7 @@ namespace lev
 //printf("IMAGE CAST!\n");
         object obj = t["lev.drawable1"];
 //printf("OBJECT: %s\n", object_cast<const char *>(obj["type_name"]));
-        boost::shared_ptr<drawable> src = object_cast<boost::shared_ptr<drawable> >(obj["to_drawable"](obj));
+        boost::shared_ptr<drawable> src = object_cast<boost::shared_ptr<drawable> >(obj["drawable"]);
         cv->draw(src, x, y, a);
 //printf("IMAGE END!\n");
       }
@@ -262,6 +262,7 @@ int luaopen_lev_draw(lua_State *L)
         .def("compile", &drawable::compile)
         .def("compile", &drawable::compile0)
         .property("descent", &drawable::get_descent, &drawable::set_descent)
+        .property("drawable", &drawable::to_drawable)
         .def("draw_on", &drawable::draw_on)
         .def("draw_on", &drawable::draw_on1)
         .def("draw_on", &drawable::draw_on3)
@@ -271,7 +272,6 @@ int luaopen_lev_draw(lua_State *L)
         .property("is_texturized", &drawable::is_texturized)
         .def("texturize", &drawable::texturize)
         .def("texturize", &drawable::texturize0)
-        .def("to_drawable", &drawable::to_drawable)
         .property("w", &drawable::get_w)
         .property("width", &drawable::get_w),
       class_<canvas, drawable, boost::shared_ptr<drawable> >("canvas")

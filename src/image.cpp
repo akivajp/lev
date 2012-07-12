@@ -720,11 +720,6 @@ namespace lev
         return append(bitmap::load(filename), duration);
       }
 
-      virtual bool append_path(const filepath *path, double duration)
-      {
-        return append_file(path->get_fullpath(), duration);
-      }
-
       static int append_l(lua_State *L)
       {
         using namespace luabind;
@@ -747,18 +742,24 @@ namespace lev
           {
             object obj = t["lev.drawable1"];
             boost::shared_ptr<drawable> img;
-            img = object_cast<boost::shared_ptr<drawable> >(obj["to_drawable"](obj));
+            img = object_cast<boost::shared_ptr<drawable> >(obj["drawable"]);
             lua_pushboolean(L, anim->append(img, duration));
           }
           else if (t["lua.string1"])
           {
             const char *path = object_cast<const char *>(t["lua.string1"]);
-            lua_pushboolean(L, anim->append_file(path, duration));
+            lua_pushboolean(L, anim->append(bitmap::load(path), duration));
           }
           else if (t["lev.filepath1"])
           {
             filepath::ptr path = object_cast<filepath::ptr>(t["lev.filepath1"]);
-            lua_pushboolean(L, anim->append_path(path.get(), duration));
+            lua_pushboolean(L, anim->append(bitmap::load(path->get_string()), duration));
+          }
+          else if (t["lev.file1"])
+          {
+            object obj = t["lev.file1"];
+            file::ptr f = object_cast<file::ptr>(obj["file"]);
+            lua_pushboolean(L, anim->append(bitmap::load_file(f), duration));
           }
           else
           {
@@ -1020,13 +1021,19 @@ namespace lev
           if (t["lev.drawable1"])
           {
             object obj = t["lev.drawable1"];
-            drawable::ptr img = object_cast<drawable::ptr>(obj["to_drawable"](obj));
+            drawable::ptr img = object_cast<drawable::ptr>(obj["drawable"]);
             result = tran->set_current(img);
+          }
+          else if (t["lev.file1"])
+          {
+            object obj = t["lev.file1"];
+            file::ptr f = object_cast<file::ptr>(obj["file"]);
+            result = tran->set_current(bitmap::load_file(f));
           }
           else if (t["lev.filepath1"])
           {
             filepath::ptr path = object_cast<filepath::ptr>(t["lev.filepath1"]);
-            result = tran->set_current(path->get_fullpath());
+            result = tran->set_current(path->get_string());
           }
           else if (t["lua.string1"])
           {
@@ -1101,13 +1108,19 @@ namespace lev
           if (t["lev.drawable1"])
           {
             object obj = t["lev.drawable1"];
-            drawable::ptr img = object_cast<drawable::ptr>(obj["to_drawable"](obj));
+            drawable::ptr img = object_cast<drawable::ptr>(obj["drawable"]);
             result = tran->set_next(img, duration, mode);
+          }
+          else if (t["lev.file1"])
+          {
+            object obj = t["lev.file1"];
+            file::ptr f = object_cast<file::ptr>(obj["file"]);
+            result = tran->set_next(bitmap::load_file(f), duration, mode);
           }
           else if (t["lev.filepath1"])
           {
             filepath::ptr path = object_cast<filepath::ptr>(t["lev.filepath1"]);
-            result = tran->set_next(path->get_fullpath(), duration, mode);
+            result = tran->set_next(path->get_string(), duration, mode);
           }
           else if (t["lua.string1"])
           {
@@ -1161,7 +1174,7 @@ namespace lev
 
   transition::ptr transition::create_with_path(filepath::ptr path)
   {
-    return create_with_string(path->get_fullpath());
+    return create_with_string(path->get_string());
   }
 
   transition::ptr transition::create_with_string(const std::string &image_path)

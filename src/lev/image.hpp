@@ -85,8 +85,6 @@ namespace lev
       virtual ~animation() { }
 
       virtual bool append(boost::shared_ptr<drawable> img, double duration) = 0;
-      virtual bool append_file(const std::string &filename, double duration) = 0;
-      virtual bool append_path(const filepath *path, double duration) = 0;
       static animation::ptr create(bool repeating = true);
       static animation::ptr create0() { return create(); }
       virtual drawable::ptr get_current() const = 0;

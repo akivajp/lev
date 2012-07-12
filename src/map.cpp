@@ -17,6 +17,7 @@
 // dependencies
 #include "lev/debug.hpp"
 #include "lev/entry.hpp"
+#include "lev/fs.hpp"
 #include "lev/image.hpp"
 #include "lev/prim.hpp"
 #include "lev/util.hpp"
@@ -152,8 +153,14 @@ namespace lev
           if (t["lev.drawable1"])
           {
             object obj = t["lev.drawable1"];
-            boost::shared_ptr<drawable> img = object_cast<boost::shared_ptr<drawable> >(obj["to_drawable"](obj));
+            drawable::ptr img = object_cast<drawable::ptr>(obj["drawable"]);
             result = m->map_image(img, x, y, alpha);
+          }
+          else if (t["lev.file1"])
+          {
+            object obj = t["lev.file1"];
+            file::ptr f = object_cast<file::ptr>(obj["file"]);
+            result = m->map_image(bitmap::load_file(f), x, y, alpha);
           }
           lua_pushboolean(L, result);
         }
@@ -221,12 +228,12 @@ namespace lev
           if (t["lev.drawable1"])
           {
             object obj = t["lev.drawable1"];
-            img1 = object_cast<drawable::ptr>(obj["to_drawable"](obj));
+            img1 = object_cast<drawable::ptr>(obj["drawable"]);
           }
           if (t["lev.drawable2"])
           {
             object obj = t["lev.drawable2"];
-            img2 = object_cast<drawable::ptr>(obj["to_drawable"](obj));
+            img2 = object_cast<drawable::ptr>(obj["drawable"]);
           }
           result = m->map_link(img1, img2, x, y, lclick_func, hover_func, alpha);
           lua_pushboolean(L, result);

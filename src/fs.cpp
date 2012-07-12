@@ -22,6 +22,7 @@
 // libraries
 #include <boost/format.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/scoped_array.hpp>
 #include <string>
 
 
@@ -105,6 +106,7 @@ namespace lev
         try {
           f.reset(new impl_file);
           if (! f) { throw -1; }
+          f->wptr = f;
           f->ops = SDL_RWFromFile(path.c_str(), mode.c_str());
           if (! f->ops) { throw -2; }
         }
@@ -129,10 +131,11 @@ namespace lev
       virtual bool read_count(std::string &content, int count)
       {
         if (count <= 0) { return false; }
-        unsigned char buf[count];
-        size_t readed = read(buf, 1, count);
+        boost::scoped_array<unsigned char> buf(new unsigned char[count]);
+        if (! buf) { return false; }
+        size_t readed = read(buf.get(), 1, count);
         if (readed <= 0) { return false; }
-        content.assign((const char *)buf, readed);
+        content.assign((const char *)buf.get(), readed);
         return true;
       }
 
@@ -227,6 +230,15 @@ namespace lev
         }
       }
 
+      virtual bool save(const std::string &path)
+      {
+        file::ptr output = file::open(path, "wb");
+        if (! output) { return false; }
+        std::string data;
+        if (! read_all(data)) { return false; }
+        return output->write(data);
+      }
+
       virtual long seek(long pos)
       {
         if (! ops) { return -1; }
@@ -239,6 +251,11 @@ namespace lev
         return ops->seek(ops, 0, SEEK_CUR);
       }
 
+      virtual file::ptr to_file()
+      {
+        return file::ptr(wptr);
+      }
+
       virtual bool write(const std::string &data)
       {
         if (! ops) { return false; }
@@ -246,6 +263,7 @@ namespace lev
       }
 
       SDL_RWops *ops;
+      boost::weak_ptr<impl_file> wptr;
   };
 
   file::ptr file::open(const std::string &path, const std::string &mode)
@@ -273,11 +291,17 @@ namespace lev
 
       virtual bool close()
       {
-        if (! ops) { return false; }
-        ops->close(ops);
-        delete buffer;
-        ops = NULL;
-        return false;
+        if (! ops)
+        {
+          ops->close(ops);
+          ops = NULL;
+        }
+        if (buffer)
+        {
+          delete [] buffer;
+          buffer = NULL;
+        }
+        return true;
       }
 
       static memfile::ptr create(long size)
@@ -287,7 +311,8 @@ namespace lev
         try {
           f.reset(new impl_memfile);
           if (! f) { throw -1; }
-          f->buffer = (unsigned char *)malloc(size);
+          f->wptr = f;
+          f->buffer = new unsigned char [size];
           if (! f->buffer) { throw -2; }
           f->ops = SDL_RWFromMem(f->buffer, size);
           if (! f->ops) { throw -3; }
@@ -465,9 +490,14 @@ namespace lev
         return p.filename().generic_string();
       }
 
-      virtual std::string get_fullpath() const
+      virtual filepath::ptr get_fullpath() const
       {
-        return boost::filesystem::absolute(p).generic_string();
+        return filepath::create(boost::filesystem::absolute(p).generic_string());
+      }
+
+      virtual filepath::ptr get_parent() const
+      {
+        return filepath::create(p.parent_path().generic_string());
       }
 
       virtual long get_size() const
@@ -491,6 +521,17 @@ namespace lev
       virtual bool is_file() const
       {
         return boost::filesystem::is_regular_file(p);
+      }
+
+      virtual bool mkdir(bool force = false)
+      {
+        try {
+          if (force) { return boost::filesystem::create_directories(p); }
+          else { return boost::filesystem::create_directory(p); }
+        }
+        catch (...) {
+          return false;
+        }
       }
 
       boost::filesystem::path p;
@@ -543,13 +584,6 @@ namespace lev
   bool filepath::is_file_writable()
   {
     return cast_path(_obj)->IsFileWritable();
-  }
-
-  bool filepath::mkdir(bool force)
-  {
-    int flags = 0;
-    if (force) { flags = wxPATH_MKDIR_FULL; }
-    return cast_path(_obj)->Mkdir(0755, flags);
   }
 
   bool filepath::touch()
@@ -842,11 +876,13 @@ int luaopen_lev_fs(lua_State *L)
     [
       class_<file, base, base::ptr>("file")
         .def("close", &file::close)
+        .property("file", &file::to_file)
         .def("eof", &file::eof)
         .def("find", &file::find_data)
         .property("pos", &file::tell, &file::seek)
         .property("postion", &file::tell, &file::seek)
         .property("size", &file::get_size)
+        .def("save", &file::save)
         .def("seek", &file::seek)
         .def("tell", &file::tell)
         .def("write", &file::write)
@@ -887,9 +923,11 @@ int luaopen_lev_fs(lua_State *L)
 //        .property("is_file_executable", &filepath::is_file_executable)
 //        .property("is_file_readable", &filepath::is_file_readable)
 //        .property("is_file_writable", &filepath::is_file_writable)
-//        .def("mkdir", &filepath::mkdir)
-//        .def("mkdir", &filepath::mkdir0)
+        .def("mkdir", &filepath::mkdir)
+        .def("mkdir", &filepath::mkdir0)
         .property("name", &filepath::get_filename)
+        .property("parent", &filepath::get_parent)
+        .property("parent_path", &filepath::get_parent)
 //        .property("path", &filepath::get_dir_path)
         .property("size", &filepath::get_size)
         .property("str", &filepath::get_string)

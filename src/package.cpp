@@ -158,10 +158,13 @@ namespace lev
     std::string filename = object_cast<const char *>(object(from_stack(L, 1)));
 
     object path_list = package::get_path_list(L);
-    filepath::ptr fpath = package::resolve(L, filename);
-    if (fpath)
+    file::ptr f = package::resolve(L, filename);
+    if (f)
     {
-      if (luaL_dofile(L, fpath->get_fullpath().c_str()) != 0)
+      std::string data;
+      if (! f->read_all(data)) { return 0; }
+//      if (luaL_dofile(L, fpath->get_string().c_str()) != 0)
+      if (luaL_dostring(L, data.c_str()) != 0)
       {
         lev::debug_print(lua_tostring(L, -1));
         lua_pushnil(L);
@@ -309,11 +312,14 @@ namespace lev
     }
 
     object path_list = package::get_path_list(L);
-    filepath::ptr fpath = package::resolve(L, module);
-    if (! fpath) { fpath = package::resolve(L, module + ".lua"); }
-    if (fpath)
+    file::ptr f = package::resolve(L, module);
+    if (! f) { f = package::resolve(L, module + ".lua"); }
+    if (f)
     {
-      if (luaL_dofile(L, fpath->get_fullpath().c_str()))
+      std::string data;
+      if (! f->read_all(data)) { return 0; }
+//      if (luaL_dofile(L, fpath->get_string().c_str()))
+      if (luaL_dostring(L, data.c_str()))
       {
         lev::debug_print(lua_tostring(L, -1));
         lua_pushnil(L);
@@ -338,7 +344,8 @@ namespace lev
     }
   }
 
-  filepath::ptr package::resolve(lua_State *L, const std::string &file)
+//  filepath::ptr package::resolve(lua_State *L, const std::string &file)
+  file::ptr package::resolve(lua_State *L, const std::string &file)
   {
     using namespace luabind;
 
@@ -359,7 +366,8 @@ namespace lev
 
           if (fs::is_file(real_path))
           {
-            return filepath::create(real_path);
+            return file::open(real_path, "rb");
+//            return filepath::create(real_path);
           }
         }
 
@@ -376,10 +384,11 @@ namespace lev
               if (system::get()) { sys_name = system::get()->get_name(); }
               std::string ext = fs::to_extension(file);
 
-              filepath::ptr fpath(filepath::create_temp(sys_name + "/", ext));
-              if (! fpath) { return fpath; }
-              lev::archive::extract_direct_to(path, entry, fpath->get_fullpath());
-              return fpath;
+//              filepath::ptr fpath(filepath::create_temp(sys_name + "/", ext));
+//              if (! fpath) { return fpath; }
+//              lev::archive::extract_direct_to(path, entry, fpath->get_string());
+//              return fpath;
+              return archive::extract_direct(path, entry, NULL);
             }
           }
 
@@ -395,10 +404,11 @@ namespace lev
               if (system::get()) { sys_name = system::get()->get_name(); }
               std::string ext = fs::to_extension(file);
 
-              filepath::ptr fpath(filepath::create_temp(sys_name + "/", ext));
-              if (! fpath) { return fpath; }
-              lev::archive::extract_direct_to(path, entry, fpath->get_fullpath());
-              return fpath;
+//              filepath::ptr fpath(filepath::create_temp(sys_name + "/", ext));
+//              if (! fpath) { return fpath; }
+//              lev::archive::extract_direct_to(path, entry, fpath->get_string());
+//              return fpath;
+              return archive::extract_direct(path, entry, NULL);
             }
           }
         }
@@ -407,7 +417,7 @@ namespace lev
     catch (...) {
       lev::debug_print("error on file path resolving");
     }
-    return filepath::ptr();
+    return file::ptr();
   }
 
   bool package::set_default_font_dirs(lua_State *L)

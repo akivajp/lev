@@ -48,8 +48,10 @@ namespace lev
       virtual unsigned long read_le32() = 0;
       virtual bool read_line(std::string &content) = 0;
       static int read_l(lua_State *L);
+      virtual bool save(const std::string &path) = 0;
       virtual long seek(long pos) = 0;
       virtual long tell() const = 0;
+      virtual file::ptr to_file() = 0;
       virtual bool write(const std::string &data) = 0;
   };
 
@@ -98,8 +100,9 @@ namespace lev
       static filepath::ptr create_temp(const std::string &prefix = "temp",
                                        const std::string &suffix = "");
       virtual std::string get_filename() const = 0;
-      virtual std::string get_fullpath() const = 0;
+      virtual filepath::ptr get_fullpath() const = 0;
       virtual std::string get_extension() const = 0;
+      virtual filepath::ptr get_parent() const = 0;
       virtual long get_size() const = 0;
       virtual std::string get_string() const = 0;
       virtual type_id get_type_id() const { return LEV_TFILEPATH; }
@@ -110,8 +113,8 @@ namespace lev
 //      bool is_file_executable();
 //      bool is_file_readable();
 //      bool is_file_writable();
-//      bool mkdir(bool force);
-//      bool mkdir0() { return mkdir(false); }
+      virtual bool mkdir(bool force) = 0;
+      bool mkdir0() { return mkdir(false); }
 //      bool touch();
   };
 
