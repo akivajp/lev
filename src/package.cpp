@@ -161,7 +161,7 @@ namespace lev
     filepath::ptr fpath = package::resolve(L, filename);
     if (fpath)
     {
-      if (luaL_dofile(L, fpath->get_full_path().c_str()) != 0)
+      if (luaL_dofile(L, fpath->get_fullpath().c_str()) != 0)
       {
         lev::debug_print(lua_tostring(L, -1));
         lua_pushnil(L);
@@ -186,7 +186,7 @@ namespace lev
       for (iterator i(dirs), end; i != end; i++)
       {
         std::string path = object_cast<const char *>(*i);
-        if (file_system::file_exists(path + "/" + filename))
+        if (fs::is_file(path + "/" + filename))
         {
           f = font::load(path + "/" + filename);
           if (f) { break; }
@@ -313,7 +313,7 @@ namespace lev
     if (! fpath) { fpath = package::resolve(L, module + ".lua"); }
     if (fpath)
     {
-      if (luaL_dofile(L, fpath->get_full_path().c_str()))
+      if (luaL_dofile(L, fpath->get_fullpath().c_str()))
       {
         lev::debug_print(lua_tostring(L, -1));
         lua_pushnil(L);
@@ -357,7 +357,7 @@ namespace lev
           std::string real_path = path + "/" + search + "/" + file;
           purge_path(real_path);
 
-          if (file_system::file_exists(real_path))
+          if (fs::is_file(real_path))
           {
             return filepath::create(real_path);
           }
@@ -374,16 +374,16 @@ namespace lev
             {
               std::string sys_name = ".";
               if (system::get()) { sys_name = system::get()->get_name(); }
-              std::string ext = file_system::get_ext(file);
+              std::string ext = fs::to_extension(file);
 
               filepath::ptr fpath(filepath::create_temp(sys_name + "/", ext));
               if (! fpath) { return fpath; }
-              lev::archive::extract_direct_to(path, entry, fpath->get_full_path());
+              lev::archive::extract_direct_to(path, entry, fpath->get_fullpath());
               return fpath;
             }
           }
 
-          std::string arc_name = file_system::to_stem(path);
+          std::string arc_name = fs::to_stem(path);
           for (iterator s(search_list); s != end; s++)
           {
             std::string entry = object_cast<const char *>(*s);
@@ -393,11 +393,11 @@ namespace lev
             {
               std::string sys_name = ".";
               if (system::get()) { sys_name = system::get()->get_name(); }
-              std::string ext = file_system::get_ext(file);
+              std::string ext = fs::to_extension(file);
 
               filepath::ptr fpath(filepath::create_temp(sys_name + "/", ext));
               if (! fpath) { return fpath; }
-              lev::archive::extract_direct_to(path, entry, fpath->get_full_path());
+              lev::archive::extract_direct_to(path, entry, fpath->get_fullpath());
               return fpath;
             }
           }

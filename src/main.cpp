@@ -128,7 +128,7 @@ static bool set_libs(lua_State *L)
 
 static bool execute_path(lua_State *L, const std::string &path)
 {
-  if (file_system::dir_exists(path))
+  if (fs::is_directory(path))
   {
     // given path is directory
     // run entry program in path directory
@@ -137,7 +137,7 @@ static bool execute_path(lua_State *L, const std::string &path)
     for (int i = 0; i < entry_files_len; i++)
     {
       std::string filename = path + "/" + entry_files[i];
-      if (! file_system::file_exists(filename)) { continue; }
+      if (! fs::is_file(filename)) { continue; }
       do_file(L, filename);
       return true;
     }
@@ -149,7 +149,7 @@ static bool execute_path(lua_State *L, const std::string &path)
     std::string entry_name;
     for (int i = 0; i < entry_files_len; i++)
     {
-      std::string arc_name = file_system::to_stem(path);
+      std::string arc_name = fs::to_stem(path);
       if (lev::archive::find_direct(path, entry_files[i], entry_name)
           || lev::archive::find_direct(path, arc_name + "/" + entry_files[i], entry_name))
       {
@@ -223,7 +223,7 @@ int main(int argc, char **argv)
   // run entry program
   if (! done_something)
   {
-    if (file_system::dir_exists(entry_dir[0]))
+    if (fs::is_directory(entry_dir[0]))
     {
       execute_path(L, entry_dir[0]);
       done_something = true;
@@ -235,7 +235,7 @@ int main(int argc, char **argv)
     for (int i = 0; i < entry_files_len; i++)
     {
       if (done_something) { break; }
-      if (! file_system::file_exists(entry_files[i])) { continue; }
+      if (! fs::is_file(entry_files[i])) { continue; }
       if (! do_file(L, entry_files[i])) { return -1; }
       done_something = true;
     }
@@ -265,7 +265,7 @@ int main(int argc, char **argv)
         lev::debug_print(e.what());
       }
     }
-    sys->done();
+    sys->close();
   }
   lua_gc(L, LUA_GCCOLLECT, 0);
   lua_close(L);

@@ -66,8 +66,7 @@ int luaopen_lev_std(lua_State *L)
     globals(L)["require"]("lev.util");
 
     globals(L)["system"] = globals(L)["lev"]["system"]();
-//    globals(L)["mixer"] = globals(L)["lev"]["sound"]["mixer"]();
-    globals(L)["mixer"] = globals(L)["system"]["create_mixer"](globals(L)["system"]);
+    globals(L)["mixer"]  = globals(L)["lev"]["mixer"]();
     globals(L)["package"]["loaded"]["lev.std"] = globals(L)["lev"];
     globals(L)["collectgarbage"]();
   }

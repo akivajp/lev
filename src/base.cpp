@@ -82,6 +82,10 @@ namespace lev
           }
 
           (*base_id_map)[LEV_TEVENT]           = LEV_TBASE;
+          (*base_id_map)[LEV_TFILE]            = LEV_TBASE;
+          {
+            (*base_id_map)[LEV_TMEMFILE]       = LEV_TFILE;
+          }
           (*base_id_map)[LEV_TFILEPATH]        = LEV_TBASE;
           (*base_id_map)[LEV_TFONT]            = LEV_TBASE;
           (*base_id_map)[LEV_TMIXER]           = LEV_TBASE;
@@ -136,10 +140,12 @@ namespace lev
         (*type_name_map)[LEV_TDEBUGGER]   = "lev.debugger";
         (*type_name_map)[LEV_TDRAWABLE]   = "lev.drawable";
         (*type_name_map)[LEV_TEVENT]      = "lev.event";
+        (*type_name_map)[LEV_TFILE]       = "lev.file";
         (*type_name_map)[LEV_TFILEPATH]   = "lev.filepath";
         (*type_name_map)[LEV_TFONT]       = "lev.font";
         (*type_name_map)[LEV_TLAYOUT]     = "lev.layout";
         (*type_name_map)[LEV_TMAP]        = "lev.map";
+        (*type_name_map)[LEV_TMEMFILE]    = "lev.memfile";
         (*type_name_map)[LEV_TMIXER]      = "lev.mixer";
         (*type_name_map)[LEV_TPOINT]      = "lev.point";
         (*type_name_map)[LEV_TRECT]       = "lev.rect";

@@ -124,6 +124,30 @@ namespace lev
     return 1;
   }
 
+  bool canvas::fill_circle(int cx, int cy, int radius, color::ptr filling)
+  {
+    if (! filling) { return false; }
+    color::ptr half = filling->clone();
+    half->set_a(half->get_a() / 2);
+    for (int y = -radius; y <= radius; y++)
+    {
+      for (int x = -radius; x <= radius; x++)
+      {
+        int dist2 = x * x + y * y;
+        int rad2 = radius * radius;
+        if (dist2 < rad2)
+        {
+          draw_pixel(cx + x, cy + y, *filling);
+        }
+        else if (dist2 <= rad2)
+        {
+          draw_pixel(cx + x, cy + y, *half);
+        }
+      }
+    }
+    return true;
+  }
+
   bool canvas::fill_rect(int offset_x, int offset_y, int w, int h, color::ptr filling)
   {
     if (! filling) { return false; }
@@ -155,8 +179,6 @@ namespace lev
 //    return bitmap_draw_mask(this, &tmp, border);
 //  }
 
-//  bool bitmap::stroke_line(int x1, int y1, int x2, int y2, color *border, int width,
-//                          const std::string &style)
   bool canvas::stroke_line(int x1, int y1, int x2, int y2, boost::shared_ptr<color> c, int width,
                            const std::string &style)
   {
@@ -202,22 +224,24 @@ namespace lev
     return true;
   }
 
-//  bool bitmap::stroke_rect(int x, int y, int w, int h, color *border, int width)
-//  {
-//    wxBitmap tmp(get_w(), get_h(), 32);
-//    try {
-//      wxMemoryDC mdc(tmp);
-//      mdc.SetPen(wxPen(wxColour(255, 255, 255, 255), width));
-//      mdc.SetBrush(wxColour(0, 0, 0, 255));
-//      mdc.SetBackground(wxColour(0, 0, 0, 255));
-//      mdc.Clear();
-//      mdc.DrawRectangle(x, y, w, h);
-//    }
-//    catch (...) {
-//      return false;
-//    }
-//    return bitmap_draw_mask(this, &tmp, border);
-//  }
+  bool canvas::stroke_rect(int offset_x, int offset_y, int w, int h, color::ptr border, int width)
+  {
+    if (! border) { return false; }
+    for (int y = 0; y < h; y++)
+    {
+      for (int x = 0; x < w; x++)
+      {
+        if (0 <= x && x < width ||
+            0 <= y && y < width ||
+            w - width <= x && x < w ||
+            h - width <= y && y < h)
+        {
+          draw_pixel(offset_x + x, offset_y + y, *border);
+        }
+      }
+    }
+    return true;
+  }
 
 }
 
@@ -261,7 +285,7 @@ int luaopen_lev_draw(lua_State *L)
         .def("clear", &canvas::clear3)
         .def("clear", &canvas::clear_color)
         .def("draw_pixel", &canvas::draw_pixel)
-//        .def("fill_circle", &canvas::fill_circle)
+        .def("fill_circle", &canvas::fill_circle)
         .def("fill_rect", &canvas::fill_rect)
         .def("fill_rectangle", &canvas::fill_rect)
         .def("get_color", &canvas::get_pixel)
@@ -269,8 +293,8 @@ int luaopen_lev_draw(lua_State *L)
 //        .def("stroke_circle", &canvas::stroke_circle)
         .def("stroke_line", &canvas::stroke_line)
         .def("stroke_line", &canvas::stroke_line6)
-//        .def("stroke_rect", &canvas::stroke_rect)
-//        .def("stroke_rectangle", &canvas::stroke_rect)
+        .def("stroke_rect", &canvas::stroke_rect)
+        .def("stroke_rectangle", &canvas::stroke_rect)
     ]
   ];
   object lev = globals(L)["lev"];

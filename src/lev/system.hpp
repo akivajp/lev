@@ -69,15 +69,16 @@ namespace lev
       virtual bool attach(boost::shared_ptr<class screen> s) = 0;
       virtual bool attach(boost::shared_ptr<class timer> t) = 0;
 
+      // close method
+      virtual bool close() = 0;
+
       // delay methods
-      virtual bool delay(unsigned long msec = 1000) = 0;
+      virtual bool delay(double seconds = 1) = 0;
       bool delay0() { return delay(); }
 
       // do event methods
       virtual bool do_event() = 0;
       virtual bool do_events() = 0;
-
-      virtual bool done() = 0;
 
       static system::ptr get();
       virtual boost::shared_ptr<class debugger> get_debugger() = 0;

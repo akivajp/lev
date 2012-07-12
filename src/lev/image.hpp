@@ -23,11 +23,6 @@ extern "C" {
 namespace lev
 {
 
-  // class dependency
-  class filepath;
-  class font;
-  typedef boost::shared_ptr<class screen> screen_ptr;
-
   class bitmap : public canvas
   {
     public:
@@ -53,7 +48,8 @@ namespace lev
       virtual type_id get_type_id() const { return LEV_TBITMAP; }
 //      static bitmap* levana_icon();
       static bitmap::ptr load(const std::string &filename);
-      static bitmap::ptr load_path(boost::shared_ptr<filepath> path);
+      static bitmap::ptr load_file(boost::shared_ptr<class file> f);
+      static bitmap::ptr load_path(boost::shared_ptr<class filepath> path);
       virtual bitmap::ptr resize(int width, int height) = 0;
       virtual bool save(const std::string &filename) const = 0;
       virtual bool set_pixel(int x, int y, const color &c) = 0;
@@ -66,26 +62,17 @@ namespace lev
     public:
       typedef boost::shared_ptr<texture> ptr;
     protected:
-      texture();
+      texture() { }
     public:
-      ~texture();
+      virtual ~texture() { }
       virtual bool blit_on(boost::shared_ptr<class screen> dst,
                            int dst_x = 0, int dst_y = 0,
                            int src_x = 0, int src_y = 0,
                            int w = -1, int h = -1,
-                           unsigned char alpha = 255) const;
+                           unsigned char alpha = 255) const = 0;
       static texture::ptr create(bitmap::ptr src);
-//      virtual bool draw_on_screen(screen_ptr dst, int x = 0, int y = 0, unsigned char alpha = 255) const;
-      virtual int get_descent() const { return descent; }
-      virtual int get_h() const;
       virtual type_id get_type_id() const { return LEV_TTEXTURE; }
-      virtual int get_w() const;
-      virtual bool is_texturized() { return true; }
-      virtual bool set_descent(int d) { descent = d; return true; }
       static boost::shared_ptr<texture> load(const std::string &file);
-    protected:
-      void *_obj;
-      int descent;
   };
 
   class animation : public drawable
@@ -141,10 +128,10 @@ namespace lev
       virtual bool complete() = 0;
       static boost::shared_ptr<layout> create(int width_stop = -1);
       static layout::ptr create0() { return create(); }
-      virtual boost::shared_ptr<color> get_fg_color() = 0;
-      virtual boost::shared_ptr<font> get_font() = 0;
-      virtual boost::shared_ptr<font> get_ruby_font() = 0;
-      virtual boost::shared_ptr<color> get_shade_color() = 0;
+      virtual boost::shared_ptr<class color> get_fg_color() = 0;
+      virtual boost::shared_ptr<class font> get_font() = 0;
+      virtual boost::shared_ptr<class font> get_ruby_font() = 0;
+      virtual boost::shared_ptr<class color> get_shade_color() = 0;
       virtual type_id get_type_id() const { return LEV_TLAYOUT; }
       virtual bool is_done() const = 0;
       virtual bool on_hover(int x, int y) = 0;

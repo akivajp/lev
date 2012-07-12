@@ -76,14 +76,14 @@ int luaopen_lev_system(lua_State *L)
         .property("y", &event::get_y)
         .property("yrel", &event::get_dy),
       class_<lev::system, base, boost::shared_ptr<base> >("system")
-        .def("close", &system::done)
+        .def("close", &system::close)
         .def("create_mixer", &mixer::init)
         .property("dbg", &system::get_debugger)
         .property("debugger", &system::get_debugger)
         .def("delay", &system::delay)
         .def("do_event", &system::do_event)
         .def("do_events", &system::do_events)
-        .def("done", &system::done)
+        .def("done", &system::close)
         .property("elapsed", &system::get_elapsed)
         .property("is_debugging", &system::is_debugging)
         .property("is_running", &system::is_running, &system::set_running)
@@ -646,6 +646,10 @@ printf("INITTED!\n");
       {
 printf("QUITING1\n");
         dbg.reset();
+//        if (mixer::get())
+//        {
+//          SDL_CloseAudio();
+//        }
 printf("QUITING2\n");
         SDL_Quit();
 printf("QUITING3\n");
@@ -676,7 +680,7 @@ printf("QUITING3\n");
     public:
       virtual ~impl_system()
       {
-        done();
+        close();
       }
 
       virtual bool attach(debugger::ptr d)
@@ -706,10 +710,24 @@ printf("ATTACH TIMER!\n");
         return true;
       }
 
-      virtual bool delay(unsigned long msec = 1000)
+      virtual bool close()
       {
         if (! core) { return false; }
-        SDL_Delay(msec);
+//printf("DONE CORE COUNT: %ld\n", system_core::singleton.use_count());
+        core.reset();
+//printf("RESETTED CORE COUNT: %ld\n", system_core::singleton.use_count());
+        if (system_core::singleton.use_count() == 1)
+        {
+printf("SINGLETON CLEAR!\n");
+          system_core::singleton.reset();
+        }
+        return true;
+      }
+
+      virtual bool delay(double seconds = 1)
+      {
+        if (! core) { return false; }
+        SDL_Delay(seconds * 1000);
         return true;
       }
 
@@ -860,20 +878,6 @@ printf("ATTACH TIMER!\n");
         return true;
       }
 
-      bool done()
-      {
-        if (! core) { return false; }
-//printf("DONE CORE COUNT: %ld\n", system_core::singleton.use_count());
-        core.reset();
-//printf("RESETTED CORE COUNT: %ld\n", system_core::singleton.use_count());
-        if (system_core::singleton.use_count() == 1)
-        {
-printf("SINGLETON CLEAR!\n");
-          system_core::singleton.reset();
-        }
-        return true;
-      }
-
       static impl_system::ptr get()
       {
         impl_system::ptr sys;
@@ -998,7 +1002,7 @@ printf("SINGLETON CLEAR!\n");
 //printf("INIT CORE COUNT: %ld\n", sys->core.use_count());
         }
         catch (...) {
-          lev::debug_print("error on system initialization");
+          lev::debug_print("error on system instance creation");
           sys.reset();
         }
         return sys;

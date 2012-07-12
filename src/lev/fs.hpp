@@ -22,8 +22,55 @@ extern "C" {
 namespace lev
 {
 
+  class file : public base
+  {
+    public:
+      typedef boost::shared_ptr<file> ptr;
+    protected:
+      file() : base() { }
+    public:
+      virtual ~file() { }
+
+      virtual bool close() = 0;
+      virtual bool eof() const = 0;
+      virtual bool find(const void *chunk, int length) = 0;
+      virtual bool find_data(const std::string &data, int numtry = 1) = 0;
+      virtual void *get_ops() = 0;
+      virtual long get_size() const = 0;
+      virtual type_id get_type_id() const { return LEV_TFILE; }
+      static int lines_l(lua_State *L);
+      static file::ptr open(const std::string &path, const std::string &mode = "r");
+      static file::ptr open1(const std::string &path) { return open(path); }
+      virtual size_t read(void *buf, size_t size, size_t maxnum) = 0;
+      virtual bool read_all(std::string &content) = 0;
+      virtual bool read_count(std::string &content, int count) = 0;
+      virtual unsigned short read_le16() = 0;
+      virtual unsigned long read_le32() = 0;
+      virtual bool read_line(std::string &content) = 0;
+      static int read_l(lua_State *L);
+      virtual long seek(long pos) = 0;
+      virtual long tell() const = 0;
+      virtual bool write(const std::string &data) = 0;
+  };
+
+  class memfile : public file
+  {
+    public:
+      typedef boost::shared_ptr<memfile> ptr;
+    protected:
+      memfile() : file() { }
+    public:
+      virtual ~memfile() { }
+
+      virtual unsigned char *get_buffer() = 0;
+      static memfile::ptr create(long size);
+      virtual type_id get_type_id() const { return LEV_TMEMFILE; }
+  };
+
   class temp_name : public base
   {
+    public:
+      typedef boost::shared_ptr<temp_name> ptr;
     protected:
       temp_name();
     public:
@@ -42,75 +89,60 @@ namespace lev
     public:
       typedef boost::shared_ptr<filepath> ptr;
     protected:
-      filepath();
+      filepath() : base() { }
     public:
-      virtual ~filepath();
-      bool clear();
-      static boost::shared_ptr<filepath> create(const std::string &path);
-      static int create_l(lua_State *L);
-      static boost::shared_ptr<filepath> create_temp(const std::string &prefix = "temp",
-                                    const std::string &suffix = "");
-      static int create_temp_l(lua_State *L);
-//      bool dir_exists();
-//      bool file_exists();
-//      std::string get_dir_path();
-      std::string get_full_path() const;
-//      std::string get_ext();
-//      std::string get_name();
-//      long get_size();
-//      std::string get_url();
+      virtual ~filepath() { }
+      virtual bool clear() = 0;
+      static filepath::ptr create(const std::string &path = "");
+      static filepath::ptr create0() { return create(); }
+      static filepath::ptr create_temp(const std::string &prefix = "temp",
+                                       const std::string &suffix = "");
+      virtual std::string get_filename() const = 0;
+      virtual std::string get_fullpath() const = 0;
+      virtual std::string get_extension() const = 0;
+      virtual long get_size() const = 0;
+      virtual std::string get_string() const = 0;
       virtual type_id get_type_id() const { return LEV_TFILEPATH; }
-//      bool is_dir();
+      virtual bool is_directory() const = 0;
 //      bool is_dir_readable();
 //      bool is_dir_writable();
+      virtual bool is_file() const = 0;
 //      bool is_file_executable();
 //      bool is_file_readable();
 //      bool is_file_writable();
 //      bool mkdir(bool force);
 //      bool mkdir0() { return mkdir(false); }
 //      bool touch();
-//
-    protected:
-      void *_obj;
   };
 
-  class file_system : public base
+  class fs : public base
   {
-//    protected:
-//      file_system();
     public:
-//      virtual ~file_system();
-      static bool dir_exists(const std::string &dir_path);
       static bool exists(const std::string &path);
-      static bool file_exists(const std::string &filepath);
 //      bool find(const std::string &pattern, std::string &file_name);
 //      static int find_l(lua_State *L);
 //      bool find_next(std::string &file_name);
 //      static int find_next_l(lua_State *L);
-//      static std::string get_cwd();
+      static std::string get_current_directory();
 //      static std::string get_executable_path();
-      static std::string get_ext(const std::string &path);
-//      std::string get_path();
 //      static std::string get_resource_dir();
       static long get_size(const std::string &filepath);
       static std::string get_temp_dir();
-//      virtual type_id get_type_id() const { return LEV_TFILE_SYSTEM; }
+//      virtual type_id get_type_id() const { return LEV_TFS; }
+      static bool is_directory(const std::string &dir_path);
+      static bool is_file(const std::string &filepath);
       static bool mkdir(const std::string &path, bool force = false);
-      static bool mkdir1(const std::string &path) { return file_system::mkdir(path); }
-//      static file_system* open(const std::string &path);
+      static bool mkdir1(const std::string &path) { return fs::mkdir(path); }
+//      static fs* open(const std::string &path);
 //      static int open_l(lua_State *L);
       static bool remove(const std::string &path, bool force);
-      static bool remove1(const std::string &path) { return file_system::remove(path, false); }
+      static bool remove1(const std::string &path) { return fs::remove(path, false); }
 //      bool set_path(const std::string &path);
-//      static std::string to_filepath(const std::string &url);
-//      static std::string to_full_path(const std::string &path);
-//      static std::string to_name(const std::string &path_to_file);
-      static std::string to_stem(const std::string &filepath);
-//      static std::string to_url(const std::string &filename);
+      static std::string to_extension(const std::string &path);
+      static std::string to_filename(const std::string &path);
+      static std::string to_fullpath(const std::string &path);
+      static std::string to_stem(const std::string &path);
       static bool touch(const std::string &path);
-//
-//    protected:
-//      void *_obj;
   };
 
 }

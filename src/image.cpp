@@ -334,11 +334,23 @@ namespace lev
 
       static bitmap::ptr load(const std::string &filename)
       {
+        file::ptr f = file::open(filename);
+        if (! f) { bitmap::ptr(); }
+        return bitmap::load_file(f);
+      }
+
+      static bitmap::ptr load_file(file::ptr f)
+      {
         bitmap::ptr bmp;
+        if (! f) { return bmp; }
         try {
-          if (! file_system::file_exists(filename)) { throw -1; }
           int w, h;
-          boost::shared_ptr<unsigned char> buf(stbi_load(filename.c_str(), &w, &h, NULL, 4), stbi_image_free);
+          std::string data;
+          if (! f->read_all(data)) { throw -1; }
+          boost::shared_ptr<unsigned char> buf;
+          buf.reset(stbi_load_from_memory((unsigned char *)data.c_str(),
+                                          data.length(), &w, &h, NULL, 4),
+                    stbi_image_free);
           if (! buf) { throw -2; }
           bmp = bitmap::create(w, h);
           if (! bmp) { throw -3; }
@@ -362,11 +374,6 @@ namespace lev
           lev::debug_print("error on bitmap data loading");
         }
         return bmp;
-      }
-
-      static bitmap::ptr load_path(boost::shared_ptr<filepath> path)
-      {
-        return load(path->get_full_path());
       }
 
       bool on_change()
@@ -512,23 +519,36 @@ namespace lev
     return impl_bitmap::load(filename);
   }
 
-  bitmap::ptr bitmap::load_path(boost::shared_ptr<filepath> path)
+  bitmap::ptr bitmap::load_file(file::ptr f)
   {
-    return impl_bitmap::load_path(path);
+    return impl_bitmap::load_file(f);
   }
 
-  class myTexture
+  bitmap::ptr bitmap::load_path(boost::shared_ptr<filepath> path)
+  {
+    if (! path) { return bitmap::ptr(); }
+    return impl_bitmap::load(path->get_string());
+  }
+
+
+  // texture class implementation
+  class impl_texture : public texture
   {
     public:
-      myTexture(int w, int h) : img_w(w), img_h(h), tex_w(1), tex_h(1)
+      typedef boost::shared_ptr<impl_texture> ptr;
+    protected:
+      impl_texture(int w, int h) :
+        texture(),
+        descent(0),
+        img_w(w), img_h(h), tex_w(1), tex_h(1)
       {
         while(tex_w < w) { tex_w <<= 1; }
         while(tex_h < h) { tex_h <<= 1; }
-        coord_x = (double)w / tex_w;
-        coord_y = (double)h / tex_h;
+        coord_x = double(w) / tex_w;
+        coord_y = double(h) / tex_h;
       }
-
-      ~myTexture()
+    public:
+      virtual ~impl_texture()
       {
         if (index > 0)
         {
@@ -538,147 +558,136 @@ namespace lev
         }
       }
 
-      static myTexture* Create(int w, int h)
+      virtual bool blit_on(screen::ptr dst,
+                           int dst_x = 0, int dst_y = 0,
+                           int src_x = 0, int src_y = 0,
+                           int w = -1, int h = -1,
+                           unsigned char alpha = 255) const
       {
-        if (w <= 0 || h <= 0) { return NULL; }
-        myTexture *tex = NULL;
-        try {
-          tex = new myTexture(w, h);
-          glGenTextures(1, &tex->index);
-//printf("Gen: %d\n", tex->index);
-          if (tex->index == 0) { throw -1; }
-          return tex;
-        }
-        catch (...) {
-//printf("ERROR!\n");
-          delete tex;
-          return NULL;
-        }
+        if (! dst) { return NULL; }
+//printf("TEXTURE BLIT ON!\n");
+
+        if (w < 0) { w = img_w; }
+        if (h < 0) { h = img_h; }
+        double tex_x = coord_x * src_x / img_w;
+        double tex_y = coord_y * src_y / img_h;
+        double tex_w = coord_x * w / img_w;
+        double tex_h = coord_y * h / img_h;
+
+        dst->set_current();
+        glBindTexture(GL_TEXTURE_2D, index);
+        glEnable(GL_TEXTURE_2D);
+        glBegin(GL_QUADS);
+          glColor4ub(255, 255, 255, alpha);
+          glTexCoord2d(tex_x, tex_y);
+          glVertex2i(dst_x, dst_y);
+          glTexCoord2d(tex_x, tex_y + tex_h);
+          glVertex2i(dst_x, dst_y + h);
+          glTexCoord2d(tex_x + tex_w, tex_y + tex_h);
+          glVertex2i(dst_x + w, dst_y + h);
+          glTexCoord2d(tex_x + tex_w, tex_y);
+          glVertex2i(dst_x + w, dst_y);
+        glEnd();
+        glDisable(GL_TEXTURE_2D);
+        return true;
       }
 
+      static impl_texture::ptr create(bitmap::ptr src)
+      {
+        impl_texture::ptr tex;
+        if (! src) { return tex; }
+        try {
+          tex.reset( new impl_texture(src->get_w(), src->get_h()) );
+          if (! tex) { throw -1; }
+          tex->wptr = tex;
+          glGenTextures(1, &tex->index);
+//printf("Gen: %d\n", tex->index);
+          if (tex->index == 0) { throw -2; }
+          tex->descent = src->get_descent();
+
+          glBindTexture(GL_TEXTURE_2D, tex->index);
+          glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+          glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+          glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+          glTexImage2D(GL_TEXTURE_2D, 0 /* level */, GL_RGBA, tex->tex_w, tex->tex_h, 0 /* border */,
+                       GL_RGBA, GL_UNSIGNED_BYTE, NULL /* only buffer reservation */);
+          glTexSubImage2D(GL_TEXTURE_2D, 0, 0 /* x offset */, 0 /* y offset */,
+                          tex->img_w, tex->img_h, GL_RGBA, GL_UNSIGNED_BYTE,
+                          src->get_buffer());
+        }
+        catch (...) {
+          tex.reset();
+          lev::debug_print("error on texture instance creation");
+        }
+        return tex;
+      }
+
+      virtual int get_descent() const
+      {
+        return descent;
+      }
+
+      virtual int get_h() const
+      {
+        return img_h;
+      }
+
+      virtual int get_w() const
+      {
+        return img_w;
+      }
+
+      virtual bool is_texturized() const
+      {
+        return true;
+      }
+
+      static impl_texture::ptr load(const std::string &file)
+      {
+        impl_texture::ptr tex;
+        try {
+          bitmap::ptr img = bitmap::load(file);
+          if (! img) { throw -1; }
+          tex = impl_texture::create(img);
+        }
+        catch (...) {
+          tex.reset();
+          lev::debug_print("error on texture bitmap loading");
+        }
+        return tex;
+      }
+
+      virtual bool set_descent(int d)
+      {
+        descent = d;
+        return true;
+      }
+
+      virtual drawable::ptr to_drawable()
+      {
+        return drawable::ptr(wptr);
+      }
+
+      boost::weak_ptr<impl_texture> wptr;
       int img_w, img_h;
       int tex_w, tex_h;
+      int descent;
       double coord_x, coord_y;
       GLuint index;
   };
-  static myTexture* cast_tex(void *obj) { return (myTexture *)obj; }
-
-  texture::texture() : _obj(NULL), descent(0) { }
-
-  texture::~texture()
-  {
-    if (_obj) { delete cast_tex(_obj); }
-  }
-
-  bool texture::blit_on(boost::shared_ptr<class screen> dst,
-                        int dst_x, int dst_y,
-                        int src_x, int src_y,
-                        int w, int h,
-                        unsigned char alpha) const
-  {
-    if (! dst) { return NULL; }
-//printf("TEXTURE BLIT ON!\n");
-
-    myTexture *tex = cast_tex(_obj);
-    if (w < 0) { w = get_w(); }
-    if (h < 0) { h = get_h(); }
-    double tex_x = src_x * tex->coord_x / get_w();
-    double tex_y = src_y * tex->coord_y / get_h();
-    double tex_w = w * tex->coord_x / get_w();
-    double tex_h = h * tex->coord_y / get_h();
-
-    glBindTexture(GL_TEXTURE_2D, tex->index);
-    glEnable(GL_TEXTURE_2D);
-    glBegin(GL_QUADS);
-      glColor4ub(255, 255, 255, alpha);
-      glTexCoord2d(tex_x, tex_y);
-      glVertex2i(dst_x, dst_y);
-      glTexCoord2d(tex_x, tex_y + tex_h);
-      glVertex2i(dst_x, dst_y + h);
-      glTexCoord2d(tex_x + tex_w, tex_y + tex_h);
-      glVertex2i(dst_x + w, dst_y + h);
-      glTexCoord2d(tex_x + tex_w, tex_y);
-      glVertex2i(dst_x + w, dst_y);
-    glEnd();
-    glDisable(GL_TEXTURE_2D);
-    return true;
-  }
 
   texture::ptr texture::create(bitmap::ptr src)
   {
-    boost::shared_ptr<texture> tex;
-    if (! src) { return tex; }
-    try {
-      myTexture *obj = NULL;
-      tex.reset(new texture);
-      if (! tex) { throw -1; }
-      tex->_obj = obj = myTexture::Create(src->get_w(), src->get_h());
-      if (! tex->_obj) { throw -2; }
-
-      glBindTexture(GL_TEXTURE_2D, obj->index);
-      glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-      glTexImage2D(GL_TEXTURE_2D, 0 /* level */, GL_RGBA, obj->tex_w, obj->tex_h, 0 /* border */,
-                   GL_RGBA, GL_UNSIGNED_BYTE, NULL /* only buffer reservation */);
-      glTexSubImage2D(GL_TEXTURE_2D, 0, 0 /* x offset */, 0 /* y offset */,
-                      obj->img_w, obj->img_h, GL_RGBA, GL_UNSIGNED_BYTE,
-                      src->get_buffer());
-      tex->set_descent(src->get_descent());
-    }
-    catch (...) {
-      tex.reset();
-      lev::debug_print("error on texture instance creation");
-    }
-    return tex;
+    return impl_texture::create(src);
   }
 
-//  bool texture::draw_on_screen(boost::shared_ptr<screen> dst, int x, int y, unsigned char alpha) const
-//  {
-//    if (! dst) { return NULL; }
-//
-//    myTexture *tex = cast_tex(_obj);
-//    glBindTexture(GL_TEXTURE_2D, tex->index);
-//    glEnable(GL_TEXTURE_2D);
-//    glBegin(GL_QUADS);
-//      glColor4ub(255, 255, 255, alpha);
-//      glTexCoord2d(0, 0);
-//      glVertex2i(x, y);
-//      glTexCoord2d(0, tex->coord_y);
-//      glVertex2i(x, y + tex->img_h);
-//      glTexCoord2d(tex->coord_x, tex->coord_y);
-//      glVertex2i(x + tex->img_w, y + tex->img_h);
-//      glTexCoord2d(tex->coord_x, 0);
-//      glVertex2i(x + tex->img_w, y);
-//    glEnd();
-//    glDisable(GL_TEXTURE_2D);
-//    return true;
-//  }
-
-  int texture::get_h() const
+  texture::ptr texture::load(const std::string &file)
   {
-    return cast_tex(_obj)->img_h;
-  }
-
-  int texture::get_w() const
-  {
-    return cast_tex(_obj)->img_w;
-  }
-
-  boost::shared_ptr<texture> texture::load(const std::string &file)
-  {
-    try {
-      boost::shared_ptr<bitmap> img(bitmap::load(file));
-      if (! img) { throw -1; }
-      return texture::create(img);
-    }
-    catch (...) {
-      lev::debug_print("error on texture bitmap loading");
-      return boost::shared_ptr<texture>();
-    }
+    return impl_texture::load(file);
   }
 
 
+  // animation class implementation
   class impl_animation : public animation
   {
     public:
@@ -713,7 +722,7 @@ namespace lev
 
       virtual bool append_path(const filepath *path, double duration)
       {
-        return append_file(path->get_full_path(), duration);
+        return append_file(path->get_fullpath(), duration);
       }
 
       static int append_l(lua_State *L)
@@ -1017,7 +1026,7 @@ namespace lev
           else if (t["lev.filepath1"])
           {
             filepath::ptr path = object_cast<filepath::ptr>(t["lev.filepath1"]);
-            result = tran->set_current(path->get_full_path());
+            result = tran->set_current(path->get_fullpath());
           }
           else if (t["lua.string1"])
           {
@@ -1098,7 +1107,7 @@ namespace lev
           else if (t["lev.filepath1"])
           {
             filepath::ptr path = object_cast<filepath::ptr>(t["lev.filepath1"]);
-            result = tran->set_next(path->get_full_path(), duration, mode);
+            result = tran->set_next(path->get_fullpath(), duration, mode);
           }
           else if (t["lua.string1"])
           {
@@ -1152,7 +1161,7 @@ namespace lev
 
   transition::ptr transition::create_with_path(filepath::ptr path)
   {
-    return create_with_string(path->get_full_path());
+    return create_with_string(path->get_fullpath());
   }
 
   transition::ptr transition::create_with_string(const std::string &image_path)
@@ -1705,7 +1714,7 @@ int luaopen_lev_image(lua_State *L)
   [
     namespace_("classes")
     [
-      class_<bitmap, canvas, boost::shared_ptr<canvas> >("bitmap")
+      class_<bitmap, canvas, canvas::ptr >("bitmap")
         .def("clone", &bitmap::clone)
 //        .def("load", &bitmap::reload)
         .property("rect",  &bitmap::get_rect)
@@ -1720,10 +1729,9 @@ int luaopen_lev_image(lua_State *L)
         [
           def("create",  &bitmap::create),
           def("create",  &bitmap::load),
+          def("create",  &bitmap::load_file),
           def("create",  &bitmap::load_path),
 //          def("levana_icon", &bitmap::levana_icon),
-          def("load",    &bitmap::load),
-          def("load",    &bitmap::load_path),
           def("sub_c", &bitmap::sub)
         ],
       class_<texture, drawable, boost::shared_ptr<drawable> >("texture")

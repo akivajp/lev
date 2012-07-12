@@ -27,14 +27,15 @@ namespace lev
   {
     public:
       typedef boost::shared_ptr<color> ptr;
-      typedef boost::shared_ptr<const color> cptr;
 
+      // ctors
       color(const color &orig);
       color(unsigned char r = 0, unsigned char g = 0, unsigned char b = 0, unsigned char a = 255);
       color(unsigned long argb_code);
-      boost::shared_ptr<color> clone();
-      static boost::shared_ptr<color> create(unsigned char r, unsigned char g,
-                                             unsigned char b, unsigned char a);
+
+      color::ptr clone();
+      static color::ptr create(unsigned char r, unsigned char g,
+                               unsigned char b, unsigned char a);
       static int create_l(lua_State *L);
       unsigned char get_a() const { return a; }
       unsigned char get_b() const { return b; }
@@ -64,7 +65,6 @@ namespace lev
   {
     public:
       typedef boost::shared_ptr<size> ptr;
-      typedef boost::shared_ptr<const size> cptr;
 
       size(int w, int h, int d = 0) : w(w), h(h), d(d), base() {}
       bool assign(int w, int h, int d = 0);
@@ -133,7 +133,6 @@ namespace lev
   {
     public:
       typedef boost::shared_ptr<rect> ptr;
-      typedef boost::shared_ptr<const rect> cptr;
 
       rect(int x = 0, int y = 0, int w = 0, int h = 0);
       rect(const vector &pos, const size &sz);

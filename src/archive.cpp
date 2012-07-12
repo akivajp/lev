@@ -153,7 +153,7 @@ namespace lev
         myArchive *arc = NULL;
         try {
           zipFile z = NULL;
-          if (file_system::file_exists(archive_path))
+          if (fs::is_file(archive_path))
           {
             z = zipOpen64(archive_path.c_str(), APPEND_STATUS_ADDINZIP);
           }

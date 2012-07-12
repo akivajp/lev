@@ -24,131 +24,289 @@
 #include <boost/filesystem.hpp>
 #include <string>
 
-int luaopen_lev_fs(lua_State *L)
-{
-  using namespace luabind;
-  using namespace lev;
-
-  open(L);
-  globals(L)["require"]("lev.base");
-
-  module(L, "lev")
-  [
-    namespace_("classes")
-    [
-      class_<temp_name, base, boost::shared_ptr<base> >("temp_name")
-        .def("__tostring", &temp_name::get_name)
-        .property("name", &temp_name::get_name)
-        .property("path", &temp_name::get_name)
-        .scope
-        [
-          def("create_c", &temp_name::create)
-        ],
-      class_<filepath, base, boost::shared_ptr<base> >("filepath")
-        .def("__tostring", &filepath::get_full_path)
-        .def("clear", &filepath::clear)
-        .property("absolute", &filepath::get_full_path)
-//        .property("dir_exists", &filepath::dir_exists)
-//        .property("dir", &filepath::get_dir_path)
-//        .property("dir_path", &filepath::get_dir_path)
-//        .property("file_exists", &filepath::file_exists)
-//        .property("file_name", &filepath::get_name)
-        .property("full_path", &filepath::get_full_path)
-        .property("full", &filepath::get_full_path)
-//        .property("ext", &filepath::get_ext)
-//        .property("is_dir", &filepath::is_dir)
-//        .property("is_dir_readable", &filepath::is_dir_readable)
-//        .property("is_dir_writable", &filepath::is_dir_writable)
-//        .property("is_file_executable", &filepath::is_file_executable)
-//        .property("is_file_readable", &filepath::is_file_readable)
-//        .property("is_file_writable", &filepath::is_file_writable)
-//        .def("mkdir", &filepath::mkdir)
-//        .def("mkdir", &filepath::mkdir0)
-//        .property("name", &filepath::get_name)
-//        .property("path", &filepath::get_dir_path)
-//        .property("size", &filepath::get_size)
-//        .property("url", &filepath::get_url)
-//        .def("touch", &filepath::touch)
-        .scope
-        [
-          def("create_c", &filepath::create),
-          def("create_temp_c", &filepath::create_temp)
-        ],
-      class_<file_system, base>("file_system")
-//        .property("path", &file_system::get_path, &file_system::set_path)
-        .scope
-        [
-          def("dir_exists", &file_system::dir_exists),
-          def("exists", &file_system::exists),
-          def("file_exists", &file_system::file_exists),
-//          def("get_cwd", &file_system::get_cwd),
-//          def("get_executable_path", &file_system::get_executable_path),
-          def("get_ext", &file_system::get_ext),
-//          def("get_resource_dir", &file_system::get_resource_dir),
-          def("get_size", &file_system::get_size),
-          def("get_temp_dir", &file_system::get_temp_dir),
-          def("mkdir", &file_system::mkdir),
-          def("mkdir", &file_system::mkdir1),
-//          def("open_c", &file_system::open, adopt(result)),
-          def("remove", &file_system::remove),
-          def("remove", &file_system::remove1),
-//          def("to_filepath", &file_system::to_filepath),
-//          def("to_full_path", &file_system::to_full_path),
-//          def("to_name", &file_system::to_name),
-          def("to_stem", &file_system::to_stem),
-//          def("to_url", &file_system::to_url),
-          def("touch", &file_system::touch)
-        ]
-    ],
-    namespace_("fs") // stub
-  ];
-
-  object lev = globals(L)["lev"];
-  object classes = lev["classes"];
-  object fs = lev["fs"];
-  register_to(classes["filepath"], "create", &filepath::create_l);
-  register_to(classes["filepath"], "create_temp", &filepath::create_temp_l);
-//  register_to(classes["file_system"], "open", &file_system::open_l);
-//  register_to(classes["file_system"], "find", &file_system::find_l);
-//  register_to(classes["file_system"], "find_next", &file_system::find_next_l);
-  register_to(classes["temp_name"], "create", &temp_name::create_l);
-  fs["create_temp"] = classes["filepath"]["create_temp"];
-//  fs["cwd"] = classes["file_system"]["get_cwd"];
-  fs["dir_exists"] = classes["file_system"]["dir_exists"];
-//  fs["exe_path"] = classes["file_system"]["get_executable_path"];
-  fs["exists"] = classes["file_system"]["exists"];
-  fs["filepath"] = classes["filepath"]["create"];
-  fs["file_exists"] = classes["file_system"]["file_exists"];
-//  fs["get_cwd"] = classes["file_system"]["get_cwd"];
-//  fs["get_executable_path"] = classes["file_system"]["get_executable_path"];
-  fs["get_ext"] = classes["file_system"]["get_ext"];
-//  fs["get_resurce_dir"] = classes["file_system"]["get_resource_dir"];
-  fs["get_size"] = classes["file_system"]["get_size"];
-  fs["get_temp_dir"] = classes["file_system"]["get_temp_dir"];
-  fs["is_dir"] = classes["file_system"]["dir_exists"];
-  fs["is_file"] = classes["file_system"]["file_exists"];
-  fs["mkdir"] = classes["file_system"]["mkdir"];
-//  fs["open"] = classes["file_system"]["open"];
-  fs["path"] = classes["filepath"]["create"];
-  fs["remove"] = classes["file_system"]["remove"];
-//  fs["res_dir"] = classes["file_system"]["get_resource_dir"];
-//  fs["resorce_dir"] = classes["file_system"]["get_resource_dir"];
-  fs["temp_name"] = classes["temp_name"]["create"];
-  fs["temp_dir"] = classes["file_system"]["get_temp_dir"];
-  fs["tmp_dir"] = classes["file_system"]["get_temp_dir"];
-  fs["tmpname"] = classes["temp_name"]["create"];
-//  fs["to_filepath"] = classes["file_system"]["to_filepath"];
-//  fs["to_path"] = classes["file_system"]["to_filepath"];
-  fs["to_stem"] = classes["file_system"]["to_stem"];
-//  fs["to_url"] = classes["file_system"]["to_url"];
-  fs["touch"] = classes["file_system"]["touch"];
-
-  globals(L)["package"]["loaded"]["lev.fs"] = fs;
-  return 0;
-}
 
 namespace lev
 {
+
+  // file class implement
+  template <typename T>
+    class impl_file : public T
+  {
+    public:
+      typedef boost::shared_ptr<impl_file> ptr;
+    protected:
+      impl_file() :
+        T(),
+        ops(NULL)
+      { }
+    public:
+      virtual ~impl_file()
+      {
+        close();
+      }
+
+      virtual bool close()
+      {
+        if (! ops) { return false; }
+        ops->close(ops);
+        ops = NULL;
+        return true;
+      }
+
+      virtual bool eof() const
+      {
+        return tell() == get_size();
+      }
+
+      virtual bool find(const void *chunk, int length)
+      {
+        if (length < 0) { return false; }
+        std::string data;
+        data.assign((const char *)chunk, length);
+        return find_data(data, 1);
+      }
+
+      virtual void *get_ops()
+      {
+        return ops;
+      }
+
+      virtual bool find_data(const std::string &data, int numtry = 1)
+      {
+        if (numtry == 0) { numtry = get_size(); }
+        if (numtry < 0) { return false; }
+        std::string buf;
+        if (! read_count(buf, data.length())) { return false; }
+        for (int i = 0; i < numtry; i++)
+        {
+//printf("POS: %d\n", (int)tell());
+          if (buf == data) { return true; }
+          unsigned char byte;
+          if (read(&byte, 1, 1) == 0) { return false; }
+          buf.replace(0, 1, "");
+          buf.append(1, byte);
+        }
+        return false;
+      }
+
+      virtual long get_size() const
+      {
+        if (! ops) { return -1; }
+        long pos = ops->seek(ops, 0, SEEK_CUR);
+        long size = ops->seek(ops, 0, SEEK_END);
+        ops->seek(ops, pos, SEEK_SET);
+        return size;
+      }
+
+      static impl_file::ptr open(const std::string &path,
+                                 const std::string &mode = "r")
+      {
+        impl_file::ptr f;
+        try {
+          f.reset(new impl_file);
+          if (! f) { throw -1; }
+          f->ops = SDL_RWFromFile(path.c_str(), mode.c_str());
+          if (! f->ops) { throw -2; }
+        }
+        catch (...) {
+          f.reset();
+          lev::debug_print("error on file opening");
+        }
+        return f;
+      }
+
+      virtual size_t read(void *buf, size_t size, size_t maxnum)
+      {
+        if (! ops) { return 0; }
+        return ops->read(ops, buf, size, maxnum);
+      }
+
+      virtual bool read_all(std::string &content)
+      {
+        return read_count(content, get_size());
+      }
+
+      virtual bool read_count(std::string &content, int count)
+      {
+        if (count <= 0) { return false; }
+        unsigned char buf[count];
+        size_t readed = read(buf, 1, count);
+        if (readed <= 0) { return false; }
+        content.assign((const char *)buf, readed);
+        return true;
+      }
+
+      virtual unsigned short read_le16()
+      {
+        unsigned char buf[2];
+        read(buf, 1, 2);
+        return buf[0] << 8 | buf[1];
+      }
+
+      virtual unsigned long read_le32()
+      {
+        unsigned char buf[4];
+        read(buf, 1, 4);
+        return buf[0] << 24 | buf[1] << 16 | buf[2] << 8 | buf[3];
+      }
+
+      virtual bool read_line(std::string &content)
+      {
+        if (! ops) { return false; }
+        const int buf_size = 4096;
+        unsigned char buf[buf_size + 1];
+        int i = 0;
+        while ( true )
+        {
+          if (ops->read(ops, &buf[i], 1, 1) == 0)
+          {
+            if (i == 0) { return false; }
+            else { return true; }
+          }
+          if (buf[i] == '\n')
+          {
+            buf[i] = '\0';
+            content.assign((const char *)buf, 0, i + 1);
+            return true;
+          }
+          if (buf[i] != '\r')
+          {
+            i++;
+            if (i == buf_size) { return true; }
+          }
+        }
+      }
+
+      static int read_l(lua_State *L)
+      {
+        using namespace luabind;
+        const char *format_str = NULL;
+        int num = -1;
+
+        try {
+          luaL_checktype(L, 1, LUA_TUSERDATA);
+          T *f = object_cast<T *>(object(from_stack(L, 1)));
+          if (! f) { throw -1; }
+          object t = util::get_merged(L, 2, -1);
+
+          if (t["lua.string1"]) { format_str = object_cast<const char *>( t["lua.string1"]); }
+          if (t["lua.number1"]) { num = object_cast<int>(t["lua.number1"]); }
+
+          if (! format_str && num < 0)
+          {
+            std::string line;
+            if (! f->read_line(line)) { lua_pushnil(L); }
+            else { lua_pushstring(L, line.c_str()); }
+            return 1;
+          }
+          else if (strcmp(format_str, "*l") == 0)
+          {
+            std::string line;
+            if (! f->read_line(line)) { lua_pushnil(L); }
+            else { lua_pushstring(L, line.c_str()); }
+            return 1;
+          }
+          else if (strcmp(format_str, "*a") == 0)
+          {
+            std::string data;
+            if (! f->read_all(data)) { lua_pushnil(L); }
+            else { lua_pushlstring(L, data.c_str(), data.length()); }
+            return 1;
+          }
+          else
+          {
+            lua_error(L);
+            return 0;
+          }
+        }
+        catch (...) {
+          lev::debug_print(lua_tostring(L, -1));
+          lev::debug_print("error on file reading");
+          lua_pushnil(L);
+          return 1;
+        }
+      }
+
+      virtual long seek(long pos)
+      {
+        if (! ops) { return -1; }
+        return ops->seek(ops, pos, SEEK_SET);
+      }
+
+      virtual long tell() const
+      {
+        if (! ops) { return -1; }
+        return ops->seek(ops, 0, SEEK_CUR);
+      }
+
+      virtual bool write(const std::string &data)
+      {
+        if (! ops) { return false; }
+        return ops->write(ops, data.c_str(), 1, data.length());
+      }
+
+      SDL_RWops *ops;
+  };
+
+  file::ptr file::open(const std::string &path, const std::string &mode)
+  {
+    return impl_file<file>::open(path, mode);
+  }
+
+  // memery class implementation
+  class impl_memfile : public impl_file<memfile>
+  {
+    public:
+      typedef boost::shared_ptr<impl_memfile> ptr;
+    protected:
+      impl_memfile() :
+        impl_file<memfile>(),
+        buffer(NULL)
+      { }
+    public:
+      virtual ~impl_memfile() { }
+
+      virtual unsigned char *get_buffer()
+      {
+        return buffer;
+      }
+
+      virtual bool close()
+      {
+        if (! ops) { return false; }
+        ops->close(ops);
+        delete buffer;
+        ops = NULL;
+        return false;
+      }
+
+      static memfile::ptr create(long size)
+      {
+        impl_memfile::ptr f;
+        if (size < 0) { return f; }
+        try {
+          f.reset(new impl_memfile);
+          if (! f) { throw -1; }
+          f->buffer = (unsigned char *)malloc(size);
+          if (! f->buffer) { throw -2; }
+          f->ops = SDL_RWFromMem(f->buffer, size);
+          if (! f->ops) { throw -3; }
+        }
+        catch (...) {
+          f.reset();
+          lev::debug_print("error on memory file allocation");
+        }
+        return f;
+      }
+
+      unsigned char *buffer;
+  };
+
+  memfile::ptr memfile::create(long size)
+  {
+    return impl_memfile::create(size);
+  }
+
 
   temp_name::temp_name() : path_str() { }
 
@@ -156,7 +314,7 @@ namespace lev
   {
     if (! path_str.empty())
     {
-      file_system::remove(path_str.c_str(), false);
+      fs::remove(path_str.c_str(), false);
     }
   }
 
@@ -171,16 +329,16 @@ namespace lev
       for (int i = 0 ; ; i++)
       {
         std::string format = (boost::format("%s%d%s") % prefix % i % suffix).str();
-        boost::filesystem::path new_path = file_system::get_temp_dir() + "/" + format;
+        boost::filesystem::path new_path = fs::get_temp_dir() + "/" + format;
         new_path = boost::filesystem::absolute(new_path);
 
-        if (! file_system::dir_exists(new_path.parent_path().generic_string()))
+        if (! fs::is_directory(new_path.parent_path().generic_string()))
         {
-          file_system::mkdir(new_path.parent_path().generic_string(), true);
+          fs::mkdir(new_path.parent_path().generic_string(), true);
         }
 
-        if (file_system::exists(new_path.generic_string())) { continue; }
-        if (! file_system::touch(new_path.generic_string())) { continue; }
+        if (fs::exists(new_path.generic_string())) { continue; }
+        if (! fs::touch(new_path.generic_string())) { continue; }
         tmp->path_str = new_path.generic_string();
         break;
       }
@@ -214,179 +372,147 @@ namespace lev
     return 1;
   }
 
-
-  class myFilePath
+  // file path class implementation
+  class impl_filepath : public filepath
   {
     public:
-      myFilePath(const std::string &path,
-                 boost::shared_ptr<temp_name> tmp = boost::shared_ptr<temp_name>())
-        : p(path), tmp(tmp)
+      typedef boost::shared_ptr<impl_filepath> ptr;
+    protected:
+      impl_filepath(const std::string &path = "",
+                    temp_name::ptr tmp = temp_name::ptr()) :
+        filepath(),
+        p(path),
+        tmp(tmp)
       { }
+    public:
+      virtual ~impl_filepath() { }
 
-      virtual ~myFilePath()
+      virtual bool clear()
       {
+        p.clear();
+        return true;
+      }
+
+      static impl_filepath::ptr create(const std::string &path = "")
+      {
+        impl_filepath::ptr fpath;
+        try {
+          fpath.reset(new impl_filepath(path));
+          if (! fpath) { throw -1; }
+        }
+        catch (...) {
+          fpath.reset();
+          lev::debug_print("error on file path instance creation");
+        }
+        return fpath;
+      }
+
+      static impl_filepath::ptr create_temp(const std::string &prefix,
+                                            const std::string &suffix)
+      {
+        impl_filepath::ptr fpath;
+        try {
+          temp_name::ptr tmp = temp_name::create(prefix, suffix);
+          if (! tmp) { throw -1; }
+          fpath.reset(new impl_filepath(tmp->get_name(), tmp));
+          if (! fpath) { throw -2; }
+        }
+        catch (...) {
+          fpath.reset();
+          lev::debug_print("error on temp file path instance creation");
+        }
+        return fpath;
+      }
+
+      static int create_temp_l(lua_State *L)
+      {
+        using namespace luabind;
+        const char *prefix = "temp", *suffix = "";
+
+        int n = lua_gettop(L);
+        lua_pushcfunction(L, &util::merge);
+        newtable(L).push(L);
+        for (int i = 1; i <= n; i++)
+        {
+          object(from_stack(L, i)).push(L);
+        }
+        lua_call(L, n + 1, 1);
+        object t(from_stack(L, -1));
+        lua_remove(L, -1);
+
+        if (t["prefix"]) { prefix = object_cast<const char *>(t["prefix"]); }
+        else if (t["pre"]) { prefix = object_cast<const char *>(t["pre"]); }
+        else if (t["p"]) { prefix = object_cast<const char *>(t["p"]); }
+        else if (t["lua.string1"]) { prefix = object_cast<const char *>(t["lua.string1"]); }
+
+        if (t["suffix"]) { suffix = object_cast<const char *>(t["suffix"]); }
+        else if (t["suf"]) { suffix = object_cast<const char *>(t["suf"]); }
+        else if (t["s"]) { suffix = object_cast<const char *>(t["s"]); }
+        else if (t["lua.string2"]) { suffix = object_cast<const char *>(t["lua.string2"]); }
+
+        object fpath = globals(L)["lev"]["classes"]["filepath"]["create_temp_c"](prefix, suffix);
+        fpath.push(L);
+        return 1;
+      }
+
+      virtual std::string get_extension() const
+      {
+        return p.extension().generic_string();
+      }
+
+      virtual std::string get_filename() const
+      {
+        return p.filename().generic_string();
+      }
+
+      virtual std::string get_fullpath() const
+      {
+        return boost::filesystem::absolute(p).generic_string();
+      }
+
+      virtual long get_size() const
+      {
+        try {
+          return boost::filesystem::file_size(p);
+        }
+        catch (...) { return -1; }
+      }
+
+      virtual std::string get_string() const
+      {
+        return p.generic_string();
+      }
+
+      virtual bool is_directory() const
+      {
+        return boost::filesystem::is_directory(p);
+      }
+
+      virtual bool is_file() const
+      {
+        return boost::filesystem::is_regular_file(p);
       }
 
       boost::filesystem::path p;
-      boost::shared_ptr<temp_name> tmp;
+      temp_name::ptr tmp;
   };
-  static myFilePath* cast_path(void *obj) { return (myFilePath *)obj; }
 
-  filepath::filepath() : _obj(NULL) { }
-
-  filepath::~filepath()
+  filepath::ptr filepath::create(const std::string &path)
   {
-    if (_obj)
-    {
-      delete cast_path(_obj);
-      _obj = NULL;
-    }
+    return impl_filepath::create(path);
   }
 
-  bool filepath::clear()
+  filepath::ptr filepath::create_temp(const std::string &prefix,
+                                      const std::string &suffix)
   {
-    cast_path(_obj)->p.clear();
-    return true;
+    return impl_filepath::create_temp(prefix, suffix);
   }
 
-  boost::shared_ptr<filepath> filepath::create(const std::string &path)
-  {
-    boost::shared_ptr<filepath> fpath;
-    try {
-      fpath.reset(new filepath);
-      if (! fpath) { throw -1; }
-      fpath->_obj = new myFilePath(path);
-      if (! fpath->_obj) { throw -2; }
-    }
-    catch (...) {
-      fpath.reset();
-      lev::debug_print("error on file path instance creation");
-    }
-    return fpath;
-  }
-
-  int filepath::create_l(lua_State *L)
-  {
-    using namespace luabind;
-    const char *path = "";
-
-    int n = lua_gettop(L);
-    lua_pushcfunction(L, &util::merge);
-    newtable(L).push(L);
-    for (int i = 1; i <= n; i++)
-    {
-      object(from_stack(L, i)).push(L);
-    }
-    lua_call(L, n + 1, 1);
-    object t(from_stack(L, -1));
-    lua_remove(L, -1);
-
-    if (t["filepath"]) { path = object_cast<const char *>(t["filepath"]); }
-    else if (t["file_path"]) { path = object_cast<const char *>(t["file_path"]); }
-    else if (t["file"]) { path = object_cast<const char *>(t["file"]); }
-    else if (t["path"]) { path = object_cast<const char *>(t["path"]); }
-    else if (t["f"]) { path = object_cast<const char *>(t["f"]); }
-    else if (t["p"]) { path = object_cast<const char *>(t["p"]); }
-    else if (t["lua.string1"]) { path = object_cast<const char *>(t["lua.string1"]); }
-
-    object fpath = globals(L)["lev"]["classes"]["filepath"]["create_c"](path);
-    fpath.push(L);
-    return 1;
-  }
-
-  boost::shared_ptr<filepath> filepath::create_temp(const std::string &prefix,
-                                                      const std::string &suffix)
-  {
-    boost::shared_ptr<filepath> fpath;
-    try {
-      boost::shared_ptr<temp_name> tmp(temp_name::create(prefix, suffix));
-      if (! tmp) { throw -1; }
-      fpath.reset(new filepath);
-      if (! fpath) { throw -2; }
-      fpath->_obj = new myFilePath(tmp->get_name(), tmp);
-      if (! fpath->_obj) { throw -3; }
-    }
-    catch (...) {
-      fpath.reset();
-      lev::debug_print("error on temp file path instance creation");
-    }
-    return fpath;
-  }
-
-  int filepath::create_temp_l(lua_State *L)
-  {
-    using namespace luabind;
-    const char *prefix = "temp", *suffix = "";
-
-    int n = lua_gettop(L);
-    lua_pushcfunction(L, &util::merge);
-    newtable(L).push(L);
-    for (int i = 1; i <= n; i++)
-    {
-      object(from_stack(L, i)).push(L);
-    }
-    lua_call(L, n + 1, 1);
-    object t(from_stack(L, -1));
-    lua_remove(L, -1);
-
-    if (t["prefix"]) { prefix = object_cast<const char *>(t["prefix"]); }
-    else if (t["pre"]) { prefix = object_cast<const char *>(t["pre"]); }
-    else if (t["p"]) { prefix = object_cast<const char *>(t["p"]); }
-    else if (t["lua.string1"]) { prefix = object_cast<const char *>(t["lua.string1"]); }
-
-    if (t["suffix"]) { suffix = object_cast<const char *>(t["suffix"]); }
-    else if (t["suf"]) { suffix = object_cast<const char *>(t["suf"]); }
-    else if (t["s"]) { suffix = object_cast<const char *>(t["s"]); }
-    else if (t["lua.string2"]) { suffix = object_cast<const char *>(t["lua.string2"]); }
-
-    object fpath = globals(L)["lev"]["classes"]["filepath"]["create_temp_c"](prefix, suffix);
-    fpath.push(L);
-    return 1;
-  }
 
   /*
-  bool filepath::dir_exists()
-  {
-    return cast_path(_obj)->DirExists();
-  }
-
-  bool filepath::file_exists()
-  {
-    return cast_path(_obj)->FileExists();
-  }
-
-  std::string filepath::get_dir_path()
-  {
-    return (const char *)cast_path(_obj)->GetPath().mb_str();
-  }
-
-  */
-  std::string filepath::get_full_path() const
-  {
-    return boost::filesystem::absolute(cast_path(_obj)->p).generic_string();
-  }
-
-  /*
-  std::string filepath::get_ext()
-  {
-    return (const char *)cast_path(_obj)->GetExt().mb_str();
-  }
-
-  std::string filepath::get_name()
-  {
-    return (const char *)cast_path(_obj)->GetName().mb_str();
-  }
-
-  long filepath::get_size()
-  {
-    wxULongLong size = cast_path(_obj)->GetSize();
-    if (size == wxInvalidSize) { return -1; }
-    return size.GetValue();
-  }
-
   std::string filepath::get_url()
   {
-    return file_system::to_url(get_full_path().c_str());
+    return fs::to_url(get_full_path().c_str());
   }
 
   bool filepath::is_dir()
@@ -441,9 +567,9 @@ namespace lev
   };
   static myFileSystem* cast_fs(void *obj) { return (myFileSystem *)obj; }
 
-  file_system::file_system() : _obj(NULL) { }
+  fs::fs() : _obj(NULL) { }
 
-  file_system::~file_system()
+  fs::~fs()
   {
     if (_obj)
     {
@@ -454,17 +580,7 @@ namespace lev
 
   */
 
-  bool file_system::dir_exists(const std::string &dir_path)
-  {
-    try {
-      return boost::filesystem::is_directory(dir_path);
-    }
-    catch (...) {
-      return false;
-    }
-  }
-
-  bool file_system::exists(const std::string &path)
+  bool fs::exists(const std::string &path)
   {
     try {
       return boost::filesystem::exists(path);
@@ -474,18 +590,8 @@ namespace lev
     }
   }
 
-  bool file_system::file_exists(const std::string &file_path)
-  {
-    try {
-      return boost::filesystem::is_regular_file(file_path);
-    }
-    catch (...) {
-      return false;
-    }
-  }
-
   /*
-  bool file_system::find(const std::string &pattern, std::string &file_name)
+  bool fs::find(const std::string &pattern, std::string &file_name)
   {
     wxString res = cast_fs(_obj)->FindFirst(wxString(pattern.c_str(), wxConvUTF8));
     file_name = (const char *)res.mb_str();
@@ -498,13 +604,13 @@ namespace lev
     return true;
   }
 
-  int file_system::find_l(lua_State *L)
+  int fs::find_l(lua_State *L)
   {
     using namespace luabind;
     const char *pattern = "*";
 
     luaL_checktype(L, 1, LUA_TUSERDATA);
-    file_system *fs = object_cast<file_system *>(object(from_stack(L, 1)));
+    fs *fs = object_cast<fs *>(object(from_stack(L, 1)));
     if (fs == NULL) { return 0; }
     object t = util::get_merged(L, 2, -1);
 
@@ -517,7 +623,7 @@ namespace lev
     return 1;
   }
 
-  bool file_system::find_next(std::string &file_name)
+  bool fs::find_next(std::string &file_name)
   {
     if (cast_fs(_obj)->last_find.empty()) { return false; }
     wxString res = cast_fs(_obj)->FindNext();
@@ -530,12 +636,12 @@ namespace lev
     return true;
   }
 
-  int file_system::find_next_l(lua_State *L)
+  int fs::find_next_l(lua_State *L)
   {
     using namespace luabind;
 
     luaL_checktype(L, 1, LUA_TUSERDATA);
-    file_system *fs = object_cast<file_system *>(object(from_stack(L, 1)));
+    fs *fs = object_cast<fs *>(object(from_stack(L, 1)));
     if (fs == NULL) { return 0; }
 //    object t = util::get_merged(L, 2, -1);
 
@@ -545,31 +651,29 @@ namespace lev
     return 1;
   }
 
-  std::string file_system::get_cwd()
+  */
+
+  std::string fs::get_current_directory()
   {
-    return (const char *)wxGetCwd().mb_str();
+    return boost::filesystem::current_path().generic_string();
   }
 
-  std::string file_system::get_executable_path()
+  /*
+  std::string fs::get_executable_path()
   {
     return (const char *)wxStandardPaths::Get().GetExecutablePath().mb_str();
   }
 
   */
-  std::string file_system::get_ext(const std::string &path)
-  {
-    return boost::filesystem::path(path).extension().generic_string();
-  }
-
   /*
-  std::string file_system::get_resource_dir()
+  std::string fs::get_resource_dir()
   {
     return (const char *)wxStandardPaths::Get().GetResourcesDir().mb_str();
   }
 
   */
 
-  long file_system::get_size(const std::string &file_path)
+  long fs::get_size(const std::string &file_path)
   {
     try {
       return boost::filesystem::file_size(file_path);
@@ -580,7 +684,7 @@ namespace lev
   }
 
 
-  std::string file_system::get_temp_dir()
+  std::string fs::get_temp_dir()
   {
     try {
       return boost::filesystem::temp_directory_path().generic_string();
@@ -591,32 +695,55 @@ namespace lev
   }
 
   /*
-  std::string file_system::get_path()
+  std::string fs::get_path()
   {
     return (const char *)cast_fs(_obj)->GetPath().mb_str();
   }
 
 */
-  bool file_system::mkdir(const std::string &path, bool force)
+
+  bool fs::is_directory(const std::string &dir_path)
+  {
+    try {
+      return boost::filesystem::is_directory(dir_path);
+    }
+    catch (...) {
+      return false;
+    }
+  }
+
+  bool fs::is_file(const std::string &file_path)
+  {
+    try {
+      return boost::filesystem::is_regular_file(file_path);
+    }
+    catch (...) {
+      return false;
+    }
+  }
+
+  bool fs::mkdir(const std::string &path, bool force)
   {
     try {
       if (force)
       {
-        boost::filesystem::create_directories(path);
-        return true;
+        return boost::filesystem::create_directories(path);
       }
-      else { return boost::filesystem::create_directory(path); }
+      else
+      {
+        return boost::filesystem::create_directory(path);
+      }
     }
     catch (...) { return false; }
   }
 
 /*
-  file_system* file_system::open(const std::string &path)
+  fs* fs::open(const std::string &path)
   {
-    file_system *fs = NULL;
+    fs *fs = NULL;
     myFileSystem *obj = NULL;
     try {
-      fs = new file_system;
+      fs = new fs;
       fs->_obj = obj = new myFileSystem;
       fs->set_path(path);
       return fs;
@@ -627,7 +754,7 @@ namespace lev
     }
   }
 
-  int file_system::open_l(lua_State *L)
+  int fs::open_l(lua_State *L)
   {
     using namespace luabind;
     const char *path = ".";
@@ -636,13 +763,13 @@ namespace lev
     if (t["path"]) { path = object_cast<const char *>(t["path"]); }
     else if (t["lua.string1"]) { path = object_cast<const char *>(t["lua.string1"]); }
 
-    object fs = globals(L)["lev"]["classes"]["file_system"]["open_c"](path);
+    object fs = globals(L)["lev"]["classes"]["fs"]["open_c"](path);
     fs.push(L);
     return 1;
   }
 
   */
-  bool file_system::remove(const std::string &path, bool force)
+  bool fs::remove(const std::string &path, bool force)
   {
     try {
       if (force) { return boost::filesystem::remove_all(path); }
@@ -654,53 +781,44 @@ namespace lev
   }
 
   /*
-  bool file_system::set_path(const std::string &path)
+  bool fs::set_path(const std::string &path)
   {
-    std::string full = file_system::to_full_path(path);
+    std::string full = fs::to_full_path(path);
     cast_fs(_obj)->ChangePathTo(wxString(full.c_str(), wxConvUTF8));
     return true;
   }
 
-  std::string file_system::to_filepath(const std::string &url)
-  {
-    wxString u(url.c_str(), wxConvUTF8);
-    return (const char *)wxFileSystem::URLToFileName(u).GetFullPath().mb_str();
-  }
-
-  std::string file_system::to_full_path(const std::string &path)
-  {
-    wxString p(path.c_str(), wxConvUTF8);
-    wxString u = wxFileSystem::FileNameToURL(p);
-    return (const char *)wxFileSystem::URLToFileName(u).GetFullPath().mb_str();
-  }
-
-  std::string file_system::to_name(const std::string &path_to_file)
-  {
-    wxString p(path_to_file.c_str(), wxConvUTF8);
-    wxString u = wxFileSystem::FileNameToURL(p);
-    return (const char *)wxFileSystem::URLToFileName(u).GetName().mb_str();
-  }
-
   */
-  std::string file_system::to_stem(const std::string &filepath)
+
+  std::string fs::to_extension(const std::string &path)
   {
-    try {
-      return boost::filesystem::path(filepath).stem().generic_string();
-    }
-    catch (...) {
-      return "";
-    }
+    return boost::filesystem::path(path).extension().generic_string();
+  }
+
+  std::string fs::to_filename(const std::string &path)
+  {
+    return boost::filesystem::path(path).filename().generic_string();
+  }
+
+  std::string fs::to_fullpath(const std::string &path)
+  {
+    return boost::filesystem::absolute(path).generic_string();
+  }
+
+  std::string fs::to_stem(const std::string &path)
+  {
+    return boost::filesystem::path(path).stem().generic_string();
   }
 
   /*
-  std::string file_system::to_url(const std::string &filename)
+  std::string fs::to_url(const std::string &filename)
   {
     wxString file(filename.c_str(), wxConvUTF8);
     return (const char *)wxFileSystem::FileNameToURL(file).mb_str();
   }
 
   */
-  bool file_system::touch(const std::string &path)
+  bool fs::touch(const std::string &path)
   {
     FILE *w = fopen(path.c_str(), "a+");
     if (! w) { return false; }
@@ -710,4 +828,156 @@ namespace lev
 
 }
 
+int luaopen_lev_fs(lua_State *L)
+{
+  using namespace luabind;
+  using namespace lev;
+
+  open(L);
+  globals(L)["require"]("lev.base");
+
+  module(L, "lev")
+  [
+    namespace_("classes")
+    [
+      class_<file, base, base::ptr>("file")
+        .def("close", &file::close)
+        .def("eof", &file::eof)
+        .def("find", &file::find_data)
+        .property("pos", &file::tell, &file::seek)
+        .property("postion", &file::tell, &file::seek)
+        .property("size", &file::get_size)
+        .def("seek", &file::seek)
+        .def("tell", &file::tell)
+        .def("write", &file::write)
+        .scope
+        [
+          def("open", &file::open),
+          def("open", &file::open1)
+        ],
+      class_<memfile, file, file::ptr>("memfile")
+        .scope
+        [
+          def("create", &memfile::create)
+        ],
+      class_<temp_name, base, boost::shared_ptr<base> >("temp_name")
+        .def("__tostring", &temp_name::get_name)
+        .property("name", &temp_name::get_name)
+        .property("path", &temp_name::get_name)
+        .scope
+        [
+          def("create_c", &temp_name::create)
+        ],
+      class_<filepath, base, boost::shared_ptr<base> >("filepath")
+        .def("clear", &filepath::clear)
+        .property("abs", &filepath::get_fullpath)
+        .property("absolute", &filepath::get_fullpath)
+//        .property("dir", &filepath::get_dir_path)
+//        .property("dir_path", &filepath::get_dir_path)
+        .property("filename", &filepath::get_filename)
+        .property("filesize", &filepath::get_size)
+        .property("full", &filepath::get_fullpath)
+        .property("fullpath", &filepath::get_fullpath)
+        .property("ext", &filepath::get_extension)
+        .property("extension", &filepath::get_extension)
+        .property("is_directory", &filepath::is_directory)
+//        .property("is_dir_readable", &filepath::is_dir_readable)
+//        .property("is_dir_writable", &filepath::is_dir_writable)
+        .property("is_file", &filepath::is_file)
+//        .property("is_file_executable", &filepath::is_file_executable)
+//        .property("is_file_readable", &filepath::is_file_readable)
+//        .property("is_file_writable", &filepath::is_file_writable)
+//        .def("mkdir", &filepath::mkdir)
+//        .def("mkdir", &filepath::mkdir0)
+        .property("name", &filepath::get_filename)
+//        .property("path", &filepath::get_dir_path)
+        .property("size", &filepath::get_size)
+        .property("str", &filepath::get_string)
+        .property("string", &filepath::get_string)
+//        .property("url", &filepath::get_url)
+//        .def("touch", &filepath::touch)
+        .scope
+        [
+          def("create", &filepath::create),
+          def("create", &filepath::create0),
+          def("create_temp_c", &filepath::create_temp)
+        ],
+      class_<fs, base>("fs")
+//        .property("path", &fs::get_path, &fs::set_path)
+        .scope
+        [
+          def("exists", &fs::exists),
+          def("get_current_directory", &fs::get_current_directory),
+//          def("get_executable_path", &fs::get_executable_path),
+//          def("get_resource_dir", &fs::get_resource_dir),
+          def("get_size", &fs::get_size),
+          def("get_temp_dir", &fs::get_temp_dir),
+          def("is_directory", &fs::is_directory),
+          def("is_file", &fs::is_file),
+          def("mkdir", &fs::mkdir),
+          def("mkdir", &fs::mkdir1),
+//          def("open_c", &fs::open, adopt(result)),
+          def("remove", &fs::remove),
+          def("remove", &fs::remove1),
+          def("to_extension", &fs::to_extension),
+          def("to_filename", &fs::to_filename),
+          def("to_fullpath", &fs::to_fullpath),
+          def("to_stem", &fs::to_stem),
+          def("touch", &fs::touch)
+        ]
+    ],
+    namespace_("fs") // stub
+  ];
+
+  object lev = globals(L)["lev"];
+  object classes = lev["classes"];
+  object fs = lev["fs"];
+
+  register_to(classes["file"], "read", &impl_file<file>::read_l);
+  register_to(classes["memfile"], "read", &impl_file<memfile>::read_l);
+  register_to(classes["filepath"], "create_temp", &impl_filepath::create_temp_l);
+//  register_to(classes["fs"], "open", &fs::open_l);
+//  register_to(classes["fs"], "find", &fs::find_l);
+//  register_to(classes["fs"], "find_next", &fs::find_next_l);
+  register_to(classes["temp_name"], "create", &temp_name::create_l);
+
+  fs["create_temp"] = classes["filepath"]["create_temp"];
+  fs["cwd"] = classes["fs"]["get_current_directory"];
+//  fs["exe_path"] = classes["fs"]["get_executable_path"];
+  fs["exists"] = classes["fs"]["exists"];
+  fs["filepath"] = classes["filepath"]["create"];
+  fs["get_current_directory"] = classes["fs"]["get_current_directory"];
+  fs["get_cwd"] = classes["fs"]["get_current_directory"];
+  fs["get_pwd"] = classes["fs"]["get_current_directory"];
+//  fs["get_executable_path"] = classes["fs"]["get_executable_path"];
+//  fs["get_resurce_dir"] = classes["fs"]["get_resource_dir"];
+  fs["get_size"] = classes["fs"]["get_size"];
+  fs["get_temp_dir"] = classes["fs"]["get_temp_dir"];
+  fs["is_dir"] = classes["fs"]["is_directory"];
+  fs["is_directory"] = classes["fs"]["is_directory"];
+  fs["is_file"] = classes["fs"]["is_file"];
+  fs["memfile"] = classes["memfile"]["create"];
+  fs["mkdir"] = classes["fs"]["mkdir"];
+  fs["open"] = classes["file"]["open"];
+  fs["path"] = classes["filepath"]["create"];
+  fs["pwd"] = classes["fs"]["get_current_directory"];
+  fs["remove"] = classes["fs"]["remove"];
+//  fs["res_dir"] = classes["fs"]["get_resource_dir"];
+//  fs["resorce_dir"] = classes["fs"]["get_resource_dir"];
+  fs["temp_name"] = classes["temp_name"]["create"];
+  fs["temp_dir"] = classes["fs"]["get_temp_dir"];
+  fs["tmp_dir"] = classes["fs"]["get_temp_dir"];
+  fs["tmpname"] = classes["temp_name"]["create"];
+  fs["to_ext"]       = classes["fs"]["to_extension"];
+  fs["to_extension"] = classes["fs"]["to_extension"];
+  fs["to_filename"]  = classes["fs"]["to_filename"];
+  fs["to_full"]      = classes["fs"]["to_fullpath"];
+  fs["to_fullpath"]  = classes["fs"]["to_fullpath"];
+  fs["to_name"]      = classes["fs"]["to_filename"];
+  fs["to_stem"]      = classes["fs"]["to_stem"];
+  fs["touch"]        = classes["fs"]["touch"];
+
+  globals(L)["package"]["loaded"]["lev.fs"] = fs;
+  return 0;
+}
 

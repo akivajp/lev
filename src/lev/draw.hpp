@@ -116,7 +116,7 @@ namespace lev
       static int draw_l(lua_State *L);
 
       // fill methods
-      virtual bool fill_circle(int x, int y, int radius, color::ptr filling) { return false; }
+      virtual bool fill_circle(int cx, int cy, int radius, color::ptr filling);
       virtual bool fill_rect(int x, int y, int w, int h, color::ptr filling);
 
       // get methods
@@ -125,15 +125,12 @@ namespace lev
 
       // stroke methods
       virtual bool stroke_circle(int x, int y, int radius, color *border, int width) { return false; }
-//      bool stroke_line(int x1, int y1, int x2, int y2, color *border, int width,
-//                       const std::string &style = "");
-      virtual bool stroke_line(int x1, int y1, int x2, int y2, boost::shared_ptr<color> c, int width,
+      virtual bool stroke_line(int x1, int y1, int x2, int y2, color::ptr c, int width,
                        const std::string &style = "");
-//      bool stroke_line6(int x1, int y1, int x2, int y2, color *border, int width)
-      virtual bool stroke_line6(int x1, int y1, int x2, int y2, boost::shared_ptr<color> c, int width)
+      virtual bool stroke_line6(int x1, int y1, int x2, int y2, color::ptr c, int width)
       { return stroke_line(x1, y1, x2, y2, c, width); }
 
-      virtual bool stroke_rect(int x, int y, int w, int h, color *border, int width) { return false; }
+      virtual bool stroke_rect(int x, int y, int w, int h, color::ptr border, int width);
 
       virtual canvas::ptr to_canvas() = 0;
   };

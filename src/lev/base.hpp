@@ -11,6 +11,7 @@
 // Licence:     MIT License
 /////////////////////////////////////////////////////////////////////////////
 
+#include <boost/shared_ptr.hpp>
 #include <luabind/luabind.hpp>
 #include <string>
 
@@ -24,6 +25,8 @@ namespace lev
   class base
   {
     public:
+      typedef boost::shared_ptr<base> ptr;
+
       enum type_id
       {
         LEV_TNONE = -1,
@@ -47,6 +50,11 @@ namespace lev
           LEV_TDRAWABLE_END,
 
           LEV_TEVENT,
+
+          LEV_TFILE,
+            LEV_TMEMFILE,
+          LEV_TFILE_END,
+
           LEV_TFILEPATH,
           LEV_TFONT,
           LEV_TMIXER,

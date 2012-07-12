@@ -266,7 +266,7 @@ namespace lev
       f = package::find_font0(system::get()->get_interpreter());
       if (f) { return f; }
     }
-    if (file_system::file_exists("default.ttf")) { f = font::load("default.ttf"); }
+    if (fs::is_file("default.ttf")) { f = font::load("default.ttf"); }
     return f;
   }
 
