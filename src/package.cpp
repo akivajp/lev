@@ -56,6 +56,7 @@ int luaopen_lev_package(lua_State *L)
   register_to(package, "dofile", &package::dofile_l);
   register_to(package, "require", &package::require_l);
 
+  lev["dofile"] = package["dofile"];
   lev["require"] = package["require"];
 
   globals(L)["package"]["loaded"]["lev.package"] = package;
@@ -65,6 +66,35 @@ int luaopen_lev_package(lua_State *L)
 
 namespace lev
 {
+
+  static int traceback (lua_State *L) {
+    if (!lua_isstring(L, 1))  /* 'message' not a string? */
+      return 1;  /* keep it intact */
+    lua_getfield(L, LUA_GLOBALSINDEX, "debug");
+    if (!lua_istable(L, -1)) {
+      lua_pop(L, 1);
+      return 1;
+    }
+    lua_getfield(L, -1, "traceback");
+    if (!lua_isfunction(L, -1)) {
+      lua_pop(L, 2);
+      return 1;
+    }
+    lua_pushvalue(L, 1);  /* pass error message */
+    lua_pushinteger(L, 2);  /* skip this function and traceback */
+    lua_call(L, 2, 1);  /* call debug.traceback */
+    return 1;
+  }
+
+  static int dobuffer(lua_State *L, const std::string &name, const std::string &data)
+  {
+    lua_pushcfunction(L, traceback);
+    int trace_pos = lua_gettop(L);
+    int result = luaL_loadbuffer(L, data.c_str(), data.length(), name.c_str())
+               || lua_pcall(L, 0, LUA_MULTRET, trace_pos);
+    lua_remove(L, trace_pos);
+    return result;
+  }
 
   static bool purge_path(std::string &path)
   {
@@ -150,10 +180,36 @@ namespace lev
     return 1;
   }
 
+  bool package::dofile(lua_State *L, const std::string &filename)
+  {
+    using namespace luabind;
+
+    file::ptr f = package::resolve(L, filename);
+    if (f)
+    {
+      std::string data;
+      if (! f->read_all(data))
+      {
+        return false;
+      }
+      if (dobuffer(L, filename.c_str(), data) != 0)
+      {
+        lev::debug_print(lua_tostring(L, -1));
+        return false;
+      }
+      return true;
+    }
+
+    lev::debug_print("cannnot open " + filename + ": No such file or     directory");
+    return true;
+  }
+
+
   int package::dofile_l(lua_State *L)
   {
     using namespace luabind;
 
+    int last_top = lua_gettop(L);
     luaL_checkstring(L, 1);
     std::string filename = object_cast<const char *>(object(from_stack(L, 1)));
 
@@ -163,15 +219,12 @@ namespace lev
     {
       std::string data;
       if (! f->read_all(data)) { return 0; }
-//      if (luaL_dofile(L, fpath->get_string().c_str()) != 0)
-      if (luaL_dostring(L, data.c_str()) != 0)
+      if (dobuffer(L, filename.c_str(), data) != 0)
       {
         lev::debug_print(lua_tostring(L, -1));
-        lua_pushnil(L);
-        return 1;
+        return 0;
       }
-      lua_pushboolean(L, true);
-      return 1;
+      return lua_gettop(L) - last_top;
     }
 
     luaL_error(L, ("cannnot open " + filename + ": No such file or directory").c_str());
@@ -311,15 +364,13 @@ namespace lev
       return 1;
     }
 
-    object path_list = package::get_path_list(L);
     file::ptr f = package::resolve(L, module);
     if (! f) { f = package::resolve(L, module + ".lua"); }
     if (f)
     {
       std::string data;
       if (! f->read_all(data)) { return 0; }
-//      if (luaL_dofile(L, fpath->get_string().c_str()))
-      if (luaL_dostring(L, data.c_str()))
+      if (dobuffer(L, module.c_str(), data.c_str()))
       {
         lev::debug_print(lua_tostring(L, -1));
         lua_pushnil(L);

@@ -81,6 +81,20 @@ namespace lev
       int w, h, descent;
   };
 
+  class clickable : public drawable
+  {
+    public:
+      typedef boost::shared_ptr<clickable> ptr;
+    protected:
+      clickable() : drawable() { }
+    public:
+      virtual ~clickable() { }
+      virtual type_id get_type_id() const { return LEV_TCLICKABLE; }
+      virtual bool on_left_down(int x, int y) = 0;
+      virtual bool on_left_up(int x, int y) = 0;
+      virtual bool on_motion(int x, int y) = 0;
+  };
+
   class canvas : public drawable
   {
     public:

@@ -54,32 +54,6 @@ static int traceback (lua_State *L) {
   return 1;
 }
 
-static int print_file_and_line(lua_State *L)
-{
-   lua_Debug d;
-   lua_getstack(L, 2, &d);
-   lua_getinfo(L, "Sln", &d);
-   std::string error_message =
-     (boost::format("error on lua script execution at %1%:%2%") % d.short_src % d.currentline).str();
-   lev::debug_print(error_message);
-   return 1;
-}
-
-static bool do_file(lua_State *L, const std::string &filename)
-{
-//    if (luaL_dofile(L, filename.c_str()))
-//    lua_pushcfunction(L, print_file_and_line);
-  lua_pushcfunction(L, traceback);
-  if (luaL_loadfile(L, filename.c_str()) || lua_pcall(L, 0, LUA_MULTRET, 1))
-  {
-    lev::debug_print(lua_tostring(L, -1));
-    return false;
-  }
-  lua_pop(L, 1);
-  return true;
-}
-
-
 static bool do_string(lua_State *L, const std::string &str)
 {
   if (luaL_dostring(L, str.c_str()))
@@ -138,7 +112,7 @@ static bool execute_path(lua_State *L, const std::string &path)
     {
       std::string filename = path + "/" + entry_files[i];
       if (! fs::is_file(filename)) { continue; }
-      do_file(L, filename);
+      package::dofile(L, filename);
       return true;
     }
   }
@@ -165,7 +139,7 @@ static bool execute_path(lua_State *L, const std::string &path)
   else
   {
     // given path is a regular file
-    do_file(L, path);
+    package::dofile(L, path);
     return true;
   }
 //  lev::debug_print((boost::format("Target %1% is not found.") % path).str());
@@ -236,7 +210,7 @@ int main(int argc, char **argv)
     {
       if (done_something) { break; }
       if (! fs::is_file(entry_files[i])) { continue; }
-      if (! do_file(L, entry_files[i])) { return -1; }
+      if (! package::dofile(L, entry_files[i])) { return -1; }
       done_something = true;
     }
   }

@@ -100,6 +100,7 @@ namespace lev
     public:
       virtual ~transition() { }
       static boost::shared_ptr<transition> create(boost::shared_ptr<drawable> img);
+      static boost::shared_ptr<transition> create_with_file(boost::shared_ptr<class file> f);
       static boost::shared_ptr<transition> create_with_path(boost::shared_ptr<filepath> path);
       static boost::shared_ptr<transition> create_with_string(const std::string &image_path);
       static boost::shared_ptr<transition> create0() { return create(boost::shared_ptr<drawable>()); }
@@ -114,12 +115,12 @@ namespace lev
                             const std::string &mode = "") = 0;
   };
 
-  class layout : public drawable
+  class layout : public clickable
   {
     public:
       typedef boost::shared_ptr<layout> ptr;
     protected:
-      layout() : drawable() { }
+      layout() : clickable() { }
     public:
       virtual ~layout() { }
       virtual bool clear() = 0;
@@ -132,13 +133,11 @@ namespace lev
       virtual boost::shared_ptr<class color> get_shade_color() = 0;
       virtual type_id get_type_id() const { return LEV_TLAYOUT; }
       virtual bool is_done() const = 0;
-      virtual bool on_hover(int x, int y) = 0;
-      virtual bool on_left_click(int x, int y) = 0;
       virtual bool rearrange() = 0;
       virtual bool reserve_clickable(drawable::ptr normal, drawable::ptr hover,
-                                     luabind::object lclick_func, luabind::object hover_func) = 0;
+                                     luabind::object lsingle_func, luabind::object hover_func) = 0;
       virtual bool reserve_clickable_text(const std::string &text,
-                                          luabind::object lclick_func, luabind::object hover_func) = 0;
+                                          luabind::object lsingle_func, luabind::object hover_func) = 0;
       virtual bool reserve_image(drawable::ptr img, bool auto_filling = true) = 0;
       bool reserve_image1(drawable::ptr img) { return reserve_image(img); }
       virtual bool reserve_new_line() = 0;

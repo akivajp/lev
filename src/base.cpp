@@ -74,8 +74,11 @@ namespace lev
               (*base_id_map)[LEV_TBITMAP]      = LEV_TCANVAS;
               (*base_id_map)[LEV_TSCREEN]      = LEV_TCANVAS;
             }
-            (*base_id_map)[LEV_TLAYOUT]     = LEV_TDRAWABLE;
-            (*base_id_map)[LEV_TMAP]        = LEV_TDRAWABLE;
+            (*base_id_map)[LEV_TCLICKABLE]  = LEV_TDRAWABLE;
+            {
+              (*base_id_map)[LEV_TLAYOUT]     = LEV_TCLICKABLE;
+              (*base_id_map)[LEV_TMAP]        = LEV_TCLICKABLE;
+            }
             (*base_id_map)[LEV_TSPACER]     = LEV_TDRAWABLE;
             (*base_id_map)[LEV_TTEXTURE]    = LEV_TDRAWABLE;
             (*base_id_map)[LEV_TTRANSITION] = LEV_TDRAWABLE;
@@ -136,6 +139,7 @@ namespace lev
         (*type_name_map)[LEV_TBASE]       = "lev.base";
         (*type_name_map)[LEV_TBITMAP]     = "lev.bitmap";
         (*type_name_map)[LEV_TCANVAS]     = "lev.canvas";
+        (*type_name_map)[LEV_TCLICKABLE]  = "lev.clickable";
         (*type_name_map)[LEV_TCOLOR]      = "lev.color";
         (*type_name_map)[LEV_TDEBUGGER]   = "lev.debugger";
         (*type_name_map)[LEV_TDRAWABLE]   = "lev.drawable";

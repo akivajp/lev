@@ -34,6 +34,7 @@ namespace lev
       static bool add_search(lua_State *L, const std::string &search);
       static int add_search_l(lua_State *L);
       static int clear_search_l(lua_State *L);
+      static bool dofile(lua_State *L, const std::string &filename);
       static int dofile_l(lua_State *L);
       static boost::shared_ptr<font> find_font(lua_State *L, const std::string &filename);
       static boost::shared_ptr<font> find_font0(lua_State *L);

@@ -508,11 +508,6 @@ namespace lev
         catch (...) { return -1; }
       }
 
-      virtual std::string get_string() const
-      {
-        return p.generic_string();
-      }
-
       virtual bool is_directory() const
       {
         return boost::filesystem::is_directory(p);
@@ -532,6 +527,11 @@ namespace lev
         catch (...) {
           return false;
         }
+      }
+
+      virtual std::string to_str() const
+      {
+        return p.generic_string();
       }
 
       boost::filesystem::path p;
@@ -930,8 +930,8 @@ int luaopen_lev_fs(lua_State *L)
         .property("parent_path", &filepath::get_parent)
 //        .property("path", &filepath::get_dir_path)
         .property("size", &filepath::get_size)
-        .property("str", &filepath::get_string)
-        .property("string", &filepath::get_string)
+        .property("str", &filepath::to_str)
+        .property("string", &filepath::to_str)
 //        .property("url", &filepath::get_url)
 //        .def("touch", &filepath::touch)
         .scope

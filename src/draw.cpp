@@ -257,7 +257,7 @@ int luaopen_lev_draw(lua_State *L)
   [
     namespace_("classes")
     [
-      class_<drawable, base, boost::shared_ptr<base> >("drawable")
+      class_<drawable, base, base::ptr>("drawable")
         .property("ascent", &drawable::get_ascent)
         .def("compile", &drawable::compile)
         .def("compile", &drawable::compile0)
@@ -274,7 +274,13 @@ int luaopen_lev_draw(lua_State *L)
         .def("texturize", &drawable::texturize0)
         .property("w", &drawable::get_w)
         .property("width", &drawable::get_w),
-      class_<canvas, drawable, boost::shared_ptr<drawable> >("canvas")
+      class_<clickable, drawable, drawable::ptr>("clickable")
+        .def("on_ldown", &clickable::on_left_down)
+        .def("on_left_down", &clickable::on_left_down)
+        .def("on_left_up", &clickable::on_left_up)
+        .def("on_lup", &clickable::on_left_up)
+        .def("on_motion", &clickable::on_motion),
+      class_<canvas, drawable, drawable::ptr>("canvas")
         .def("blit", &canvas::blit)
         .def("blit", &canvas::blit1)
         .def("blit", &canvas::blit2)

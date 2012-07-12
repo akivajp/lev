@@ -104,7 +104,6 @@ namespace lev
       virtual std::string get_extension() const = 0;
       virtual filepath::ptr get_parent() const = 0;
       virtual long get_size() const = 0;
-      virtual std::string get_string() const = 0;
       virtual type_id get_type_id() const { return LEV_TFILEPATH; }
       virtual bool is_directory() const = 0;
 //      bool is_dir_readable();
@@ -116,6 +115,7 @@ namespace lev
       virtual bool mkdir(bool force) = 0;
       bool mkdir0() { return mkdir(false); }
 //      bool touch();
+      virtual std::string to_str() const = 0;
   };
 
   class fs : public base

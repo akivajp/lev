@@ -477,7 +477,7 @@ namespace lev
 
       virtual bool open_path(filepath::ptr path)
       {
-        return open(path->get_string());
+        return open(path->to_str());
       }
 
       virtual bool open_and_play(const std::string &filename, bool repeat)

@@ -527,7 +527,7 @@ namespace lev
   bitmap::ptr bitmap::load_path(boost::shared_ptr<filepath> path)
   {
     if (! path) { return bitmap::ptr(); }
-    return impl_bitmap::load(path->get_string());
+    return impl_bitmap::load(path->to_str());
   }
 
 
@@ -753,7 +753,7 @@ namespace lev
           else if (t["lev.filepath1"])
           {
             filepath::ptr path = object_cast<filepath::ptr>(t["lev.filepath1"]);
-            lua_pushboolean(L, anim->append(bitmap::load(path->get_string()), duration));
+            lua_pushboolean(L, anim->append(bitmap::load(path->to_str()), duration));
           }
           else if (t["lev.file1"])
           {
@@ -1033,7 +1033,7 @@ namespace lev
           else if (t["lev.filepath1"])
           {
             filepath::ptr path = object_cast<filepath::ptr>(t["lev.filepath1"]);
-            result = tran->set_current(path->get_string());
+            result = tran->set_current(path->to_str());
           }
           else if (t["lua.string1"])
           {
@@ -1120,7 +1120,7 @@ namespace lev
           else if (t["lev.filepath1"])
           {
             filepath::ptr path = object_cast<filepath::ptr>(t["lev.filepath1"]);
-            result = tran->set_next(path->get_string(), duration, mode);
+            result = tran->set_next(path->to_str(), duration, mode);
           }
           else if (t["lua.string1"])
           {
@@ -1172,9 +1172,14 @@ namespace lev
     return impl_transition::create(img);
   }
 
+  transition::ptr transition::create_with_file(file::ptr f)
+  {
+    return impl_transition::create(bitmap::load_file(f));
+  }
+
   transition::ptr transition::create_with_path(filepath::ptr path)
   {
-    return create_with_string(path->get_string());
+    return create_with_string(path->to_str());
   }
 
   transition::ptr transition::create_with_string(const std::string &image_path)
@@ -1193,8 +1198,7 @@ namespace lev
       {
         item_type() :
           x(-1), y(-1), fixed(false),
-          img(), img_hover(), img_showing(),
-          func_hover(), func_lclick(),
+          func_hover(), func_lsingle(),
           auto_fill(true)
         { }
 
@@ -1202,7 +1206,7 @@ namespace lev
         drawable::ptr img_hover;
         drawable::ptr img_showing;
         luabind::object func_hover;
-        luabind::object func_lclick;
+        luabind::object func_lsingle;
         bool auto_fill;
         int x, y;
         bool fixed;
@@ -1451,7 +1455,57 @@ namespace lev
         return get_next_index() < 0;
       }
 
-      virtual bool on_hover(int x, int y)
+      virtual bool on_left_down(int x, int y)
+      {
+        using namespace luabind;
+
+        for (int i = 0; i < items.size(); i++)
+        {
+          item_type &item = items[i];
+
+          if (! item.img_hover) { continue; }
+          if (! item.img_showing) { continue; }
+
+          calc_position(i);
+          rect r(item.x, item.y, item.img->get_w(), item.img->get_h());
+          if (r.include(x, y))
+          {
+//            if (item.func_lsingle && type(item.func_lsingle) == LUA_TFUNCTION)
+//            {
+//              item.func_lsingle(x, y);
+//            }
+            return true;
+          }
+        }
+        return false;
+      }
+
+      virtual bool on_left_up(int x, int y)
+      {
+        using namespace luabind;
+
+        for (int i = 0; i < items.size(); i++)
+        {
+          item_type &item = items[i];
+
+          if (! item.img_hover) { continue; }
+          if (! item.img_showing) { continue; }
+
+          calc_position(i);
+          rect r(item.x, item.y, item.img->get_w(), item.img->get_h());
+          if (r.include(x, y) && item.img_showing == item.img_hover)
+          {
+            if (item.func_lsingle && type(item.func_lsingle) == LUA_TFUNCTION)
+            {
+              item.func_lsingle(x, y);
+            }
+            return true;
+          }
+        }
+        return false;
+      }
+
+      virtual bool on_motion(int x, int y)
       {
         using namespace luabind;
 
@@ -1488,31 +1542,6 @@ namespace lev
         return true;
       }
 
-      virtual bool on_left_click(int x, int y)
-      {
-        using namespace luabind;
-
-        for (int i = 0; i < items.size(); i++)
-        {
-          item_type &item = items[i];
-
-          if (! item.img_hover) { continue; }
-          if (! item.img_showing) { continue; }
-
-          calc_position(i);
-          rect r(item.x, item.y, item.img->get_w(), item.img->get_h());
-          if (r.include(x, y))
-          {
-            if (item.func_lclick && type(item.func_lclick) == LUA_TFUNCTION)
-            {
-              item.func_lclick(x, y);
-            }
-            return true;
-          }
-        }
-        return false;
-      }
-
       virtual bool rearrange()
       {
         for (int i = 0; i < items.size(); i++)
@@ -1529,7 +1558,7 @@ namespace lev
       virtual bool
         reserve_clickable(drawable::ptr normal,
                           drawable::ptr hover,
-                          luabind::object lclick_func,
+                          luabind::object lsingle_func,
                           luabind::object hover_func)
       {
         try {
@@ -1541,7 +1570,7 @@ namespace lev
           i.img = normal;
           i.img_hover = hover;
           i.func_hover = hover_func;
-          i.func_lclick = lclick_func;
+          i.func_lsingle = lsingle_func;
           texturized = false;
           return true;
         }
@@ -1552,7 +1581,7 @@ namespace lev
 
       virtual bool
         reserve_clickable_text(const std::string &text,
-                               luabind::object lclick_func,
+                               luabind::object lsingle_func,
                                luabind::object hover_func)
       {
         if (! font_text) { return false; }
@@ -1565,7 +1594,7 @@ namespace lev
           img->stroke_line(0, img->get_h() - 1,
                            img->get_w() - 1, img->get_h() - 1, color_fg, 1, "dot");
           hover_img = font_text->rasterize(text, hover_fg, hover_bg, color::ptr());
-          return reserve_clickable(img, hover_img, lclick_func, hover_func);
+          return reserve_clickable(img, hover_img, lsingle_func, hover_func);
         }
         catch (...) {
           return false;
@@ -1768,10 +1797,11 @@ int luaopen_lev_image(lua_State *L)
         [
           def("create", &transition::create),
           def("create", &transition::create0),
+          def("create", &transition::create_with_file),
           def("create", &transition::create_with_path),
           def("create", &transition::create_with_string)
         ],
-      class_<layout, drawable, boost::shared_ptr<drawable> >("layout")
+      class_<layout, clickable, clickable::ptr>("layout")
         .def("clear", &layout::clear)
         .property("color",  &layout::get_fg_color, &layout::set_fg_color)
         .def("complete", &layout::complete)
@@ -1780,9 +1810,6 @@ int luaopen_lev_image(lua_State *L)
         .property("font",  &layout::get_font, &layout::set_font)
         .property("fore",  &layout::get_fg_color, &layout::set_fg_color)
         .property("is_done", &layout::is_done)
-        .def("on_hover", &layout::on_hover)
-        .def("on_lclick", &layout::on_left_click)
-        .def("on_left_click", &layout::on_left_click)
         .def("rearrange", &layout::rearrange)
         .def("reserve_clickable", &layout::reserve_clickable)
         .def("reserve_clickable", &layout::reserve_clickable_text)

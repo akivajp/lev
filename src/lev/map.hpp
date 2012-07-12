@@ -23,12 +23,12 @@ extern "C" {
 namespace lev
 {
 
-  class map : public drawable
+  class map : public clickable
   {
     public:
       typedef boost::shared_ptr<map> ptr;
     protected:
-      map() : drawable() { }
+      map() : clickable() { }
     public:
       virtual ~map() { }
       virtual bool clear() = 0;
@@ -36,10 +36,8 @@ namespace lev
       virtual type_id get_type_id() const { return LEV_TMAP; }
       virtual bool map_image(drawable::ptr img, int x, int y, unsigned char alpha = 255) = 0;
       virtual bool map_link(drawable::ptr img, drawable::ptr hover_img,
-                            int x, int y, luabind::object on_lclick, luabind::object on_hover,
+                            int x, int y, luabind::object on_lsingle, luabind::object on_hover,
                             unsigned char alpha = 255) = 0;
-      virtual bool on_hover(int x, int y) = 0;
-      virtual bool on_left_click(int x, int y) = 0;
       virtual bool pop_back() = 0;
   };
 
